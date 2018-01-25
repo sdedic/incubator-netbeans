@@ -20,7 +20,10 @@
 package org.openide.util;
 
 import java.lang.ref.*;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1626,6 +1629,57 @@ class R extends Object implements Runnable {
         } finally {
             l.removeHandler(handler);
         }
+    }
+    
+    /**
+     * Checks that the CCL effective durign schedule() will be applied to the
+     * running task.
+     * 
+     * @throws Exception 
+     */
+    public void testTransferContextClassLoader() throws Exception {
+       RequestProcessor checkProcessor = new RequestProcessor(getName(), 2); 
+       ClassLoader save = Thread.currentThread().getContextClassLoader();
+       
+       ClassLoader ldr1 = new URLClassLoader(new URL[0], getClass().getClassLoader());
+       ClassLoader ldr2 = new URLClassLoader(new URL[0], getClass().getClassLoader());
+       
+       final CountDownLatch l = new CountDownLatch(3);
+       class Check implements Runnable {
+            volatile ClassLoader myClassLoader;
+
+            @Override
+            public void run() {
+                synchronized (RequestProcessorTest.this) {
+                    myClassLoader = Thread.currentThread().getContextClassLoader();
+                }
+                l.countDown();
+            }
+       }
+       try {
+           Check inst1 = new Check();
+           Check inst2 = new Check();
+           Check inst3 = new Check();
+           
+           Thread.currentThread().setContextClassLoader(ldr1);
+            // post 2 works, they should have ldr1 remembered and set. Block
+            // the works from completing by the mutex
+           synchronized (this) {
+               checkProcessor.post(inst1);
+               checkProcessor.post(inst2);
+               
+               Thread.currentThread().setContextClassLoader(ldr2);
+               checkProcessor.post(inst3);
+           }
+           
+           l.await(5, TimeUnit.SECONDS);
+           
+           assertSame(ldr1, inst1.myClassLoader);
+           assertSame(ldr1, inst2.myClassLoader);
+           assertSame(ldr2, inst3.myClassLoader);
+       } finally {
+           Thread.currentThread().setContextClassLoader(save);
+       }
     }
 
     private static void doGc (int count, Reference toClear) {

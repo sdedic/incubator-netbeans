@@ -601,7 +601,6 @@ public final class RequestProcessor implements ScheduledExecutorService {
                                 }
                             );
                         }
-                        proc.setContextClassLoader(item.ctxLoader);
                     }
                     proc.setName(name);
                     proc.attachTo(this);
@@ -623,7 +622,7 @@ public final class RequestProcessor implements ScheduledExecutorService {
         item.enqueued = true;
     }
 
-    Task askForWork(Processor worker, String debug, Lookup[] lkp) {
+    Task askForWork(Processor worker, String debug, Lookup[] lkp, ClassLoader[] ldr) {
         if (getQueue().isEmpty() || (stopped && !finishAwaitingTasks)) { // no more work in this burst, return him
             processors.remove(worker);
             Processor.put(worker, debug);
@@ -634,6 +633,7 @@ public final class RequestProcessor implements ScheduledExecutorService {
             getQueue().remove(i);
             Task t = i.getTask();
             lkp[0] = i.current;
+            ldr[0] = i.ctxLoader;
             i.clear(worker);
 
             return t;
@@ -2015,21 +2015,26 @@ outer:  do {
                 // while we have something to do
                 for (;;) {
                     Lookup[] lkp = new Lookup[1];
+                    ClassLoader[] ldr = new ClassLoader[1];
                     // need the same sync as interruptTask
                     synchronized (current.processorLock) {
-                        todo = current.askForWork(this, debug, lkp);
+                        todo = current.askForWork(this, debug, lkp, ldr);
                         if (todo == null) {
                             break;
                         }
                     }
                     setPrio(todo.getPriority());
-
+                    ClassLoader ccl = getContextClassLoader();
                     try {
                         procesing = current;
                         if (loggable) {
                             em.log(Level.FINE, "  Executing {0}", todo); // NOI18N
                         }
                         registerParallel(todo, current);
+                        if (ldr[0] != ccl) {
+                            em.log(Level.FINE, "  Switching context CL to {0}", ldr[0]);
+                            setContextClassLoader(ldr[0]);
+                        }
                         Lookups.executeWith(lkp[0], todo);
                         lkp[0] = null;
 
@@ -2053,6 +2058,10 @@ outer:  do {
                     } finally {
                         procesing = null;
                         unregisterParallel(todo, current);
+                        if (ccl != ldr[0]) {
+                            em.log(Level.FINE, "  Restoring context CL to {0}", ccl);
+                            setContextClassLoader(ccl);
+                        }
                     }
 
                     // need the same sync as interruptTask
