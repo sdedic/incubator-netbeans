@@ -58,5 +58,14 @@
     </target>
 
     <!-- Hook into harness "basic-init" task -->
-    <target name="-javac-init" depends="-prepare-patched-binary, projectized-common.-javac-init" />
+    <target name="-release.dir" depends="projectized-common.-release.dir,-define-downloadbinaries-task">
+        <downloadbinaries cache="${binaries.cache}" server="${binaries.server}">
+            <manifest dir=".">
+                <include name="external/binaries-list"/>
+            </manifest>
+        </downloadbinaries>
+        <antcall target="-prepare-patched-binary"/>
+        <taskdef name="releasefilesextra" classname="org.netbeans.nbbuild.extlibs.ReleaseFilesExtra" classpath="${nbantext.jar}"/>
+        <releasefilesextra property="release.files.extra"/>
+    </target>
 </project>
