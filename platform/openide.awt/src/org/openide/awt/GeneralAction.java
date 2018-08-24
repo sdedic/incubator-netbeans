@@ -251,7 +251,7 @@ final class GeneralAction {
                 return;
             }
             Action pa = prev.get(key);
-            Action na = now.get(key);
+            Action na = now == null ? null : now.get(key);
             if (pa == na) {
                 return;
             }
