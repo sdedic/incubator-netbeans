@@ -55,6 +55,8 @@ import java.util.TreeSet;
 import java.util.WeakHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.jar.Manifest;
 import java.util.logging.Level;
 import org.openide.modules.Dependency;
@@ -940,6 +942,10 @@ public final class ModuleManager extends Modules {
         return shouldDelegateResource(m, parent, pkg, null);
     }
     
+    AtomicLong  completeTimer = new AtomicLong(0);
+    AtomicLong  bootstrapTimer = new AtomicLong(0);
+    AtomicInteger  bootstrapCounter = new AtomicInteger(0);
+    
     /**
      * Determines if module `m' should delegate loading resources from package `p' to the
      * `parent'. The parent is identified either by module specification (parent) or by a classloader
@@ -957,10 +963,27 @@ public final class ModuleManager extends Modules {
      */
     public boolean shouldDelegateResource(Module m, Module parent, String pkg, ClassLoader ldr) {
         // Cf. #19621:
+        long t = System.nanoTime();
+        try {
+           return shouldDelegateResource0(m, parent, pkg, ldr);
+        } finally {
+            completeTimer.addAndGet(System.nanoTime() - t);
+        }
+    }
+    
+    public void reportTimes() {
+        System.err.println("Total time spent in shouldDelegateResources: " + (completeTimer.get() / 1000));
+        System.err.println("Number of bootstrap accesses: " + bootstrapCounter.get());
+        System.err.println("Extra time for bootstrap restrictions: " + (bootstrapTimer.get() / 1000));
+    }
+    
+    boolean shouldDelegateResource0(Module m, Module parent, String pkg, ClassLoader ldr) {
         Module.PackageExport[] exports;
         if (parent != null) {
             exports = parent.getPublicPackages();
         } else if (ldr != null) {
+            bootstrapCounter.incrementAndGet();
+            long t = System.nanoTime();
             Collection<Module> loaderMods = null;
             synchronized (this) {
                 // create exports from modules for that classloader
@@ -984,13 +1007,18 @@ public final class ModuleManager extends Modules {
                     cbn.add(d.getName());
                 }
             }
-            if (loaderMods != null) {
-                for (Module lm : loaderMods) {
-                    if (cbn.remove(lm.getCodeName()) && shouldDelegateResource(m, lm, pkg, ldr)) {
-                        return true;
+            try {
+                if (loaderMods != null) {
+                    for (Module lm : loaderMods) {
+                        if (cbn.remove(lm.getCodeName()) && shouldDelegateResource(m, lm, pkg, ldr)) {
+                            return true;
+                        }
                     }
+                    return false;
                 }
-                return false;
+            } finally {
+                long t2 = System.nanoTime();
+                bootstrapTimer.addAndGet(t2 - t);
             }
             exports = null;
         } else {
@@ -1454,6 +1482,7 @@ public final class ModuleManager extends Modules {
         }
         ev.log(Events.FINISH_ENABLE_MODULES, toEnable);
         firer.fire();
+        reportTimes();
     }
 
     /** Disable a set of modules together.
@@ -2230,6 +2259,7 @@ public final class ModuleManager extends Modules {
      * @since 2.56
      */
     public Future<Boolean> shutDownAsync(Runnable midHook) {
+        reportTimes();
         assertWritable();
         Set<Module> unorderedModules = getEnabledModules();
         Map<String, Set<Module>> providersMap = new HashMap<String, Set<Module>>();
