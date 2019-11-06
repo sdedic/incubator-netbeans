@@ -46,6 +46,7 @@ import org.netbeans.modules.java.freeform.jdkselection.JdkConfiguration;
 import org.netbeans.modules.java.freeform.ui.ProjectModel;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.AuxiliaryConfiguration;
+import org.netbeans.spi.project.SingleMethod;
 import org.netbeans.spi.project.support.ant.AntProjectHelper;
 import org.netbeans.spi.project.support.ant.PropertyEvaluator;
 import org.netbeans.spi.project.support.ant.PropertyUtils;
@@ -97,7 +98,9 @@ final class JavaActions implements ActionProvider {
         ActionProvider.COMMAND_PROFILE,
         ActionProvider.COMMAND_RUN_SINGLE,
         ActionProvider.COMMAND_DEBUG_SINGLE,
-        ActionProvider.COMMAND_PROFILE_SINGLE
+        ActionProvider.COMMAND_PROFILE_SINGLE,
+        ActionProvider.COMMAND_TEST_SINGLE,
+        ActionProvider.COMMAND_DEBUG_TEST_SINGLE
         // XXX more
     };
     
@@ -148,6 +151,10 @@ final class JavaActions implements ActionProvider {
             return (findPackageRoot(context) != null) && isSingleJavaFileSelected(context);
         } else if (command.equals(ActionProvider.COMMAND_PROFILE_SINGLE)) {
             return (findPackageRoot(context) != null) && isSingleJavaFileSelected(context);
+        } else if (command.equals(ActionProvider.COMMAND_TEST_SINGLE)) {
+            return (findPackageRoot(context) != null) && isSingleJavaFileSelected(context);
+        } else if (command.equals(ActionProvider.COMMAND_DEBUG_TEST_SINGLE)) {
+            return (findPackageRoot(context) != null) && isSingleJavaFileSelected(context);
         } else {
             throw new IllegalArgumentException(command);
         }
@@ -170,6 +177,10 @@ final class JavaActions implements ActionProvider {
                             handleDebugSingle(context);
                         } else if (command.equals(ActionProvider.COMMAND_PROFILE_SINGLE)) {
                             handleProfileSingle(context);
+//                        } else if (command.equals(ActionProvider.COMMAND_TEST_SINGLE)) {
+//                            handleTestSingle(context);
+                        } else if (command.equals(ActionProvider.COMMAND_DEBUG_TEST_SINGLE)) {
+                            handleDebugTestSingleMethod(context);
                         } else {
                             throw new IllegalArgumentException(command);
                         }
@@ -930,38 +941,24 @@ final class JavaActions implements ActionProvider {
     //Used to add <ide-actions> at the correct place.
     private static final String[] rootElementsOrder = {"name", "properties", "folders", "ide-actions", "export", "view", "subprojects"}; // NOI18N
     
-    /**
-     * Add an action binding to project.xml.
-     * If there is no required context, the action is also added to the context menu of the project node.
-     * @param command the command name
-     * @param scriptPath the path to the generated script
-     * @param target the name of the target (in scriptPath)
-     * @param propertyName a property name to hold the selection (or null for no context, in which case remainder should be null)
-     * @param dir the raw text to use for the directory name
-     * @param pattern the regular expression to match, or null
-     * @param format the format to use
-     * @param separator the separator to use for multiple files, or null for single file only
-     */
-    void addBinding(String command, String scriptPath, String target, String propertyName, String dir, String pattern, String format, String separator) throws IOException {
-        // XXX cannot use FreeformProjectGenerator since that is currently not a public support SPI from ant/freeform
-        // XXX should this try to find an existing binding? probably not, since it is assumed that if there was one, we would never get here to begin with
-        Element data = Util.getPrimaryConfigurationData(helper);
-        Element ideActions = XMLUtil.findElement(data, "ide-actions", Util.NAMESPACE); // NOI18N
-        if (ideActions == null) {
-            //fix for #58442:
-            ideActions = data.getOwnerDocument().createElementNS(Util.NAMESPACE, "ide-actions"); // NOI18N
-            XMLUtil.appendChildElement(data, ideActions, rootElementsOrder);
+    private class BindingBuilder {
+        private final String command;
+        private final Document doc;
+        private final Element action;
+        private final Element data;
+        private final Element ideActions;
+        
+        private boolean propertyAdded;
+
+        public BindingBuilder(String command, Document doc, Element action, Element data, Element ideActions) {
+            this.command = command;
+            this.doc = doc;
+            this.action = action;
+            this.data = data;
+            this.ideActions = ideActions;
         }
-        Document doc = data.getOwnerDocument();
-        Element action = doc.createElementNS(Util.NAMESPACE, "action"); // NOI18N
-        action.setAttribute("name", command); // NOI18N
-        Element script = doc.createElementNS(Util.NAMESPACE, "script"); // NOI18N
-        script.appendChild(doc.createTextNode(scriptPath));
-        action.appendChild(script);
-        Element targetEl = doc.createElementNS(Util.NAMESPACE, "target"); // NOI18N
-        targetEl.appendChild(doc.createTextNode(target));
-        action.appendChild(targetEl);
-        if (propertyName != null) {
+
+        public void addProperty(String propertyName, String dir, String pattern, String format, String separator) throws IOException {
             Element context = doc.createElementNS(Util.NAMESPACE, "context"); // NOI18N
             Element property = doc.createElementNS(Util.NAMESPACE, "property"); // NOI18N
             property.appendChild(doc.createTextNode(propertyName));
@@ -987,7 +984,14 @@ final class JavaActions implements ActionProvider {
             }
             context.appendChild(arity);
             action.appendChild(context);
-        } else {
+            
+            propertyAdded = true;
+        }
+        
+        private void addProjectAction() {
+            if (propertyAdded) {
+                return;
+            }
             // Add a context menu item, since it applies to the project as a whole.
             // Assume there is already a <context-menu> defined, which is quite likely.
             Element view = XMLUtil.findElement(data, "view", Util.NAMESPACE); // NOI18N
@@ -1000,9 +1004,56 @@ final class JavaActions implements ActionProvider {
                 }
             }
         }
-        ideActions.appendChild(action);
-        Util.putPrimaryConfigurationData(helper, data);
-        ProjectManager.getDefault().saveProject(project);
+
+        public void build() throws IOException {
+            addProjectAction();
+            ideActions.appendChild(action);
+            Util.putPrimaryConfigurationData(helper, data);
+            ProjectManager.getDefault().saveProject(project);
+        }
+    }
+    
+    BindingBuilder bindingBuilder(String command, String scriptPath, String target) {
+        // XXX cannot use FreeformProjectGenerator since that is currently not a public support SPI from ant/freeform
+        // XXX should this try to find an existing binding? probably not, since it is assumed that if there was one, we would never get here to begin with
+        Element data = Util.getPrimaryConfigurationData(helper);
+        Element ideActions = XMLUtil.findElement(data, "ide-actions", Util.NAMESPACE); // NOI18N
+        if (ideActions == null) {
+            //fix for #58442:
+            ideActions = data.getOwnerDocument().createElementNS(Util.NAMESPACE, "ide-actions"); // NOI18N
+            XMLUtil.appendChildElement(data, ideActions, rootElementsOrder);
+        }
+        Document doc = data.getOwnerDocument();
+        Element action = doc.createElementNS(Util.NAMESPACE, "action"); // NOI18N
+        action.setAttribute("name", command); // NOI18N
+        Element script = doc.createElementNS(Util.NAMESPACE, "script"); // NOI18N
+        script.appendChild(doc.createTextNode(scriptPath));
+        action.appendChild(script);
+        Element targetEl = doc.createElementNS(Util.NAMESPACE, "target"); // NOI18N
+        targetEl.appendChild(doc.createTextNode(target));
+        action.appendChild(targetEl);
+        
+        return new BindingBuilder(command, doc, action, data, ideActions);
+    }
+    
+    /**
+     * Add an action binding to project.xml.
+     * If there is no required context, the action is also added to the context menu of the project node.
+     * @param command the command name
+     * @param scriptPath the path to the generated script
+     * @param target the name of the target (in scriptPath)
+     * @param propertyName a property name to hold the selection (or null for no context, in which case remainder should be null)
+     * @param dir the raw text to use for the directory name
+     * @param pattern the regular expression to match, or null
+     * @param format the format to use
+     * @param separator the separator to use for multiple files, or null for single file only
+     */
+    void addBinding(String command, String scriptPath, String target, String propertyName, String dir, String pattern, String format, String separator) throws IOException {
+        BindingBuilder bb = bindingBuilder(command, scriptPath, target);
+        if (propertyName != null) {
+            bb.addProperty(propertyName, dir, pattern, format, separator);
+        }
+        bb.build();
     }
 
     /**
@@ -1254,6 +1305,26 @@ final class JavaActions implements ActionProvider {
         jumpToBuildScript(FILE_SCRIPT_PATH, targetName);
     }
     
+    private void handleDebugTestSingleMethod(Lookup context) throws IOException, SAXException {
+        if (!alert(NbBundle.getMessage(JavaActions.class, "ACTION_debug.test.single.method"), GENERAL_SCRIPT_PATH)) {
+            return;
+        }
+        Document doc = readCustomScript(FILE_SCRIPT_PATH);
+        AntLocation root = handleInitials(doc, context);
+        assert root != null : context;
+        String propertyName = "debug.class"; // NOI18N
+        String targetName = "debug-selected-file-method-in-" + root.physical.getNameExt(); // NOI18N
+        Element targetElem = createDebugSingleTargetElem(doc, targetName, propertyName, root);
+        doc.getDocumentElement().appendChild(targetElem);
+        writeCustomScript(doc, GENERAL_SCRIPT_PATH);
+        
+        BindingBuilder bb = bindingBuilder(SingleMethod.COMMAND_DEBUG_SINGLE_METHOD, FILE_SCRIPT_PATH, targetName);
+        bb.addProperty(propertyName, root.virtual, JAVA_FILE_PATTERN, "java-name", null);
+        
+        jumpToBinding(ActionProvider.COMMAND_DEBUG_SINGLE);
+        jumpToBuildScript(GENERAL_SCRIPT_PATH, targetName);
+    }
+    
     private void handleProfileSingle(Lookup context) throws IOException, SAXException {
         if (!alert(NbBundle.getMessage(JavaActions.class, "ACTION_profile.single"), FILE_SCRIPT_PATH)) { // NOI18N
             return;
@@ -1306,6 +1377,50 @@ final class JavaActions implements ActionProvider {
     }
 
     Element createDebugSingleTargetElem(Document doc, String tgName,
+                String propName, AntLocation root) throws IOException, SAXException {
+
+        Element targetElem = doc.createElement("target"); // NOI18N
+        addJdkInitDeps(targetElem);
+        targetElem.setAttribute("name", tgName); // NOI18N
+        Element failElem = doc.createElement("fail"); // NOI18N
+        failElem.setAttribute("unless", propName); // NOI18N
+        failElem.appendChild(doc.createTextNode(NbBundle.getMessage(JavaActions.class,
+                "COMMENT_must_set_property", propName)));
+        targetElem.appendChild(failElem);
+
+        String depends[] = getRunDepends();
+        if (depends != null) {
+            targetElem.appendChild(createAntElem(doc, depends[0], depends[1]));
+        }
+
+        Element pElem = getPathFromCU(doc, root.virtual, "path"); // NOI18N
+        pElem.setAttribute("id", "cp"); // NOI18N
+        // add comment only if there is no definition
+        if (pElem.getChildNodes().getLength() == 0) {
+            pElem.appendChild(doc.createComment(" " + NbBundle.getMessage(JavaActions.class,
+                    "COMMENT_set_runtime_cp") + " "));
+        }
+        targetElem.appendChild(pElem);
+
+        Element nbjpdastartElem = createNbjpdastart(doc);
+        Element cpElem = doc.createElement("classpath"); // NOI18N
+        cpElem.setAttribute("refid", "cp"); // NOI18N
+        nbjpdastartElem.appendChild(cpElem);
+        targetElem.appendChild(nbjpdastartElem);
+
+        Element javaElem = doc.createElement("java"); // NOI18N
+        javaElem.setAttribute("classname", "${" + propName + "}"); // NOI18N
+
+        cpElem = doc.createElement("classpath"); // NOI18N
+        cpElem.setAttribute("refid", "cp"); // NOI18N
+        javaElem.appendChild(cpElem);
+        addDebugVMArgs(javaElem, doc);
+
+        targetElem.appendChild(javaElem);
+        return targetElem;
+    }
+    
+    Element createDebugSingleMethodTargetElem(Document doc, String tgName,
                 String propName, AntLocation root) throws IOException, SAXException {
 
         Element targetElem = doc.createElement("target"); // NOI18N
