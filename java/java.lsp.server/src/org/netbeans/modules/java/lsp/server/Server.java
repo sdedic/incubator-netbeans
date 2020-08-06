@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.eclipse.lsp4j.CompletionOptions;
@@ -59,6 +60,7 @@ import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.api.project.Sources;
 import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.api.sendopts.CommandException;
+import org.netbeans.modules.java.lsp.server.debugging.Debugger;
 import org.netbeans.modules.java.lsp.server.text.TextDocumentServiceImpl;
 import org.netbeans.modules.java.lsp.server.workspace.WorkspaceServiceImpl;
 import org.netbeans.spi.sendopts.Arg;
@@ -67,6 +69,7 @@ import org.netbeans.spi.sendopts.Description;
 import org.netbeans.spi.sendopts.Env;
 import org.netbeans.spi.sendopts.Option;
 import org.netbeans.spi.sendopts.OptionProcessor;
+import org.openide.LifecycleManager;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Lookup;
 import org.openide.util.NbBundle.Messages;
@@ -115,7 +118,9 @@ public class Server implements ArgsProcessor {
         LanguageServerImpl server = new LanguageServerImpl();
         Launcher<LanguageClient> serverLauncher = LSPLauncher.createServerLauncher(server, in, out);
         ((LanguageClientAware) server).connect(serverLauncher.getRemoteProxy());
-        serverLauncher.startListening().get();
+        Future<Void> runningServer = serverLauncher.startListening();
+        Debugger.startDebugger();
+        runningServer.get();
     }
 
     private static class LanguageServerImpl implements LanguageServer, LanguageClientAware {

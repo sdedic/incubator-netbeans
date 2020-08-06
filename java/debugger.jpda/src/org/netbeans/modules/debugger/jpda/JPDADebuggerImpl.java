@@ -62,6 +62,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.Refreshable;
@@ -1243,7 +1244,15 @@ public class JPDADebuggerImpl extends JPDADebugger {
         this.attachingCookie = cookie;
     }
 
+    Consumer<VirtualMachine> callback;
+    public void setRunningCallback(Consumer<VirtualMachine> callback) {
+        this.callback = callback;
+    }
     public void setRunning (VirtualMachine vm, Operator o) {
+        if (callback != null) {
+            callback.accept(vm);
+            return ;
+        }
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Start - JPDADebuggerImpl.setRunning ()");
             JPDAUtils.printFeatures (logger, vm);

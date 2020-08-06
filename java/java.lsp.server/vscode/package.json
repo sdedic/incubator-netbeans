@@ -14,10 +14,11 @@
 		"multi-root ready"
 	],
 	"engines": {
-		"vscode": "^1.26.0"
+		"vscode": "^1.30.0"
 	},
 	"activationEvents": [
-		"onLanguage:java"
+		"onLanguage:java",
+                "onDebug"
 	],
 	"main": "./out/extension",
 	"scripts": {
@@ -34,7 +35,8 @@
 		"vscode": "1.1.36"
 	},
 	"dependencies": {
-		"vscode-languageclient": "4.4.2"
+		"vscode-languageclient": "4.4.2",
+                "vscode-debugadapter": "1.33.0"
 	},
         "contributes": {
             "configuration": {
@@ -46,6 +48,18 @@
                          "description": "Specifies the JDK on which the Java language server should be run"
                     }
                 }
-            }
+            },
+            "breakpoints": [{ "language": "java" }],
+            "debuggers": [{
+                "type": "java",
+                "label": "Java (NetBeans)",
+                "runtime": "node",
+                "initialConfigurations": [{
+                    "type": "java",
+                    "request": "launch",
+                    "name": "Java (NetBeans)",
+                    "program": "${file}"
+                }]
+            }]
         }
 }
