@@ -25,10 +25,10 @@ let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
     //verify acceptable JDK is available/set:
-    let specifiedJDK: string = workspace.getConfiguration('netbeans').get('jdkhome');
+    let specifiedJDK = workspace.getConfiguration('netbeans').get('jdkhome');
 
     try {
-        let targetJava = specifiedJDK != null ? specifiedJDK + '/bin/java' : 'java';
+        let targetJava = specifiedJDK ? specifiedJDK + '/bin/java' : 'java';
         execSync(targetJava + ' ' + context.extensionPath + '/src/VerifyJDK14.java');
     } catch (e) {
         window.showErrorMessage('The Java language server needs a JDK 14 to run, but none found. Please configure it under File/Preferences/Settings/Extensions/Java and restart VS Code.');
@@ -38,8 +38,8 @@ export function activate(context: ExtensionContext) {
 
     let serverOptions: ServerOptions;
     let args: string[] = [];
-    if (specifiedJDK != null) {
-        args = ['--jdkhome', specifiedJDK];
+    if (specifiedJDK) {
+        args = ['--jdkhome', specifiedJDK as string];
     }
     serverOptions = {
         command: serverPath,
@@ -83,7 +83,7 @@ export function activate(context: ExtensionContext) {
 
 export function deactivate(): Thenable<void> {
 	if (!client) {
-		return undefined;
+		return Promise.resolve();
 	}
 	return client.stop();
 }
