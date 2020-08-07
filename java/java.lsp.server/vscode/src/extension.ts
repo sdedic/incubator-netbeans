@@ -1,12 +1,21 @@
-/* --------------------------------------------------------------------------------------------
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License. See License.txt in the project root for license information.
- * ------------------------------------------------------------------------------------------ */
-/*Heavily influenced by the extension for Kotlin Language Server which is:
- * Copyright (c) 2016 George Fraser
- * Copyright (c) 2018 fwcd
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
-/*Also based on the vscode-mock-debug.*/
 'use strict';
 
 import { window, workspace, ExtensionContext } from 'vscode';
@@ -18,8 +27,10 @@ import {
 } from 'vscode-languageclient';
 
 import * as path from 'path';
+import { execSync, spawn } from 'child_process';
+import { resolve } from 'path';
+import { rejects } from 'assert';
 import * as vscode from 'vscode';
-import { execSync } from 'child_process';
 
 let client: LanguageClient;
 
@@ -37,48 +48,103 @@ export function activate(context: ExtensionContext) {
     let serverPath = path.resolve(context.extensionPath, "nb-java-lsp-server", "bin", "nb-java-lsp-server");
 
     let serverOptions: ServerOptions;
-    let args: string[] = [];
+    let ideArgs: string[] = [];
     if (specifiedJDK) {
-        args = ['--jdkhome', specifiedJDK as string];
+        ideArgs = ['--jdkhome', specifiedJDK as string];
     }
+    let serverArgs: string[] = new Array<string>(...ideArgs);
+    serverArgs.push("--start-java-language-server");
+
     serverOptions = {
         command: serverPath,
-        args: args,
-        options: { cwd: workspace.rootPath }
+        args: serverArgs,
+        options: { cwd: workspace.rootPath },
+
     }
 
-    // Options to control the language client
-    let clientOptions: LanguageClientOptions = {
-        // Register the server for java documents
-        documentSelector: ['java'],
-        synchronize: {
-            configurationSection: 'java',
-            fileEvents: [
-                workspace.createFileSystemWatcher('**/*.java')
-            ]
-        },
-        outputChannelName: 'Java',
-        revealOutputChannelOn: 4 // never
-    }
+    // give the process some reasonable command
+    ideArgs.push("--modules");
+    ideArgs.push("--list");
 
-    // Create the language client and start the client.
-    client = new LanguageClient(
-            'java',
-            'NetBeans Java',
-            serverOptions,
-            clientOptions
-    );
+    let log = vscode.window.createOutputChannel("Java Language Server");
+    log.show(true);
+    log.appendLine("Launching Java Language Server");
+    vscode.window.showInformationMessage("Launching Java Language Server");
 
-    // Start the client. This will also launch the server
-    client.start();
+    let ideRunning = new Promise((resolve, reject) => {
+        let collectedText : string | null = '';
+        function logAndWaitForEnabled(text: string) {
+            log.append(text);
+            if (collectedText == null) {
+                return;
+            }
+            collectedText += text;
+            if (collectedText.match(/org.netbeans.modules.java.lsp.server.*Enabled/)) {
+                resolve(text);
+                collectedText = null;
+            }
+        }
 
-    //register debugger:
-    let configProvider = new NetBeansConfigurationProvider();
-    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('java', configProvider));
+        let nb = spawn(serverPath, ideArgs, {
+            stdio : ["ignore", "pipe", "pipe"]
+        });
+        nb.stdout.on('data', function(d: any) {
+            logAndWaitForEnabled(d.toString());
+        });
+        nb.stderr.on('data', function(d: any) {
+            logAndWaitForEnabled(d.toString());
+        });
+        nb.on('close', function(code: number) {
+            if (code != 0) {
+                vscode.window.showWarningMessage("Java Language Server exited with " + code);
+            }
+            log.appendLine("");
+            if (collectedText != null) {
+                reject("Exit code " + code);
+            } else {
+                log.appendLine("Exit code " + code);
+            }
+        });
+    });
 
-    let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory();
-    context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('java', debugDescriptionFactory));
-    window.showErrorMessage('NB debug - all setup.');
+    ideRunning.then((value) => {
+        // Options to control the language client
+        let clientOptions: LanguageClientOptions = {
+            // Register the server for java documents
+            documentSelector: ['java'],
+            synchronize: {
+                configurationSection: 'java',
+                fileEvents: [
+                    workspace.createFileSystemWatcher('**/*.java')
+                ]
+            },
+            outputChannelName: 'Java',
+            revealOutputChannelOn: 4 // never
+        }
+
+        // Create the language client and start the client.
+        client = new LanguageClient(
+                'java',
+                'NetBeans Java',
+                serverOptions,
+                clientOptions
+        );
+
+        // Start the client. This will also launch the server
+        client.start();
+
+        //register debugger:
+        let configProvider = new NetBeansConfigurationProvider();
+        context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('java', configProvider));
+
+        let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory();
+        context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('java', debugDescriptionFactory));
+        window.showErrorMessage('NB debug - all setup.');
+    }).catch((reason) => {
+        log.append(reason);
+        window.showErrorMessage('Error initializing ' + reason);
+    });
+
 }
 
 export function deactivate(): Thenable<void> {
