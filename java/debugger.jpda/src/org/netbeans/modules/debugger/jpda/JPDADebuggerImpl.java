@@ -1251,7 +1251,6 @@ public class JPDADebuggerImpl extends JPDADebugger {
     public void setRunning (VirtualMachine vm, Operator o) {
         if (callback != null) {
             callback.accept(vm);
-            return ;
         }
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Start - JPDADebuggerImpl.setRunning ()");
