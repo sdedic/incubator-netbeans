@@ -32,8 +32,11 @@
         <copy todir="${lsp.build.dir}/extide" failonerror="false">
             <fileset dir="${netbeans.dest.dir}/extide" />
         </copy>
+        <copy todir="${lsp.build.dir}/webcommon" failonerror="false">
+            <fileset dir="${netbeans.dest.dir}/webcommon" includes="**/*truffle*api*"/>
+        </copy>
         <copy todir="${lsp.build.dir}/java" failonerror="false">
-            <fileset dir="${netbeans.dest.dir}/java" excludes="**/org-netbeans-modules-java-hints-test.jar,**/org-netbeans-modules-debugger-jpda-truffle.jar" />
+            <fileset dir="${netbeans.dest.dir}/java" excludes="**/org-netbeans-modules-java-hints-test.jar" />
         </copy>
         <mkdir dir="${lsp.build.dir}/bin" />
         <copy todir="${lsp.build.dir}/bin" file="script/bin/nb-java-lsp-server" />
