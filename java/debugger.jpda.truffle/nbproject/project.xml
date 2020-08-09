@@ -269,7 +269,11 @@
                     </test-dependency>
                 </test-type>
             </test-dependencies>
-            <public-packages/>
+            <public-packages>
+                <package>org.netbeans.modules.debugger.jpda.truffle.api</package>
+                <package>org.netbeans.modules.debugger.jpda.truffle.frames</package>
+                <package>org.netbeans.modules.debugger.jpda.truffle.source</package>
+            </public-packages>
             <extra-compilation-unit>
                 <package-root>truffle-backend</package-root>
                 <classpath>${module.classpath}:${truffle-backend.cp.extra}</classpath>

@@ -60,6 +60,7 @@ import com.sun.jdi.connect.Transport;
 import com.sun.jdi.connect.VMStartException;
 import com.sun.jdi.connect.spi.Connection;
 import com.sun.jdi.event.EventQueue;
+import com.sun.jdi.event.EventSet;
 import com.sun.jdi.request.EventRequestManager;
 import com.sun.source.util.TreePath;
 import io.reactivex.Observable;
@@ -887,6 +888,10 @@ public class Debugger {
 
             if (source != null) {
                 return source.toURI().toString();
+            }
+            
+            if (new File(fileName).exists()) {
+                return fileName;
             }
 
             return null;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.netbeans.modules.debugger.jpda.truffle.frames.models;
+package org.netbeans.modules.debugger.jpda.truffle.api;
 
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
@@ -80,12 +80,18 @@ public class DebuggingTruffleTreeModel implements TreeModelFilter {
     public Object[] getChildren(TreeModel original, Object parent, int from, int to) throws UnknownTypeException {
         Object[] children = original.getChildren(parent, from, to);
         if (parent instanceof DebuggingView.DVThread && children.length > 0) {
-            CurrentPCInfo currentPCInfo = TruffleAccess.getCurrentPCInfo(((WeakCacheMap.KeyedValue<JPDAThread>) parent).getKey());
-            if (currentPCInfo != null) {
-                boolean showInternalFrames = TruffleOptions.isLanguageDeveloperMode();
-                TruffleStackFrame[] stackFrames = currentPCInfo.getStack().getStackFrames(showInternalFrames);
-                children = filterAndAppend(children, stackFrames, currentPCInfo.getTopFrame());
-            }
+            final JPDAThread currentThread = ((WeakCacheMap.KeyedValue<JPDAThread>) parent).getKey();
+            children = filterAndAppend(currentThread, children);
+        }
+        return children;
+    }
+
+    public static Object[] filterAndAppend(final JPDAThread currentThread, Object[] children) {
+        CurrentPCInfo currentPCInfo = TruffleAccess.getCurrentPCInfo(currentThread);
+        if (currentPCInfo != null) {
+            boolean showInternalFrames = TruffleOptions.isLanguageDeveloperMode();
+            TruffleStackFrame[] stackFrames = currentPCInfo.getStack().getStackFrames(showInternalFrames);
+            children = filterAndAppend(children, stackFrames, currentPCInfo.getTopFrame());
         }
         return children;
     }
@@ -118,7 +124,7 @@ public class DebuggingTruffleTreeModel implements TreeModelFilter {
         }
     }
 
-    private Object[] filterAndAppend(Object[] children, TruffleStackFrame[] stackFrames,
+    private static Object[] filterAndAppend(Object[] children, TruffleStackFrame[] stackFrames,
                                      TruffleStackFrame topFrame) {
         List<Object> newChildren = new ArrayList<>(children.length);
         //newChildren.addAll(Arrays.asList(children));
