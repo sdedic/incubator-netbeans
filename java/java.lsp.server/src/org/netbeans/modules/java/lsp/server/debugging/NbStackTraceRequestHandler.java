@@ -18,8 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-
 import java.io.File;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -133,10 +131,14 @@ public class NbStackTraceRequestHandler implements IDebugRequestHandler {
 
                 int count = stacktraceArgs.levels == 0 ? totalFrames - stacktraceArgs.startFrame
                         : Math.min(totalFrames - stacktraceArgs.startFrame, stacktraceArgs.levels);
-                for (int i = startFrame; i < frames.length && count-- > 0; i++) {
+                for (int i = startFrame; i < frames.length && count > 0; i++) {
                     StackFrameReference stackframe = new StackFrameReference(thread, i);
                     int frameId = context.getRecyclableIdPool().addObject(thread.uniqueID(), stackframe);
-                    result.add(convertDebuggerStackFrameToClient(frames[i], frameId, context));
+                    Types.StackFrame frameOrNull = convertDebuggerStackFrameToClient(frames[i], frameId, context);
+                    if (frameOrNull != null) {
+                        result.add(frameOrNull);
+                        count--;
+                    }
                 }
             } catch (IncompatibleThreadStateException | IndexOutOfBoundsException | URISyntaxException
                     | AbsentInformationException | ObjectCollectedException e) {
@@ -154,6 +156,13 @@ public class NbStackTraceRequestHandler implements IDebugRequestHandler {
             throws URISyntaxException, AbsentInformationException {
         Location location = stackFrame.location();
         Method method = location.method();
+        String className = method.declaringType().name();
+        if (className.startsWith("org.netbeans.modules.debugger.jpda.backend.truffle")) {
+            return null;
+        }
+        if (className.startsWith("com.oracle.truffle")) {
+            return null;
+        }
         Types.Source clientSource = this.convertDebuggerSourceToClient(location, context);
         String methodName = formatMethodName(method, true, true);
         int lineNumber = AdapterUtils.convertLineNumber(location.lineNumber(), context.isDebuggerLinesStartAt1(), context.isClientLinesStartAt1());
