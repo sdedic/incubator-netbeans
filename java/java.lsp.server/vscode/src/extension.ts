@@ -27,12 +27,13 @@ import {
 } from 'vscode-languageclient';
 
 import * as path from 'path';
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn, ChildProcess } from 'child_process';
 import { resolve } from 'path';
 import { rejects } from 'assert';
 import * as vscode from 'vscode';
 
 let client: LanguageClient;
+let nbProcess : ChildProcess | null = null;
 
 export function activate(context: ExtensionContext) {
     //verify acceptable JDK is available/set:
@@ -85,16 +86,17 @@ export function activate(context: ExtensionContext) {
             }
         }
 
-        let nb = spawn(serverPath, ideArgs, {
+        let p = spawn(serverPath, ideArgs, {
             stdio : ["ignore", "pipe", "pipe"]
         });
-        nb.stdout.on('data', function(d: any) {
+        p.stdout.on('data', function(d: any) {
             logAndWaitForEnabled(d.toString());
         });
-        nb.stderr.on('data', function(d: any) {
+        p.stderr.on('data', function(d: any) {
             logAndWaitForEnabled(d.toString());
         });
-        nb.on('close', function(code: number) {
+        nbProcess = p;
+        nbProcess.on('close', function(code: number) {
             if (code != 0) {
                 vscode.window.showWarningMessage("Java Language Server exited with " + code);
             }
@@ -104,6 +106,7 @@ export function activate(context: ExtensionContext) {
             } else {
                 log.appendLine("Exit code " + code);
             }
+            nbProcess = null;
         });
     });
 
@@ -148,6 +151,9 @@ export function activate(context: ExtensionContext) {
 }
 
 export function deactivate(): Thenable<void> {
+    if (nbProcess != null) {
+        nbProcess.kill();
+    }
 	if (!client) {
 		return Promise.resolve();
 	}
