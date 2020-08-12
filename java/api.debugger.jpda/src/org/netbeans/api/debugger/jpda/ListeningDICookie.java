@@ -311,7 +311,7 @@ public final class ListeningDICookie extends AbstractDICookie {
 
                 @Override
                 public EventSet remove() throws InterruptedException {
-                    return remove(Long.MAX_VALUE);
+                    return remove(0);
                 }
 
                 @Override
@@ -324,11 +324,14 @@ public final class ListeningDICookie extends AbstractDICookie {
                                 if (id != 0) {
                                     sets.wait(l);
                                 }
+                                if (sets.size() > index) {
+                                    return sets.get(index++);
+                                }
                             }
                         }
                         if (id == 0) {
                             EventSet es = del.remove(l);
-                            synchronized (this) {    
+                            synchronized (sets) {    
                                 sets.add(es);
                                 sets.notifyAll();
                             }
