@@ -19,6 +19,7 @@
 package org.netbeans.modules.java.lsp.server.debugging;
 
 import com.microsoft.java.debug.core.DebugException;
+import com.microsoft.java.debug.core.IDebugSession;
 import com.microsoft.java.debug.core.IEvaluatableBreakpoint;
 import com.microsoft.java.debug.core.UsageDataSession;
 import com.microsoft.java.debug.core.adapter.HotCodeReplaceEvent;
@@ -229,6 +230,14 @@ public class Debugger {
         return port;
     }
 
+    static JPDADebugger findJPDADebugger(IDebugSession debugSession) {
+        VirtualMachine vm = debugSession.getVM();
+        if (vm instanceof LaunchingVirtualMachine) {
+            return ((LaunchingVirtualMachine) vm).jpdaDebuger;
+        }
+        throw new IllegalStateException("Unexpected vm: " + vm);
+    }
+
     private static class VirtualMachineManagerImpl implements VirtualMachineManager {
 
         private final SourceProvider sourceProvider;
@@ -386,6 +395,7 @@ public class Debugger {
         private final ActionProgress progress;
         private int exitCode;
         private boolean finished;
+        private JPDADebugger jpdaDebuger;
 
         public LaunchingVirtualMachine(FileObject toRun, SourceProvider sourceProvider) {
             this.toRun = toRun;
@@ -510,6 +520,7 @@ public class Debugger {
                                     cdl.countDown();
                                 });
                             }
+                            jpdaDebuger = d;
                         }
                     });
                     cdl.await();
