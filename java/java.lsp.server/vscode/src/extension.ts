@@ -40,7 +40,7 @@ export function activate(context: ExtensionContext) {
     let specifiedJDK = workspace.getConfiguration('netbeans').get('jdkhome');
 
     try {
-        let targetJava = specifiedJDK ? specifiedJDK + '/bin/java' : 'java';
+        let targetJava = specifiedJDK != null ? specifiedJDK + '/bin/java' : 'java';
         execSync(targetJava + ' ' + context.extensionPath + '/src/VerifyJDK14.java');
     } catch (e) {
         window.showErrorMessage('The Java language server needs a JDK 14 to run, but none found. Please configure it under File/Preferences/Settings/Extensions/Java and restart VS Code.');
