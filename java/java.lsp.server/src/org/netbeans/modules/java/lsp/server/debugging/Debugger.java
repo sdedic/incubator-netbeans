@@ -868,23 +868,26 @@ public class Debugger {
             try {
                 FileObject file = URLMapper.findFileObject(new URL(uri));
                 if (file != null) {
-                    JavaSource.forFileObject(file).runUserActionTask(new Task<CompilationController>() {
-                        @Override
-                        public void run(CompilationController parameter) throws Exception {
-                            parameter.toPhase(JavaSource.Phase.ELEMENTS_RESOLVED); //XXX
-                            for (int line : lines) {
-                                int offsets = (int) parameter.getCompilationUnit().getLineMap().getStartPosition(line);
-                                TreePath path = parameter.getTreeUtilities().pathFor(offsets);
-                                while (path != null) {
-                                    if (TreeUtilities.CLASS_TREE_KINDS.contains(path.getLeaf().getKind())) {
-                                        result.add(parameter.getElements().getBinaryName((TypeElement) parameter.getTrees().getElement(path)).toString());
-                                        break;
+                    JavaSource javaSource = JavaSource.forFileObject(file);
+                    if (javaSource != null) {
+                        javaSource.runUserActionTask(new Task<CompilationController>() {
+                            @Override
+                            public void run(CompilationController parameter) throws Exception {
+                                parameter.toPhase(JavaSource.Phase.ELEMENTS_RESOLVED); //XXX
+                                for (int line : lines) {
+                                    int offsets = (int) parameter.getCompilationUnit().getLineMap().getStartPosition(line);
+                                    TreePath path = parameter.getTreeUtilities().pathFor(offsets);
+                                    while (path != null) {
+                                        if (TreeUtilities.CLASS_TREE_KINDS.contains(path.getLeaf().getKind())) {
+                                            result.add(parameter.getElements().getBinaryName((TypeElement) parameter.getTrees().getElement(path)).toString());
+                                            break;
+                                        }
+                                        path = path.getParentPath();
                                     }
-                                    path = path.getParentPath();
                                 }
                             }
-                        }
-                    }, true);
+                        }, true);
+                    }
                 }
             } catch (IOException | IllegalArgumentException ex) {
                 throw new DebugException(ex);
@@ -1140,7 +1143,7 @@ public class Debugger {
     
     private static @CheckForNull Pair<ActionProvider, String> findTarget(FileObject toRun, boolean debug) {
         ClassPath sourceCP = ClassPath.getClassPath(toRun, ClassPath.SOURCE);
-        FileObject fileRoot = sourceCP.findOwnerRoot(toRun);
+        FileObject fileRoot = sourceCP != null ? sourceCP.findOwnerRoot(toRun) : null;
         boolean mainSource;
         if (fileRoot != null) {
             mainSource = UnitTestForSourceQuery.findUnitTests(fileRoot).length > 0;

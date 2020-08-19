@@ -47,11 +47,14 @@ vscode$ npm run compile
 
 # Running and Debugging
 
+Have a Maven project, open it in NetBeans first and select the main file for both
+the Run and Debug actions.
+
 To use the extension created for developement you can run VSCode with
 following parameter:
 
 ```bash
-vscode$ code --extensionDevelopmentPath=`pwd` name_of_folder_to_open
+vscode$ code --extensionDevelopmentPath=`pwd` path_to_maven_project
 ```
 
 Or you can open the `vscode` folder in `code` directly and use **F5** to
@@ -68,5 +71,5 @@ and then connect to with debugger setup all breakpoints and then also connect
 from the VSCode extension:
 
 ```bash
-vscode$ code --extensionDevelopmentPath=`pwd` name_of_folder_to_open
+vscode$ code --extensionDevelopmentPath=`pwd` path_to_maven_project
 ```

@@ -118,7 +118,7 @@ public class NbDebugAdapter implements IDebugAdapter {
         registerHandlerForDebug(new StepRequestHandler());
         registerHandlerForDebug(new NbStackTraceRequestHandler());
         registerHandlerForDebug(new ScopesRequestHandler());
-        registerHandlerForDebug(new VariablesRequestHandler());
+        registerHandlerForDebug(new NbVariablesRequestHandler());
         registerHandlerForDebug(new SetVariableRequestHandler());
         registerHandlerForDebug(new EvaluateRequestHandler());
         registerHandlerForDebug(new HotCodeReplaceHandler());

@@ -111,8 +111,14 @@ public class NbStackTraceRequestHandler implements IDebugRequestHandler {
                     try {
                         TruffleStackFrame tsf = (TruffleStackFrame) newChildren[i];
                         final Source source = tsf.getSourcePosition().getSource();
-                        File fqn = new File(source.getURI());
-                        Types.Source src = new Types.Source(source.getName(), fqn.getPath(), 0);
+                        String path;
+                        try {
+                            File fqn = new File(source.getURI());
+                            path = fqn.getPath();
+                        } catch (IllegalArgumentException e) {
+                            path = source.getURI().getPath();
+                        }
+                        Types.Source src = new Types.Source(source.getName(), path, 0);
                         result.add(new Types.StackFrame(i, tsf.getMethodName(), src, tsf.getSourcePosition().getStartLine(), 1));
                     } catch (Exception ex) {
                         Exceptions.printStackTrace(ex);
