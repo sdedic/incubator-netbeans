@@ -48,6 +48,13 @@
         <delete file="${lsp.build.dir}/lib/nb-javac-9-api.jar" />
         <delete file="${lsp.build.dir}/lib/nb-javac-9-impl.jar" />
         <delete file="${lsp.build.dir}/lib/org-netbeans-modules-java-source-nbjavac.jar" />
+        <taskdef name="autoupdate" classname="org.netbeans.nbbuild.AutoUpdate" classpath="${nbantext.jar}"/>
+        <taskdef name="configureproxy" classname="org.netbeans.nbbuild.extlibs.ConfigureProxy" classpath="${nbantext.jar}"/>
+        <configureproxy connectto="https://netbeans.osuosl.org/binaries/" hostProperty="proxyHost" portProperty="proxyPort"/>
+        <setproxy proxyhost="${proxyHost}" proxyPort="${proxyPort}"/>
+        <autoupdate todir="${lsp.build.dir}/extra" updatecenter="file://${nb_all}/nb/updatecenters/build/classes/org/netbeans/modules/updatecenters/resources/3rdparty-catalog.xml">
+            <modules includes=".*nbjavac.*"/>
+        </autoupdate>
     </target>
     <target name="-set-use-jdk-javac">
         <property name="test.use.jdk.javac" value="true" />
