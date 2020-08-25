@@ -23,12 +23,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import com.microsoft.java.debug.core.DebugUtility;
 import com.microsoft.java.debug.core.adapter.AdapterUtils;
 import com.microsoft.java.debug.core.adapter.ErrorCode;
 import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
 import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.adapter.IEvaluationProvider;
 import com.microsoft.java.debug.core.protocol.Events;
 import com.microsoft.java.debug.core.protocol.Messages.Response;
 import com.microsoft.java.debug.core.protocol.Requests;
@@ -41,8 +39,6 @@ import com.microsoft.java.debug.core.protocol.Responses;
 import com.microsoft.java.debug.core.protocol.Types;
 import com.sun.jdi.ObjectCollectedException;
 import com.sun.jdi.ThreadReference;
-import com.sun.jdi.VMDisconnectedException;
-import org.netbeans.api.debugger.jpda.JPDADebugger;
 import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
 
 public class NbThreadsHandler implements IDebugRequestHandler {
@@ -67,7 +63,7 @@ public class NbThreadsHandler implements IDebugRequestHandler {
             case PAUSE: {
                 PauseArguments args = (PauseArguments) arguments;
                 final Events.StoppedEvent ev;
-                if (args.threadId != 0) {
+                if (args.threadId != 0 || jpdaDebugger.getCurrentThread() != null) {
                     jpdaDebugger.getCurrentThread().suspend();
                     ev = new Events.StoppedEvent("pause", args.threadId, true);
                 } else {
