@@ -18,19 +18,12 @@
  */
 package org.netbeans.modules.java.lsp.server;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -67,12 +60,9 @@ import org.netbeans.spi.sendopts.Arg;
 import org.netbeans.spi.sendopts.ArgsProcessor;
 import org.netbeans.spi.sendopts.Description;
 import org.netbeans.spi.sendopts.Env;
-import org.netbeans.spi.sendopts.Option;
-import org.netbeans.spi.sendopts.OptionProcessor;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Lookup;
 import org.openide.util.NbBundle.Messages;
-import org.openide.util.lookup.ServiceProvider;
 
 /**
  *
@@ -81,7 +71,7 @@ import org.openide.util.lookup.ServiceProvider;
 public class Server implements ArgsProcessor {
 
     @Arg(longName="start-java-language-server")
-    @Description(shortDescription="whatever")
+    @Description(shortDescription="#DESC_StartJavaLanguageServer")
     @Messages("DESC_StartJavaLanguageServer=Starts the Java Language Server")
     public boolean enable;
 
@@ -94,25 +84,6 @@ public class Server implements ArgsProcessor {
         }
     }
     
-    @ServiceProvider(service=OptionProcessor.class)
-    public static class OptionProcessorImpl extends OptionProcessor {
-
-        @Override
-        protected Set<Option> getOptions() {
-            return new HashSet<>(Arrays.asList(Option.withoutArgument('\0', "--start-java-language-server")));
-        }
-
-        @Override
-        protected void process(Env env, Map<Option, String[]> optionValues) throws CommandException {
-            try {
-                run(env.getInputStream(), env.getOutputStream());
-            } catch (Exception ex) {
-                throw (CommandException) new CommandException(1).initCause(ex);
-            }
-        }
-        
-    }
-
     private static void run(InputStream in, OutputStream out) throws Exception {
         LanguageServerImpl server = new LanguageServerImpl();
         Launcher<LanguageClient> serverLauncher = LSPLauncher.createServerLauncher(server, in, out);
