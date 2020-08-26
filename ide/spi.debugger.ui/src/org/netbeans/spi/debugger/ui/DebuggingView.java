@@ -367,6 +367,13 @@ public final class DebuggingView {
          */
         public void removePropertyChangeListener(PropertyChangeListener pcl);
 
+        /** XXX: API change
+         * @since XXX
+         * @return ID of the thread or {@code -1}
+         */
+        public default long getId() {
+            return -1;
+        };
     }
     
     /**

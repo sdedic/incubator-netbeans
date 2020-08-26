@@ -29,17 +29,17 @@ import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
 import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
 import com.microsoft.java.debug.core.protocol.Events;
 import com.microsoft.java.debug.core.protocol.Messages.Response;
-import com.microsoft.java.debug.core.protocol.Requests;
 import com.microsoft.java.debug.core.protocol.Requests.Arguments;
 import com.microsoft.java.debug.core.protocol.Requests.Command;
 import com.microsoft.java.debug.core.protocol.Requests.ContinueArguments;
 import com.microsoft.java.debug.core.protocol.Requests.PauseArguments;
-import com.microsoft.java.debug.core.protocol.Requests.ThreadsArguments;
 import com.microsoft.java.debug.core.protocol.Responses;
 import com.microsoft.java.debug.core.protocol.Types;
-import com.sun.jdi.ObjectCollectedException;
-import com.sun.jdi.ThreadReference;
 import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
+import org.netbeans.spi.viewmodel.Models;
+import org.netbeans.spi.viewmodel.UnknownTypeException;
+import org.openide.util.Exceptions;
 
 public class NbThreadsHandler implements IDebugRequestHandler {
 
@@ -56,10 +56,27 @@ public class NbThreadsHandler implements IDebugRequestHandler {
 
         JPDADebuggerImpl jpdaDebugger = (JPDADebuggerImpl) Debugger.findJPDADebugger(context.getDebugSession());
 
-
         switch (command) {
-            case THREADS:
-                return this.threads((ThreadsArguments) arguments, response, context);
+            case THREADS: {
+                Models.CompoundModel threadsModel = new ViewModel("DebuggingView").createModel();
+                Object[] threads;
+                try {
+                    threads = threadsModel.getChildren(threadsModel.getRoot(), 0, Integer.MAX_VALUE);
+                } catch (UnknownTypeException ex) {
+                    Exceptions.printStackTrace(ex);
+                    threads = new Object[0];
+                }
+                List<Types.Thread> arr = new ArrayList<>();
+                for (int i = 0; i < threads.length; i++) {
+                    Object t = threads[i];
+                    if (t instanceof DVThread) {
+                        DVThread dvt = (DVThread) t;
+                        arr.add(new Types.Thread(dvt.getId(), dvt.getName()));
+                    }
+                }
+                response.body = new Responses.ThreadsResponseBody(arr);
+                return CompletableFuture.completedFuture(response);
+            }
             case PAUSE: {
                 PauseArguments args = (PauseArguments) arguments;
                 final Events.StoppedEvent ev;
@@ -89,23 +106,5 @@ public class NbThreadsHandler implements IDebugRequestHandler {
                 return AdapterUtils.createAsyncErrorResponse(response, ErrorCode.UNRECOGNIZED_REQUEST_FAILURE,
                         String.format("Unrecognized request: { _request: %s }", command.toString()));
         }
-    }
-
-    private CompletableFuture<Response> threads(Requests.ThreadsArguments arguments, Response response, IDebugAdapterContext context) {
-        ArrayList<Types.Thread> threads = new ArrayList<>();
-        try {
-            for (ThreadReference thread : context.getDebugSession().getAllThreads()) {
-                if (thread.isCollected()) {
-                    continue;
-                }
-                Types.Thread clientThread = new Types.Thread(thread.uniqueID(), "Thread [" + thread.name() + "]");
-                threads.add(clientThread);
-            }
-        } catch (ObjectCollectedException ex) {
-            // allThreads may throw VMDisconnectedException when VM terminates and thread.name() may throw ObjectCollectedException
-            // when the thread is exiting.
-        }
-        response.body = new Responses.ThreadsResponseBody(threads);
-        return CompletableFuture.completedFuture(response);
     }
 }

@@ -52,6 +52,12 @@ public class JPDADVThread implements DVThread, WeakCacheMap.KeyedValue<JPDAThrea
         return t.getName();
     }
 
+    /* XXX: depends on new DebuggingView.DVThread */
+    @Override
+    public long getId() {
+        return t.getThreadReference().uniqueID();
+    }
+
     @Override
     public boolean isSuspended() {
         return t.isSuspended();
