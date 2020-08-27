@@ -18,7 +18,7 @@
  */
 'use strict';
 
-import { window, workspace, ExtensionContext } from 'vscode';
+import { commands, window, workspace, ExtensionContext, ProgressLocation } from 'vscode';
 
 import {
 	LanguageClient,
@@ -128,6 +128,9 @@ export function activate(context: ExtensionContext) {
 
         // Start the client. This will also launch the server
         client.start();
+        client.onReady().then((value) => {
+            commands.executeCommand('setContext', 'nbJavaLSReady', true);
+        });
 
         //register debugger:
         let configProvider = new NetBeansConfigurationProvider();
@@ -136,6 +139,32 @@ export function activate(context: ExtensionContext) {
         let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory();
         context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('java', debugDescriptionFactory));
         window.showErrorMessage('NB debug - all setup.');
+
+        // register commands
+        context.subscriptions.push(commands.registerCommand('java.workspace.compile', () => {
+            return window.withProgress({ location: ProgressLocation.Window }, p => {
+                return new Promise(async (resolve, reject) => {
+                    const commands = await vscode.commands.getCommands();
+                    if (commands.includes('java.build.workspace')) {
+                        p.report({ message: 'Compiling workspace...' });
+                        const start = new Date().getTime();
+                        const res = await vscode.commands.executeCommand('java.build.workspace');
+                        const elapsed = new Date().getTime() - start;
+                        const humanVisibleDelay = elapsed < 1000 ? 1000 : 0;
+                        setTimeout(() => { // set a timeout so user would still see the message when build time is short
+                            if (res) {
+                                resolve();
+                            } else {
+                                reject();
+                            }
+                        }, humanVisibleDelay);
+                    } else {
+                        reject();
+                    }
+                });
+            });
+        }));
+
     }).catch((reason) => {
         log.append(reason);
         window.showErrorMessage('Error initializing ' + reason);

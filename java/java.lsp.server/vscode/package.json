@@ -55,7 +55,29 @@
 					}
 				]
 			}
-		]
+		],
+		"commands": [
+			{
+				"command": "java.workspace.compile",
+				"title": "Compile Workspace",
+				"category": "Java"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "java.workspace.compile",
+				"key": "shift+alt+b",
+				"when": "nbJavaLSReady"
+			}
+		],
+		"menus": {
+			"commandPalette": [
+				{
+					"command": "java.workspace.compile",
+					"when": "nbJavaLSReady"
+				}
+			]
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",

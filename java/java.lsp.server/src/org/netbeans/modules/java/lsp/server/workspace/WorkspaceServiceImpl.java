@@ -22,15 +22,43 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
+import org.eclipse.lsp4j.ExecuteCommandParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.eclipse.lsp4j.services.WorkspaceService;
+import org.netbeans.api.project.Project;
+import org.netbeans.api.project.ui.OpenProjects;
+import org.netbeans.modules.java.lsp.server.Server;
+import org.netbeans.modules.java.lsp.server.utils.IOProviderImpl;
+import org.netbeans.spi.project.ActionProvider;
+import org.openide.util.Lookup;
+import org.openide.util.lookup.Lookups;
+import org.openide.util.lookup.ProxyLookup;
+import org.openide.windows.IOProvider;
 
 /**
  *
  * @author lahvac
  */
 public class WorkspaceServiceImpl implements WorkspaceService {
+
+    @Override
+    public CompletableFuture<Object> executeCommand(ExecuteCommandParams params) {
+        switch(params.getCommand()) {
+            case Server.JAVA_BUILD_WORKSPACE:
+                for (Project prj : OpenProjects.getDefault().getOpenProjects()) {
+                    ActionProvider ap = prj.getLookup().lookup(ActionProvider.class);
+                    if (ap != null && ap.isActionEnabled(ActionProvider.COMMAND_BUILD, Lookups.fixed())) {
+                        Lookups.executeWith(new ProxyLookup(Lookups.fixed(ioProvider), Lookup.getDefault()), () -> {
+                            ap.invokeAction(ActionProvider.COMMAND_BUILD, Lookups.fixed());
+                        });
+                    }
+                }
+                return CompletableFuture.completedFuture(true);
+            default:
+                throw new UnsupportedOperationException();
+        }
+    }
 
     @Override
     public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams arg0) {
@@ -47,4 +75,5 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         //TODO: not watching files for now
     }
     
+    private final IOProvider ioProvider = new IOProviderImpl(IOProviderImpl.createCopyingStreams().second(), IOProviderImpl.createCopyingStreams().second());
 }

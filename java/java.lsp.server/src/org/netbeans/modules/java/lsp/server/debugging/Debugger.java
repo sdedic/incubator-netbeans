@@ -61,7 +61,6 @@ import com.sun.jdi.connect.Transport;
 import com.sun.jdi.connect.VMStartException;
 import com.sun.jdi.connect.spi.Connection;
 import com.sun.jdi.event.EventQueue;
-import com.sun.jdi.event.EventSet;
 import com.sun.jdi.request.EventRequestManager;
 import com.sun.source.util.TreePath;
 import io.reactivex.Observable;
@@ -70,9 +69,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Reader;
-import java.io.Writer;
 import java.net.Inet4Address;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -83,12 +79,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -108,6 +102,7 @@ import org.netbeans.api.java.source.TreeUtilities;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
 import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
+import org.netbeans.modules.java.lsp.server.utils.IOProviderImpl;
 import org.netbeans.spi.project.ActionProgress;
 import org.netbeans.spi.project.ActionProvider;
 import org.openide.filesystems.FileObject;
@@ -119,9 +114,6 @@ import org.openide.util.Pair;
 import org.openide.util.lookup.Lookups;
 import org.openide.util.lookup.ProxyLookup;
 import org.openide.windows.IOProvider;
-import org.openide.windows.InputOutput;
-import org.openide.windows.OutputListener;
-import org.openide.windows.OutputWriter;
 
 /**
  *
@@ -400,9 +392,9 @@ public class Debugger {
         public LaunchingVirtualMachine(FileObject toRun, SourceProvider sourceProvider) {
             this.toRun = toRun;
             this.sourceProvider = sourceProvider;
-            Pair<InputStream, OutputStream> outPair = createCopyingStreams();
+            Pair<InputStream, OutputStream> outPair = IOProviderImpl.createCopyingStreams();
             out = outPair.first();
-            Pair<InputStream, OutputStream> errPair = createCopyingStreams();
+            Pair<InputStream, OutputStream> errPair = IOProviderImpl.createCopyingStreams();
             err = errPair.first();
             ioProvider = new IOProviderImpl(outPair.second(), errPair.second());
             progress = new ActionProgress() {
@@ -918,229 +910,6 @@ public class Debugger {
         }
     }
 
-    private static final class IOProviderImpl extends IOProvider {
-
-        private final OutputStream out;
-        private final OutputStream err;
-
-        public IOProviderImpl(OutputStream out, OutputStream err) {
-            this.out = out;
-            this.err = err;
-        }
-
-        @Override
-        public synchronized InputOutput getIO(String name, boolean newIO) {
-            return new IO(new OutputWriterImpl(this, OutputWriterImpl.Kind.OUT),
-                          new OutputWriterImpl(this, OutputWriterImpl.Kind.ERR));
-        }
-
-        @Override
-        public OutputWriter getStdOut() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-    }
-
-    private static final class IO implements InputOutput {
-
-        private final OutputWriter out;
-        private final OutputWriter err;
-
-        public IO(OutputWriter out, OutputWriter err) {
-            this.out = out;
-            this.err = err;
-        }
-
-        @Override
-        public OutputWriter getOut() {
-            return out;
-        }
-
-        @Override
-        public Reader getIn() {
-            return new Reader() {
-                @Override
-                public int read(char[] cbuf, int off, int len) throws IOException {
-                    return -1;
-                }
-
-                @Override
-                public void close() throws IOException {
-                }
-            };
-        }
-
-        @Override
-        public OutputWriter getErr() {
-            return err;
-        }
-
-        @Override
-        public void closeInputOutput() {
-        }
-
-        @Override
-        public boolean isClosed() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public void setOutputVisible(boolean value) {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public void setErrVisible(boolean value) {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public void setInputVisible(boolean value) {
-            //ignore...
-        }
-
-        @Override
-        public void select() {
-        }
-
-        @Override
-        public boolean isErrSeparated() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public void setErrSeparated(boolean value) {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public boolean isFocusTaken() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public void setFocusTaken(boolean value) {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public Reader flushReader() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-    }
-
-    private static class OutputWriterImpl extends OutputWriter {
-
-        private final Kind kind;
-
-        public OutputWriterImpl(IOProviderImpl io, Kind kind) {
-            super(createWriter(io, kind));
-            this.kind = kind;
-        }
-
-        private static Writer createWriter(IOProviderImpl io, Kind kind) {
-            return new OutputStreamWriter(kind == Kind.OUT ? io.out : io.err);
-        }
-
-        @Override
-        public void println(String s, OutputListener l) throws IOException {
-            out.write(s);
-            out.write("\n");
-            out.flush();
-        }
-
-        @Override
-        public void write(String s, int off, int len) {
-            super.write(s, off, len);
-            flush();
-        }
-
-        @Override
-        public void write(char[] buf, int off, int len) {
-            super.write(buf, off, len);
-            flush();
-        }
-
-        @Override
-        public void write(int c) {
-            super.write(c);
-            flush();
-        }
-
-        @Override
-        public void reset() throws IOException {
-            IOProvider io = Lookup.getDefault().lookup(IOProvider.class);
-            if (io instanceof IOProviderImpl) {
-                out = createWriter((IOProviderImpl) io, kind);
-            }
-        }
-
-        @Override
-        public void close() {
-        }
-
-        public enum Kind {
-            OUT, ERR;
-        }
-    }
-
-    private static Pair<InputStream, OutputStream> createCopyingStreams() {
-        List<Integer> data = new LinkedList<>();
-        AtomicBoolean closed = new AtomicBoolean();
-        InputStream in = new InputStream() {
-            @Override
-            public int read() throws IOException {
-                synchronized (data) {
-                    try {
-                        while (data.isEmpty() && !closed.get()) {
-                            data.wait();
-                        }
-                    } catch (InterruptedException ex) {
-                        //ignore
-                    }
-                    if (data.isEmpty() && closed.get()) {
-                        return -1;
-                    }
-                    return data.remove(0);
-                }
-            }
-            @Override
-            public int read(byte[] b, int off, int len) throws IOException {
-                int l = 0;
-                while (l < len) {
-                    int r = read();
-                    if (r == -1) {
-                        if (l == 0) return -1;
-                        break;
-                    }
-                    b[off + l] = (byte) r;
-                    l++;
-                    if (r == '\n') break;
-                }
-                return l;
-            }
-        };
-        OutputStream out = new OutputStream() {
-            @Override
-            public void write(int b) throws IOException {
-                synchronized (data) {
-                    data.add(b);
-                    data.notifyAll();
-                }
-            }
-
-            @Override
-            public void close() throws IOException {
-                synchronized (data) {
-                    closed.set(true);
-                    data.notifyAll();
-                }
-            }
-        };
-        return Pair.of(in, out);
-    }
-    
     private static @CheckForNull Pair<ActionProvider, String> findTarget(FileObject toRun, boolean debug) {
         ClassPath sourceCP = ClassPath.getClassPath(toRun, ClassPath.SOURCE);
         FileObject fileRoot = sourceCP != null ? sourceCP.findOwnerRoot(toRun) : null;

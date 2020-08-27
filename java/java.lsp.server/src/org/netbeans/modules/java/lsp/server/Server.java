@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -30,6 +31,7 @@ import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.eclipse.lsp4j.CompletionOptions;
+import org.eclipse.lsp4j.ExecuteCommandOptions;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.InitializeResult;
 import org.eclipse.lsp4j.MessageParams;
@@ -165,6 +167,7 @@ public class Server implements ArgsProcessor {
             capabilities.setDocumentSymbolProvider(true);
             capabilities.setDefinitionProvider(true);
             capabilities.setDocumentHighlightProvider(true);
+            capabilities.setExecuteCommandProvider(new ExecuteCommandOptions(Arrays.asList(JAVA_BUILD_WORKSPACE)));
             return CompletableFuture.completedFuture(new InitializeResult(capabilities));
         }
 
@@ -195,5 +198,6 @@ public class Server implements ArgsProcessor {
         }
     }
 
+    public static final String JAVA_BUILD_WORKSPACE =  "java.build.workspace";
     static final String INDEXING_COMPLETED = "Indexing completed.";
 }
