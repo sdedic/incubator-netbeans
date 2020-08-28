@@ -45,8 +45,10 @@ export function activate(context: ExtensionContext) {
         ideArgs = ['--jdkhome', specifiedJDK as string];
     }
     let serverArgs: string[] = new Array<string>(...ideArgs);
-    const port = random(3000, 50000);
-    serverArgs.push(`--start-java-language-server=${port}`);
+    const lsPort = random(3000, 50000);
+    const debugPort = random(3000, 50000);
+    serverArgs.push(`--start-java-language-server=${lsPort}`);
+    serverArgs.push(`--start-java-debug-adapter-server=${debugPort}`);
 
     let serverOptions = {
         command: serverPath,
@@ -113,7 +115,7 @@ export function activate(context: ExtensionContext) {
             server.on('error', (err) => {
                 reject(err);
             });
-            server.listen(port);
+            server.listen(lsPort);
             const srv = spawn(serverOptions.command, serverOptions.args, serverOptions.options);
             if (!srv) {
                 reject();
@@ -156,7 +158,7 @@ export function activate(context: ExtensionContext) {
         let configProvider = new NetBeansConfigurationProvider();
         context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('java', configProvider));
 
-        let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory();
+        let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory(debugPort);
         context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('java', debugDescriptionFactory));
         window.showErrorMessage('NB debug - all setup.');
 
@@ -207,11 +209,17 @@ function random(low: number, high: number): number {
 }
 
 class NetBeansDebugAdapterDescriptionFactory implements vscode.DebugAdapterDescriptorFactory {
-    createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
-        window.showErrorMessage('NB debug - debug adapter server.');
-        return new vscode.DebugAdapterServer(10001);
+
+    private port: number;
+
+    constructor(port: number) {
+        this.port = port;
     }
 
+    createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
+        window.showErrorMessage('NB debug - debug adapter server.');
+        return new vscode.DebugAdapterServer(this.port);
+    }
 }
 
 

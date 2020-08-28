@@ -123,9 +123,8 @@ public class Debugger {
 
     private static final Logger LOG = Logger.getLogger(Debugger.class.getName());
 
-    public static int startDebugger() throws IOException {
+    public static int startDebugger(int port) throws IOException {
         NbPreferences.forModule(AntProjectCookie.class).putBoolean("autoCloseTabs", false);
-        int port = 10001;
         ServerSocket vsCodeSide = new ServerSocket(port, 1, Inet4Address.getLoopbackAddress());
         System.err.println("Debugger listens on port: " + port);
         new Thread(() -> {

@@ -76,30 +76,38 @@ public class Server implements ArgsProcessor {
     @Arg(longName="start-java-language-server", defaultValue = "-1")
     @Description(shortDescription="#DESC_StartJavaLanguageServer")
     @Messages("DESC_StartJavaLanguageServer=Starts the Java Language Server")
-    public String port;
+    public String lsPort;
+
+    @Arg(longName="start-java-debug-adapter-server", defaultValue = "-1")
+    @Description(shortDescription="#DESC_StartJavaDebugAdapterServer")
+    @Messages("DESC_StartJavaDebugAdapterServer=Starts the Java Debug Adapter Server")
+    public String debugPort;
 
     @Override
     public void process(Env env) throws CommandException {
         try {
-            int connectTo = Integer.parseInt(port);
+            int connectTo = Integer.parseInt(lsPort);
+            int debugConnectTo = Integer.parseInt(lsPort);
+            if (debugConnectTo == -1) {
+                debugConnectTo = 10001;
+            }
             if (connectTo == -1) {
-                run(env.getInputStream(), env.getOutputStream());
+                run(env.getInputStream(), env.getOutputStream(), debugConnectTo);
             } else {
                 Socket socket = new Socket("127.0.0.1", connectTo);
-                run(socket.getInputStream(), socket.getOutputStream());
+                run(socket.getInputStream(), socket.getOutputStream(), debugConnectTo);
             }
-            run(env.getInputStream(), env.getOutputStream());
         } catch (Exception ex) {
             throw (CommandException) new CommandException(1).initCause(ex);
         }
     }
     
-    private static void run(InputStream in, OutputStream out) throws Exception {
+    private static void run(InputStream in, OutputStream out, int debugPort) throws Exception {
         LanguageServerImpl server = new LanguageServerImpl();
         Launcher<LanguageClient> serverLauncher = LSPLauncher.createServerLauncher(server, in, out);
         ((LanguageClientAware) server).connect(serverLauncher.getRemoteProxy());
         Future<Void> runningServer = serverLauncher.startListening();
-        Debugger.startDebugger();
+        Debugger.startDebugger(debugPort);
         runningServer.get();
     }
 
