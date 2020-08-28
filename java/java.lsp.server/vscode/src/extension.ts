@@ -21,15 +21,14 @@
 import { commands, window, workspace, ExtensionContext, ProgressLocation } from 'vscode';
 
 import {
-	LanguageClient,
-	LanguageClientOptions,
-	ServerOptions
+    LanguageClient,
+    LanguageClientOptions,
+    StreamInfo
 } from 'vscode-languageclient';
 
+import * as net from 'net';
 import * as path from 'path';
 import { execSync, spawn, ChildProcess } from 'child_process';
-import { resolve } from 'path';
-import { rejects } from 'assert';
 import * as vscode from 'vscode';
 
 let client: LanguageClient;
@@ -41,19 +40,18 @@ export function activate(context: ExtensionContext) {
 
     let serverPath = path.resolve(context.extensionPath, "nb-java-lsp-server", "bin", "nb-java-lsp-server");
 
-    let serverOptions: ServerOptions;
     let ideArgs: string[] = [];
     if (specifiedJDK) {
         ideArgs = ['--jdkhome', specifiedJDK as string];
     }
     let serverArgs: string[] = new Array<string>(...ideArgs);
-    serverArgs.push("--start-java-language-server");
+    const port = random(3000, 50000);
+    serverArgs.push(`--start-java-language-server=${port}`);
 
-    serverOptions = {
+    let serverOptions = {
         command: serverPath,
         args: serverArgs,
         options: { cwd: workspace.rootPath },
-
     }
 
     // give the process some reasonable command
@@ -104,6 +102,28 @@ export function activate(context: ExtensionContext) {
     });
 
     ideRunning.then((value) => {
+        const connection = () => new Promise<StreamInfo>((resolve, reject) => {
+            const server = net.createServer(socket => {
+                server.close();
+                resolve({
+                    reader: socket,
+                    writer: socket
+                });
+            });
+            server.on('error', (err) => {
+                reject(err);
+            });
+            server.listen(port);
+            const srv = spawn(serverOptions.command, serverOptions.args, serverOptions.options);
+            if (!srv) {
+                reject();
+            } else {
+                srv.once("error", (err) => {
+                    reject(err);
+                });
+            }
+        });
+
         // Options to control the language client
         let clientOptions: LanguageClientOptions = {
             // Register the server for java documents
@@ -122,7 +142,7 @@ export function activate(context: ExtensionContext) {
         client = new LanguageClient(
                 'java',
                 'NetBeans Java',
-                serverOptions,
+                connection,
                 clientOptions
         );
 
@@ -180,6 +200,10 @@ export function deactivate(): Thenable<void> {
 		return Promise.resolve();
 	}
 	return client.stop();
+}
+
+function random(low: number, high: number): number {
+    return Math.floor(Math.random() * (high - low) + low);
 }
 
 class NetBeansDebugAdapterDescriptionFactory implements vscode.DebugAdapterDescriptorFactory {

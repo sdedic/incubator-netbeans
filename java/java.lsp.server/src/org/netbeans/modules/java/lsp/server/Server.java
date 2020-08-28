@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -72,14 +73,21 @@ import org.openide.util.NbBundle.Messages;
  */
 public class Server implements ArgsProcessor {
 
-    @Arg(longName="start-java-language-server")
+    @Arg(longName="start-java-language-server", defaultValue = "-1")
     @Description(shortDescription="#DESC_StartJavaLanguageServer")
     @Messages("DESC_StartJavaLanguageServer=Starts the Java Language Server")
-    public boolean enable;
+    public String port;
 
     @Override
     public void process(Env env) throws CommandException {
         try {
+            int connectTo = Integer.parseInt(port);
+            if (connectTo == -1) {
+                run(env.getInputStream(), env.getOutputStream());
+            } else {
+                Socket socket = new Socket("127.0.0.1", connectTo);
+                run(socket.getInputStream(), socket.getOutputStream());
+            }
             run(env.getInputStream(), env.getOutputStream());
         } catch (Exception ex) {
             throw (CommandException) new CommandException(1).initCause(ex);
