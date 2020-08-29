@@ -87,7 +87,7 @@ public class Server implements ArgsProcessor {
     public void process(Env env) throws CommandException {
         try {
             int connectTo = Integer.parseInt(lsPort);
-            int debugConnectTo = Integer.parseInt(lsPort);
+            int debugConnectTo = Integer.parseInt(debugPort);
             if (debugConnectTo == -1) {
                 debugConnectTo = 10001;
             }

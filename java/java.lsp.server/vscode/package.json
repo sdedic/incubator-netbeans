@@ -46,6 +46,16 @@
 				"type": "java",
 				"label": "Java (NetBeans)",
 				"runtime": "node",
+				"configurationAttributes": {
+					"launch": {
+						"properties": {
+							"program": {
+								"type": "string",
+								"description": "Absolute path to the program."
+							}
+						}
+					}
+				},
 				"initialConfigurations": [
 					{
 						"type": "java",
