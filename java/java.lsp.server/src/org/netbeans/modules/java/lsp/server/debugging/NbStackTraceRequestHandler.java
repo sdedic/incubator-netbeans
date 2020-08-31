@@ -54,7 +54,6 @@ import org.netbeans.api.debugger.jpda.JPDADebugger;
 import org.netbeans.api.debugger.jpda.JPDAThread;
 import org.netbeans.modules.debugger.jpda.truffle.frames.TruffleStackFrame;
 import org.netbeans.modules.debugger.jpda.truffle.source.Source;
-import org.netbeans.spi.viewmodel.TreeModelFilter;
 import org.openide.util.Exceptions;
 
 public class NbStackTraceRequestHandler implements IDebugRequestHandler {
@@ -73,6 +72,7 @@ public class NbStackTraceRequestHandler implements IDebugRequestHandler {
             return CompletableFuture.completedFuture(response);
         }
         
+        /*
         String f = "netbeans-JPDASession/GraalVM_Script/DebuggingView";
         List<? extends TreeModelFilter> res = DebuggerManager.getDebuggerManager().lookup(f, TreeModelFilter.class);
         System.err.println("res: " + res);
@@ -80,9 +80,9 @@ public class NbStackTraceRequestHandler implements IDebugRequestHandler {
         System.err.println("res: " + res2);
         JPDADebugger jpdaDeb = DebuggerManager.getDebuggerManager().lookupFirst("", JPDADebugger.class);
         System.err.println("jpdaDeb: " + jpdaDeb);
+        */
         JPDADebugger jpdaDebSes = DebuggerManager.getDebuggerManager().getCurrentSession().lookupFirst("", JPDADebugger.class);
-        System.err.println("jpdaDeb: " + jpdaDebSes);
-        
+//        System.err.println("jpdaDeb: " + jpdaDebSes);
                 
         ThreadReference thread = DebugUtility.getThread(context.getDebugSession(), stacktraceArgs.threadId);
         int totalFrames = 0;
