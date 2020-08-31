@@ -552,6 +552,18 @@ public abstract class JPDADebugger {
     public boolean canGetInstanceInfo() {
         return false;
     }
+
+    public JPDAThread getThread(long id) {
+        return null;
+    }
+    
+    public void suspend() {
+        throw new AbstractMethodError();
+    }
+    
+    public void resume() {
+        throw new AbstractMethodError();
+    }
     
     /**
      * Get the list of all classes in the debuggee.
@@ -746,7 +758,6 @@ public abstract class JPDADebugger {
             String serviceName = (String) attrs.get(DebuggerProcessor.SERVICE_NAME);
             return new ContextAware(serviceName);
         }
-
     }
 
 }
