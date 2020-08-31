@@ -110,6 +110,9 @@ public class JPDAEngineComponentsProvider implements EngineComponentsProvider {
     @Override
     public void willCloseNotify(List<ComponentInfo> components) {
         for (ComponentInfo ci : components) {
+            if (!ci.isInitialized()) {
+                continue;
+            }
             Component c = ci.getComponent();
             if (c instanceof TopComponent) {
                 TopComponent tc = (TopComponent) c;
