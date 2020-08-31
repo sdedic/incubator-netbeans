@@ -35,6 +35,7 @@ import com.microsoft.java.debug.core.protocol.Requests.ContinueArguments;
 import com.microsoft.java.debug.core.protocol.Requests.PauseArguments;
 import com.microsoft.java.debug.core.protocol.Responses;
 import com.microsoft.java.debug.core.protocol.Types;
+import org.netbeans.api.debugger.jpda.JPDAThread;
 import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 import org.netbeans.spi.viewmodel.Models;
@@ -80,12 +81,13 @@ public class NbThreadsHandler implements IDebugRequestHandler {
             case PAUSE: {
                 PauseArguments args = (PauseArguments) arguments;
                 final Events.StoppedEvent ev;
-                if (args.threadId != 0 || jpdaDebugger.getCurrentThread() != null) {
-                    jpdaDebugger.getCurrentThread().suspend();
-                    ev = new Events.StoppedEvent("pause", args.threadId, true);
+                final JPDAThread currentThread = jpdaDebugger.getCurrentThread();
+                if (args.threadId != 0 && currentThread != null && currentThread.getID() == args.threadId) {
+                    currentThread.suspend();
+                    ev = new Events.StoppedEvent("pause", args.threadId, false);
                 } else {
                     jpdaDebugger.suspend();
-                    ev = new Events.StoppedEvent("pause", 0, false);
+                    ev = new Events.StoppedEvent("pause", 0, true);
                 }
                 context.getProtocolServer().sendEvent(ev);
                 return CompletableFuture.completedFuture(response);
