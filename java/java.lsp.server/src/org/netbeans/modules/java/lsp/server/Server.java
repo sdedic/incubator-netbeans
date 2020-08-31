@@ -21,6 +21,8 @@ package org.netbeans.modules.java.lsp.server;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -64,6 +66,7 @@ import org.netbeans.spi.sendopts.ArgsProcessor;
 import org.netbeans.spi.sendopts.Description;
 import org.netbeans.spi.sendopts.Env;
 import org.openide.filesystems.FileObject;
+import org.openide.util.Exceptions;
 import org.openide.util.Lookup;
 import org.openide.util.NbBundle.Messages;
 
@@ -78,36 +81,54 @@ public class Server implements ArgsProcessor {
     @Messages("DESC_StartJavaLanguageServer=Starts the Java Language Server")
     public String lsPort;
 
-    @Arg(longName="start-java-debug-adapter-server", defaultValue = "-1")
+    @Arg(longName="start-java-debug-adapter-server")
     @Description(shortDescription="#DESC_StartJavaDebugAdapterServer")
     @Messages("DESC_StartJavaDebugAdapterServer=Starts the Java Debug Adapter Server")
     public String debugPort;
 
     @Override
     public void process(Env env) throws CommandException {
-        try {
-            int connectTo = Integer.parseInt(lsPort);
+        if (lsPort != null) {
+            try {
+                int connectTo = Integer.parseInt(lsPort);
+                if (connectTo == -1) {
+                    launchServer(env.getInputStream(), env.getOutputStream());
+                } else {
+                    final Socket socket = new Socket(InetAddress.getLocalHost(), connectTo);
+                    Thread languageServerThread = new Thread("Java Language Server:" + connectTo) {
+                        @Override
+                        public void run() {
+                            try {
+                                launchServer(socket.getInputStream(), socket.getOutputStream());
+                            } catch (Exception ex) {
+                                Exceptions.printStackTrace(ex);
+                            }
+                        }
+                    };
+                    languageServerThread.start();
+                }
+            } catch (Exception ex) {
+                throw (CommandException) new CommandException(1).initCause(ex);
+            }
+        }
+        if (debugPort != null) {
             int debugConnectTo = Integer.parseInt(debugPort);
-            if (debugConnectTo == -1) {
-                debugConnectTo = 10001;
+            try {
+                int port = Debugger.startDebugger(debugConnectTo);
+                PrintStream ps = new PrintStream(env.getOutputStream());
+                ps.println("Debug Server Adapter listening at port " + port); // NOI18N
+                ps.flush();
+            } catch (IOException ex) {
+                throw (CommandException) new CommandException(1).initCause(ex);
             }
-            if (connectTo == -1) {
-                run(env.getInputStream(), env.getOutputStream(), debugConnectTo);
-            } else {
-                Socket socket = new Socket("127.0.0.1", connectTo);
-                run(socket.getInputStream(), socket.getOutputStream(), debugConnectTo);
-            }
-        } catch (Exception ex) {
-            throw (CommandException) new CommandException(1).initCause(ex);
         }
     }
     
-    private static void run(InputStream in, OutputStream out, int debugPort) throws Exception {
+    private static void launchServer(InputStream in, OutputStream out) throws Exception {
         LanguageServerImpl server = new LanguageServerImpl();
         Launcher<LanguageClient> serverLauncher = LSPLauncher.createServerLauncher(server, in, out);
         ((LanguageClientAware) server).connect(serverLauncher.getRemoteProxy());
         Future<Void> runningServer = serverLauncher.startListening();
-        Debugger.startDebugger(debugPort);
         runningServer.get();
     }
 

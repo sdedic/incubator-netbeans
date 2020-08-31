@@ -47,6 +47,7 @@ import com.sun.jdi.StackFrame;
 import com.sun.jdi.StringReference;
 import com.sun.jdi.ThreadGroupReference;
 import com.sun.jdi.ThreadReference;
+import com.sun.jdi.Type;
 import com.sun.jdi.VMDisconnectedException;
 import com.sun.jdi.Value;
 import com.sun.jdi.VirtualMachine;
@@ -126,98 +127,111 @@ public class Debugger {
     public static int startDebugger(int port) throws IOException {
         NbPreferences.forModule(AntProjectCookie.class).putBoolean("autoCloseTabs", false);
         ServerSocket vsCodeSide = new ServerSocket(port, 1, Inet4Address.getLoopbackAddress());
-        System.err.println("Debugger listens on port: " + port);
-        new Thread(() -> {
-            while (true) {
-                try {
-                    Socket vsCodeSocket = vsCodeSide.accept();
+        LOG.log(Level.INFO, "Debugger listens on port: {0}", port);
+        new Thread("Java Debug Server Adapter: " + port) {
+            @Override            
+            public void run() {
+                while (true) {
+                    try {
+                        Socket vsCodeSocket = vsCodeSide.accept();
 
-                    System.err.println("accepted....");
-                    SourceProvider sourceProvider = new SourceProvider();
-                    ProviderContext context = new ProviderContext();
-                    context.registerProvider(IVirtualMachineManagerProvider.class, new IVirtualMachineManagerProvider() {
-                        @Override
-                        public VirtualMachineManager getVirtualMachineManager() {
-                            return new VirtualMachineManagerImpl(sourceProvider);
-                        }
-
-                    });
-                    context.registerProvider(IHotCodeReplaceProvider.class, new IHotCodeReplaceProvider() {
-                        @Override
-                        public void onClassRedefined(Consumer<List<String>> arg0) {
-                            throw new UnsupportedOperationException("Not supported yet.");
-                        }
-
-                        @Override
-                        public CompletableFuture<List<String>> redefineClasses() {
-                            throw new UnsupportedOperationException("Not supported yet.");
-                        }
-
-                        @Override
-                        public Observable<HotCodeReplaceEvent> getEventHub() {
-                            return new Observable<HotCodeReplaceEvent>() {
-                                @Override
-                                protected void subscribeActual(Observer<? super HotCodeReplaceEvent> arg0) {
-                                    System.err.println("arg0= " +arg0);
-                                }
-                            };
-                        }
-                    });
-                    context.registerProvider(ISourceLookUpProvider.class, sourceProvider);
-                    context.registerProvider(IEvaluationProvider.class, new IEvaluationProvider() {
-                        @Override
-                        public boolean isInEvaluation(ThreadReference thread) {
-                            return false;
-                        }
-
-                        @Override
-                        public CompletableFuture<Value> evaluate(String arg0, ThreadReference arg1, int arg2) {
-                            throw new UnsupportedOperationException("Not supported yet.");
-                        }
-
-                        @Override
-                        public CompletableFuture<Value> evaluate(String arg0, ObjectReference arg1, ThreadReference arg2) {
-                            throw new UnsupportedOperationException("Not supported yet.");
-                        }
-
-                        @Override
-                        public CompletableFuture<Value> evaluateForBreakpoint(IEvaluatableBreakpoint arg0, ThreadReference arg1) {
-                            throw new UnsupportedOperationException("Not supported yet.");
-                        }
-
-                        @Override
-                        public CompletableFuture<Value> invokeMethod(ObjectReference arg0, String arg1, String arg2, Value[] arg3, ThreadReference arg4, boolean arg5) {
-                            throw new UnsupportedOperationException("Not supported yet.");
-                        }
-
-                        @Override
-                        public void clearState(ThreadReference arg0) {
-                        }
-                    });
-                    context.registerProvider(ICompletionsProvider.class, new ICompletionsProvider() {
-                        @Override
-                        public List<Types.CompletionItem> codeComplete(StackFrame arg0, String arg1, int arg2, int arg3) {
-                            throw new UnsupportedOperationException("Not supported yet.");
-                        }
-                    });
-                    context.registerProvider(IExecuteProvider.class, new IExecuteProvider() {
-                        @Override
-                        public Process launch(Requests.LaunchArguments la) throws IOException {
-                            String filePath = la.mainClass;
-                            FileObject file = filePath != null ? FileUtil.toFileObject(new File(filePath)) : null;
-                            if (file == null) {
-                                throw new IOException("Missing file: " + la.mainClass);
+                        LOG.info("debugging requestaccepted....");
+                        SourceProvider sourceProvider = new SourceProvider();
+                        ProviderContext context = new ProviderContext();
+                        context.registerProvider(IVirtualMachineManagerProvider.class, new IVirtualMachineManagerProvider() {
+                            @Override
+                            public VirtualMachineManager getVirtualMachineManager() {
+                                return new VirtualMachineManagerImpl(sourceProvider);
                             }
-                            return new LaunchingVirtualMachine(file, sourceProvider).runWithoutDebugger();
-                        }
-                    });
-                    NbProtocolServer server = new NbProtocolServer(vsCodeSocket.getInputStream(), vsCodeSocket.getOutputStream(), context);
-                    server.run();
-                } catch (Throwable t) {
-                    t.printStackTrace();
+
+                        });
+                        context.registerProvider(IHotCodeReplaceProvider.class, new IHotCodeReplaceProvider() {
+                            @Override
+                            public void onClassRedefined(Consumer<List<String>> arg0) {
+                                throw new UnsupportedOperationException("Not supported yet.");
+                            }
+
+                            @Override
+                            public CompletableFuture<List<String>> redefineClasses() {
+                                throw new UnsupportedOperationException("Not supported yet.");
+                            }
+
+                            @Override
+                            public Observable<HotCodeReplaceEvent> getEventHub() {
+                                return new Observable<HotCodeReplaceEvent>() {
+                                    @Override
+                                    protected void subscribeActual(Observer<? super HotCodeReplaceEvent> arg0) {
+                                        LOG.log(Level.INFO, "arg0= {0}", arg0);
+                                    }
+                                };
+                            }
+                        });
+                        context.registerProvider(ISourceLookUpProvider.class, sourceProvider);
+                        context.registerProvider(IEvaluationProvider.class, new IEvaluationProvider() {
+                            @Override
+                            public boolean isInEvaluation(ThreadReference thread) {
+                                return false;
+                            }
+
+                            @Override
+                            public CompletableFuture<Value> evaluate(String arg0, ThreadReference arg1, int arg2) {
+                                return CompletableFuture.completedFuture(new Value() {
+                                    @Override
+                                    public Type type() {
+                                        return null;
+                                    }
+
+                                    @Override
+                                    public VirtualMachine virtualMachine() {
+                                        return null;
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public CompletableFuture<Value> evaluate(String arg0, ObjectReference arg1, ThreadReference arg2) {
+                                throw new UnsupportedOperationException("Not supported yet.");
+                            }
+
+                            @Override
+                            public CompletableFuture<Value> evaluateForBreakpoint(IEvaluatableBreakpoint arg0, ThreadReference arg1) {
+                                throw new UnsupportedOperationException("Not supported yet.");
+                            }
+
+                            @Override
+                            public CompletableFuture<Value> invokeMethod(ObjectReference arg0, String arg1, String arg2, Value[] arg3, ThreadReference arg4, boolean arg5) {
+                                throw new UnsupportedOperationException("Not supported yet.");
+                            }
+
+                            @Override
+                            public void clearState(ThreadReference arg0) {
+                            }
+                        });
+                        context.registerProvider(ICompletionsProvider.class, new ICompletionsProvider() {
+                            @Override
+                            public List<Types.CompletionItem> codeComplete(StackFrame arg0, String arg1, int arg2, int arg3) {
+                                throw new UnsupportedOperationException("Not supported yet.");
+                            }
+                        });
+                        context.registerProvider(IExecuteProvider.class, new IExecuteProvider() {
+                            @Override
+                            public Process launch(Requests.LaunchArguments la) throws IOException {
+                                String filePath = la.mainClass;
+                                FileObject file = filePath != null ? FileUtil.toFileObject(new File(filePath)) : null;
+                                if (file == null) {
+                                    throw new IOException("Missing file: " + la.mainClass);
+                                }
+                                return new LaunchingVirtualMachine(file, sourceProvider).runWithoutDebugger();
+                            }
+                        });
+                        NbProtocolServer server = new NbProtocolServer(vsCodeSocket.getInputStream(), vsCodeSocket.getOutputStream(), context);
+                        server.run();
+                    } catch (Throwable t) {
+                        t.printStackTrace();
+                    }
                 }
             }
-        }).start();
+        }.start();
         return port;
     }
 
@@ -883,7 +897,7 @@ public class Debugger {
             } catch (IOException | IllegalArgumentException ex) {
                 throw new DebugException(ex);
             }
-            System.err.println("result=" + result);
+            LOG.info("result=" + result);
             return result.toArray(new String[0]);
         }
 
@@ -904,7 +918,7 @@ public class Debugger {
 
         @Override
         public String getSourceContents(String arg0) {
-            System.err.println("arg0=" + arg0);
+            LOG.log(Level.INFO, "arg0={0}", arg0);
             throw new UnsupportedOperationException("Not supported yet.");
         }
     }
