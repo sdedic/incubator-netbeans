@@ -33,6 +33,7 @@ import * as vscode from 'vscode';
 
 let client: LanguageClient;
 let nbProcess : ChildProcess | null = null;
+let debugPort: number = -1;
 
 export function activate(context: ExtensionContext) {
     //verify acceptable JDK is available/set:
@@ -45,10 +46,6 @@ export function activate(context: ExtensionContext) {
         ideArgs = ['--jdkhome', specifiedJDK as string];
     }
     let serverArgs: string[] = new Array<string>(...ideArgs);
-    const lsPort = random(3000, 50000);
-    const debugPort = random(3000, 50000);
-    serverArgs.push(`--start-java-language-server=${lsPort}`);
-    serverArgs.push(`--start-java-debug-adapter-server=${debugPort}`);
 
     let serverOptions = {
         command: serverPath,
@@ -115,15 +112,26 @@ export function activate(context: ExtensionContext) {
             server.on('error', (err) => {
                 reject(err);
             });
-            server.listen(lsPort);
-            const srv = spawn(serverOptions.command, serverOptions.args, serverOptions.options);
-            if (!srv) {
-                reject();
-            } else {
-                srv.once("error", (err) => {
-                    reject(err);
-                });
-            }
+            server.listen(() => {
+                const address: any = server.address();
+                serverOptions.args.push(`--start-java-language-server=${address.port}`);
+                const srv = spawn(serverOptions.command, serverOptions.args, serverOptions.options);
+                if (!srv) {
+                    reject();
+                } else {
+                    srv.stdout.on("data", (chunk) => {
+                        if (debugPort < 0) {
+                            const info = chunk.toString().match(/Debug Server Adapter listening at port (\d*)/);
+                            if (info) {
+                                debugPort = info[1];
+                            }
+                        }
+                    });
+                    srv.once("error", (err) => {
+                        reject(err);
+                    });
+                }
+            });
         });
 
         // Options to control the language client
@@ -158,7 +166,7 @@ export function activate(context: ExtensionContext) {
         let configProvider = new NetBeansConfigurationProvider();
         context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('java', configProvider));
 
-        let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory(debugPort);
+        let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory();
         context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('java', debugDescriptionFactory));
         window.showErrorMessage('NB debug - all setup.');
 
@@ -204,21 +212,11 @@ export function deactivate(): Thenable<void> {
 	return client.stop();
 }
 
-function random(low: number, high: number): number {
-    return Math.floor(Math.random() * (high - low) + low);
-}
-
 class NetBeansDebugAdapterDescriptionFactory implements vscode.DebugAdapterDescriptorFactory {
-
-    private port: number;
-
-    constructor(port: number) {
-        this.port = port;
-    }
 
     createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
         window.showErrorMessage('NB debug - debug adapter server.');
-        return new vscode.DebugAdapterServer(this.port);
+        return new vscode.DebugAdapterServer(debugPort);
     }
 }
 

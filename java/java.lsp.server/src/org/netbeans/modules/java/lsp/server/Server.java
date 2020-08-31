@@ -81,11 +81,6 @@ public class Server implements ArgsProcessor {
     @Messages("DESC_StartJavaLanguageServer=Starts the Java Language Server")
     public String lsPort;
 
-    @Arg(longName="start-java-debug-adapter-server")
-    @Description(shortDescription="#DESC_StartJavaDebugAdapterServer")
-    @Messages("DESC_StartJavaDebugAdapterServer=Starts the Java Debug Adapter Server")
-    public String debugPort;
-
     @Override
     public void process(Env env) throws CommandException {
         if (lsPort != null) {
@@ -94,7 +89,7 @@ public class Server implements ArgsProcessor {
                 if (connectTo == -1) {
                     launchServer(env.getInputStream(), env.getOutputStream());
                 } else {
-                    final Socket socket = new Socket(InetAddress.getLocalHost(), connectTo);
+                    final Socket socket = new Socket(InetAddress.getLoopbackAddress(), connectTo);
                     Thread languageServerThread = new Thread("Java Language Server:" + connectTo) {
                         @Override
                         public void run() {
@@ -111,16 +106,13 @@ public class Server implements ArgsProcessor {
                 throw (CommandException) new CommandException(1).initCause(ex);
             }
         }
-        if (debugPort != null) {
-            int debugConnectTo = Integer.parseInt(debugPort);
-            try {
-                int port = Debugger.startDebugger(debugConnectTo);
-                PrintStream ps = new PrintStream(env.getOutputStream());
-                ps.println("Debug Server Adapter listening at port " + port); // NOI18N
-                ps.flush();
-            } catch (IOException ex) {
-                throw (CommandException) new CommandException(1).initCause(ex);
-            }
+        try {
+            int port = Debugger.startDebugger();
+            PrintStream ps = new PrintStream(env.getOutputStream());
+            ps.println("Debug Server Adapter listening at port " + port); // NOI18N
+            ps.flush();
+        } catch (IOException ex) {
+            throw (CommandException) new CommandException(1).initCause(ex);
         }
     }
     
