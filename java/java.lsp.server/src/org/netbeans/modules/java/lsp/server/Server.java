@@ -215,7 +215,6 @@ public class Server implements ArgsProcessor {
 
         @Override
         public void exit() {
-            System.exit(1);
         }
 
         @Override
