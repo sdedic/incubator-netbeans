@@ -463,6 +463,9 @@ public class DebuggerManagerListener extends DebuggerManagerAdapter {
                         public void run() {
                             List<Component> retainOpenedComponents = new ArrayList<Component>(retainOpened.size());
                             for (ComponentInfo ci : retainOpened) {
+                                if (!ci.isInitialized()) {
+                                    continue;
+                                }
                                 Component c = ci.getComponent();
                                 if (c == null) {
                                     ErrorManager.getDefault().notify(new IllegalStateException("Null component from "+ci));

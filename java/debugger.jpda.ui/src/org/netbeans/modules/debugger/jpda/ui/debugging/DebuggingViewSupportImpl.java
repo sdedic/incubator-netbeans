@@ -43,6 +43,7 @@ import org.netbeans.modules.debugger.jpda.ui.models.DebuggingNodeModel;
 import org.netbeans.modules.debugger.jpda.util.WeakCacheMap;
 import org.netbeans.spi.debugger.ContextProvider;
 import org.netbeans.spi.debugger.ui.DebuggingView;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
 import org.netbeans.spi.viewmodel.UnknownTypeException;
 import org.openide.util.ImageUtilities;
 import org.openide.util.NbBundle;
@@ -216,6 +217,14 @@ public class DebuggingViewSupportImpl extends DebuggingView.DVSupport {
         return dvGroups;
     }
     
+    protected int getFrameCount(JPDADVThread thread) {
+        return thread.getKey().getStackDepth();
+    }
+    
+    protected List<DVFrame> getFrames(JPDADVThread thread, int from, int to) {
+        return JPDADVThread.getFrames(thread, from, to);
+    }
+
     private class ChangeListener implements PropertyChangeListener {
         
         private STATE state = STATE.DISCONNECTED;

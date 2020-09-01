@@ -58,6 +58,10 @@ import org.openide.util.Exceptions;
 
 public class NbStackTraceRequestHandler implements IDebugRequestHandler {
 
+    private static final String THREADS_VIEW_NAME = "DebuggingView";
+
+    private final ViewModel threadsView = new ViewModel(THREADS_VIEW_NAME);
+
     @Override
     public List<Command> getTargetCommands() {
         return Arrays.asList(Command.STACKTRACE);
@@ -101,7 +105,7 @@ public class NbStackTraceRequestHandler implements IDebugRequestHandler {
             
             System.err.println("found thread: " + jpdaThread);
             
-            Object[] newChildren = org.netbeans.modules.debugger.jpda.truffle.api.DebuggingTruffleTreeModel.filterAndAppend(jpdaThread, new Object[0]);
+            Object[] newChildren = new Object[0];//org.netbeans.modules.debugger.jpda.truffle.api.DebuggingTruffleTreeModel.filterAndAppend(jpdaThread, new Object[0]);
             
             System.err.println("newChildren: " + Arrays.asList(newChildren));
             int startFrame = stacktraceArgs.startFrame;

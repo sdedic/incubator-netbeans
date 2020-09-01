@@ -22,13 +22,22 @@ package org.netbeans.modules.debugger.jpda.ui.debugging;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.AbstractList;
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import com.sun.jdi.AbsentInformationException;
+
 import org.netbeans.api.debugger.Breakpoint;
+import org.netbeans.api.debugger.jpda.CallStackFrame;
 import org.netbeans.api.debugger.jpda.JPDAThread;
+
 import org.netbeans.modules.debugger.jpda.models.JPDAThreadImpl;
 import org.netbeans.modules.debugger.jpda.util.WeakCacheMap;
+
+import org.netbeans.spi.debugger.ui.DebuggingView;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVSupport;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
@@ -36,13 +45,13 @@ import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
  *
  * @author Martin Entlicher
  */
-public class JPDADVThread implements DVThread, WeakCacheMap.KeyedValue<JPDAThreadImpl> {
+public final class JPDADVThread implements DVThread, WeakCacheMap.KeyedValue<JPDAThreadImpl> {
     
     private final DebuggingViewSupportImpl dvSupport;
     private final JPDAThreadImpl t;
     private PropertyChangeProxyListener proxyListener;
     
-    public JPDADVThread(DebuggingViewSupportImpl dvSupport, JPDAThreadImpl t) {
+    JPDADVThread(DebuggingViewSupportImpl dvSupport, JPDAThreadImpl t) {
         this.dvSupport = dvSupport;
         this.t = t;
     }
@@ -76,6 +85,40 @@ public class JPDADVThread implements DVThread, WeakCacheMap.KeyedValue<JPDAThrea
     @Override
     public void makeCurrent() {
         t.makeCurrent();
+    }
+
+    @Override
+    public int getFrameCount() {
+        return dvSupport.getFrameCount(this);
+    }
+
+    @Override
+    public List<DVFrame> getFrames() {
+        return getFrames(0, Integer.MAX_VALUE);
+    }
+
+    @Override
+    public List<DVFrame> getFrames(int from, int to) {
+        return dvSupport.getFrames(this, from, to);
+    }
+
+    static List<DVFrame> getFrames(JPDADVThread thread, int from, int to) {
+        int depth = thread.t.getStackDepth();
+        if (depth == 0 || depth <= from) {
+            return Collections.emptyList();
+        }
+        //to = Math.min(to, depth);
+        CallStackFrame[] callStack;
+        try {
+            callStack = thread.t.getCallStack(from, to);
+        } catch (AbsentInformationException ex) {
+            return Collections.emptyList();
+        }
+        List<DebuggingView.DVFrame> frames = new ArrayList<>(callStack.length);
+        for (int i = 0; i < callStack.length; i++) {
+            frames.add(new JPDADVFrame(thread, callStack[i]));
+        }
+        return Collections.unmodifiableList(frames);
     }
 
     @Override

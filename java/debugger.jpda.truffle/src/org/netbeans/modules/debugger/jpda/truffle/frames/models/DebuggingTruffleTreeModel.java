@@ -17,10 +17,11 @@
  * under the License.
  */
 
-package org.netbeans.modules.debugger.jpda.truffle.api;
+package org.netbeans.modules.debugger.jpda.truffle.frames.models;
 
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -33,10 +34,13 @@ import org.netbeans.modules.debugger.jpda.truffle.access.TruffleAccess;
 import org.netbeans.modules.debugger.jpda.truffle.access.TruffleStrataProvider;
 import org.netbeans.modules.debugger.jpda.truffle.frames.TruffleStackFrame;
 import org.netbeans.modules.debugger.jpda.truffle.options.TruffleOptions;
+import org.netbeans.modules.debugger.jpda.ui.debugging.JPDADVFrame;
+import org.netbeans.modules.debugger.jpda.ui.debugging.JPDADVThread;
 import org.netbeans.modules.debugger.jpda.util.WeakCacheMap;
 import org.netbeans.spi.debugger.ContextProvider;
 import org.netbeans.spi.debugger.DebuggerServiceRegistration;
 import org.netbeans.spi.debugger.ui.DebuggingView;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
 import org.netbeans.spi.viewmodel.ModelEvent;
 import org.netbeans.spi.viewmodel.ModelListener;
 import org.netbeans.spi.viewmodel.TreeModel;
@@ -80,18 +84,12 @@ public class DebuggingTruffleTreeModel implements TreeModelFilter {
     public Object[] getChildren(TreeModel original, Object parent, int from, int to) throws UnknownTypeException {
         Object[] children = original.getChildren(parent, from, to);
         if (parent instanceof DebuggingView.DVThread && children.length > 0) {
-            final JPDAThread currentThread = ((WeakCacheMap.KeyedValue<JPDAThread>) parent).getKey();
-            children = filterAndAppend(currentThread, children);
-        }
-        return children;
-    }
-
-    public static Object[] filterAndAppend(final JPDAThread currentThread, Object[] children) {
-        CurrentPCInfo currentPCInfo = TruffleAccess.getCurrentPCInfo(currentThread);
-        if (currentPCInfo != null) {
-            boolean showInternalFrames = TruffleOptions.isLanguageDeveloperMode();
-            TruffleStackFrame[] stackFrames = currentPCInfo.getStack().getStackFrames(showInternalFrames);
-            children = filterAndAppend(children, stackFrames, currentPCInfo.getTopFrame());
+            CurrentPCInfo currentPCInfo = TruffleAccess.getCurrentPCInfo(((WeakCacheMap.KeyedValue<JPDAThread>) parent).getKey());
+            if (currentPCInfo != null) {
+                boolean showInternalFrames = TruffleOptions.isLanguageDeveloperMode();
+                TruffleStackFrame[] stackFrames = currentPCInfo.getStack().getStackFrames(showInternalFrames);
+                children = filterAndAppend(children, stackFrames, currentPCInfo.getTopFrame());
+            }
         }
         return children;
     }
@@ -147,5 +145,29 @@ public class DebuggingTruffleTreeModel implements TreeModelFilter {
         }
         return newChildren.toArray();
     }
-    
+
+    static List<DVFrame> filterAndAppend(JPDADVThread thread, List<DVFrame> children,
+                                         TruffleStackFrame[] stackFrames,
+                                         TruffleStackFrame topFrame) {
+        List<DVFrame> newChildren = new ArrayList<>(children.size());
+        for (DVFrame ch : children) {
+            if (ch instanceof JPDADVFrame) {
+                String className = ((JPDADVFrame) ch).getCallStackFrame().getClassName();
+                if (PREDICATE1.test(className) ||
+                    className.startsWith(FILTER2) ||
+                    className.startsWith(FILTER3)) {
+                    
+                    continue;
+                }
+            }
+            newChildren.add(ch);
+        }
+        int i = 0;
+        newChildren.add(i++, new TruffleDVFrame(thread, topFrame));
+        for (TruffleStackFrame tsf : stackFrames) {
+            newChildren.add(i++, new TruffleDVFrame(thread, tsf));
+        }
+        return Collections.unmodifiableList(newChildren);
+    }
+
 }
