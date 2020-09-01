@@ -18,13 +18,22 @@
  */
 package org.netbeans.modules.java.lsp.server.workspace;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
 import org.eclipse.lsp4j.ExecuteCommandParams;
+import org.eclipse.lsp4j.MessageParams;
+import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.WorkspaceSymbolParams;
+import org.eclipse.lsp4j.services.LanguageClient;
+import org.eclipse.lsp4j.services.LanguageClientAware;
 import org.eclipse.lsp4j.services.WorkspaceService;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ui.OpenProjects;
@@ -32,6 +41,7 @@ import org.netbeans.modules.java.lsp.server.Server;
 import org.netbeans.modules.java.lsp.server.utils.IOProviderImpl;
 import org.netbeans.spi.project.ActionProvider;
 import org.openide.util.Lookup;
+import org.openide.util.Pair;
 import org.openide.util.lookup.Lookups;
 import org.openide.util.lookup.ProxyLookup;
 import org.openide.windows.IOProvider;
@@ -40,11 +50,22 @@ import org.openide.windows.IOProvider;
  *
  * @author lahvac
  */
-public class WorkspaceServiceImpl implements WorkspaceService {
+public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAware {
+
+    private final IOProvider ioProvider;
+    private LanguageClient client;
+
+    public WorkspaceServiceImpl() {
+        final Pair<InputStream, OutputStream> out = IOProviderImpl.createCopyingStreams();
+        final Pair<InputStream, OutputStream> err = IOProviderImpl.createCopyingStreams();
+        this.ioProvider = new IOProviderImpl(out.second(), err.second());
+        StreamPrinter sp = new StreamPrinter(out.first());
+        sp.start();
+    }
 
     @Override
     public CompletableFuture<Object> executeCommand(ExecuteCommandParams params) {
-        switch(params.getCommand()) {
+        switch (params.getCommand()) {
             case Server.JAVA_BUILD_WORKSPACE:
                 for (Project prj : OpenProjects.getDefault().getOpenProjects()) {
                     ActionProvider ap = prj.getLookup().lookup(ActionProvider.class);
@@ -56,7 +77,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 }
                 return CompletableFuture.completedFuture(true);
             default:
-                throw new UnsupportedOperationException();
+                throw new UnsupportedOperationException("Command not supported: " + params.getCommand());
         }
     }
 
@@ -74,6 +95,32 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     public void didChangeWatchedFiles(DidChangeWatchedFilesParams arg0) {
         //TODO: not watching files for now
     }
-    
-    private final IOProvider ioProvider = new IOProviderImpl(IOProviderImpl.createCopyingStreams().second(), IOProviderImpl.createCopyingStreams().second());
+
+    @Override
+    public void connect(LanguageClient client) {
+        this.client = client;
+    }
+
+    private class StreamPrinter extends Thread {
+
+        InputStream is;
+
+        public StreamPrinter(InputStream stream) {
+            is = stream;
+        }
+
+        public void run() {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+                String line = br.readLine();
+                while (line != null) {
+                    if (client != null) {
+                        client.logMessage(new MessageParams(MessageType.Info, line));
+                    }
+                    line = br.readLine();
+                }
+            } catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+            }
+        }
+    }
 }

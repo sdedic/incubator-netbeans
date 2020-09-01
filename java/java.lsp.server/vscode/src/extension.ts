@@ -28,7 +28,7 @@ import {
 
 import * as net from 'net';
 import * as path from 'path';
-import { execSync, spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import * as vscode from 'vscode';
 
 let client: LanguageClient;
@@ -177,6 +177,7 @@ export function activate(context: ExtensionContext) {
                     const commands = await vscode.commands.getCommands();
                     if (commands.includes('java.build.workspace')) {
                         p.report({ message: 'Compiling workspace...' });
+                        client.outputChannel.show(true);
                         const start = new Date().getTime();
                         const res = await vscode.commands.executeCommand('java.build.workspace');
                         const elapsed = new Date().getTime() - start;

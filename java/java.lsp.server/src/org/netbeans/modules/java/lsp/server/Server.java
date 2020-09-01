@@ -129,6 +129,7 @@ public class Server implements ArgsProcessor {
         private static final Logger LOG = Logger.getLogger(LanguageServerImpl.class.getName());
         private LanguageClient client;
         private final TextDocumentService textDocumentService = new TextDocumentServiceImpl();
+        private final WorkspaceService workspaceService = new WorkspaceServiceImpl();
 
         @Override
         public CompletableFuture<InitializeResult> initialize(InitializeParams init) {
@@ -216,13 +217,14 @@ public class Server implements ArgsProcessor {
 
         @Override
         public WorkspaceService getWorkspaceService() {
-            return new WorkspaceServiceImpl();
+            return workspaceService;
         }
 
         @Override
         public void connect(LanguageClient client) {
             this.client = client;
             ((LanguageClientAware) getTextDocumentService()).connect(client);
+            ((LanguageClientAware) getWorkspaceService()).connect(client);
         }
     }
 
