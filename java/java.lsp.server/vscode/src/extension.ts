@@ -226,9 +226,21 @@ class NetBeansConfigurationProvider implements vscode.DebugConfigurationProvider
 
     resolveDebugConfiguration(folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration, token?: vscode.CancellationToken): vscode.ProviderResult<vscode.DebugConfiguration> {
         window.showErrorMessage('NB debug - resolveDebugConfiguration.');
-        config.mainClass = config.program;
-        config.classPaths = ['any'];
-        config.console = 'internalConsole';
+        if (!config.type) {
+            config.type = 'java';
+        }
+        if (!config.request) {
+            config.request = 'launch';
+        }
+        if (!config.mainClass) {
+            config.mainClass = '${file}';
+        }
+        if (!config.classPaths) {
+            config.classPaths = ['any'];
+        }
+        if (!config.console) {
+            config.console = 'internalConsole';
+        }
 
         return config;
     }

@@ -50,11 +50,29 @@
 				"runtime": "node",
 				"configurationAttributes": {
 					"launch": {
+						"required": ["mainClass"],
 						"properties": {
-							"program": {
+							"mainClass": {
 								"type": "string",
-								"description": "Absolute path to the program."
-							}
+								"description": "Absolute path to the program main class.",
+								"default": "${file}"
+							},
+							"classPaths": {
+								"type": "array",
+								"items": {
+								  "type": "string"
+								},
+								"description": "The classpaths for launching the JVM.",
+								"default": []
+							},
+							"console": {
+								"type": "string",
+								"enum": [
+								  "internalConsole"
+								],
+								"description": "The specified console to launch the program.",
+								"default": "internalConsole"
+							  }
 						}
 					}
 				},
@@ -63,7 +81,7 @@
 						"type": "java",
 						"request": "launch",
 						"name": "Java (NetBeans)",
-						"program": "${file}"
+						"mainClass": "${file}"
 					}
 				]
 			}
