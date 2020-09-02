@@ -30,7 +30,6 @@ import com.microsoft.java.debug.core.adapter.IProviderContext;
 import com.microsoft.java.debug.core.adapter.LaunchMode;
 import com.microsoft.java.debug.core.adapter.handler.AttachRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.CompletionsHandler;
-import com.microsoft.java.debug.core.adapter.handler.ConfigurationDoneRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.DisconnectRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.DisconnectRequestWithoutDebuggingHandler;
 import com.microsoft.java.debug.core.adapter.handler.EvaluateRequestHandler;
@@ -39,15 +38,9 @@ import com.microsoft.java.debug.core.adapter.handler.HotCodeReplaceHandler;
 import com.microsoft.java.debug.core.adapter.handler.InitializeRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.LaunchRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.RestartFrameHandler;
-import com.microsoft.java.debug.core.adapter.handler.ScopesRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.SetBreakpointsRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.SetExceptionBreakpointsRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.SetVariableRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.SourceRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.StackTraceRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.StepRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.ThreadsRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.VariablesRequestHandler;
 import com.microsoft.java.debug.core.protocol.IProtocolServer;
 import com.microsoft.java.debug.core.protocol.JsonUtils;
 import com.microsoft.java.debug.core.protocol.Messages;
@@ -57,7 +50,7 @@ import com.microsoft.java.debug.core.protocol.Requests.Command;
 public class NbDebugAdapter implements IDebugAdapter {
     private static final Logger logger = Logger.getLogger(Configuration.LOGGER_NAME);
 
-    private IDebugAdapterContext debugContext = null;
+    private final IDebugAdapterContext debugContext;
     private Map<Command, List<IDebugRequestHandler>> requestHandlersForDebug = null;
     private Map<Command, List<IDebugRequestHandler>> requestHandlersForNoDebug = null;
 
@@ -105,18 +98,19 @@ public class NbDebugAdapter implements IDebugAdapter {
         // Register request handlers.
         // When there are multiple handlers registered for the same request, follow the rule "first register, first execute".
         registerHandler(new InitializeRequestHandler());
+        registerHandler(new NbInitializeRequestHandler());
         registerHandler(new LaunchRequestHandler());
 
         // DEBUG node only
         registerHandlerForDebug(new AttachRequestHandler());
-        registerHandlerForDebug(new ConfigurationDoneRequestHandler());
+        //registerHandlerForDebug(new ConfigurationDoneRequestHandler());
+        registerHandlerForDebug(new NbConfigurationDoneRequestHandler());
+        registerHandlerForDebug(new NbDisconnectRequestHandler());
         registerHandlerForDebug(new DisconnectRequestHandler());
-        registerHandlerForDebug(new SetBreakpointsRequestHandler());
+        registerHandlerForDebug(new NbSetBreakpointsRequestHandler());
         registerHandlerForDebug(new SetExceptionBreakpointsRequestHandler());
         registerHandlerForDebug(new SourceRequestHandler());
-        //registerHandlerForDebug(new NbThreadsHandler());
-        registerHandlerForDebug(new StepRequestHandler());
-        //registerHandlerForDebug(new NbStackTraceRequestHandler());
+        registerHandlerForDebug(new NbStepRequestHandler());
         registerHandlerForDebug(new NbThreadsAndStacksRequestHandler());
         registerHandlerForDebug(new NbScopesRequestHandler());
         registerHandlerForDebug(new NbVariablesRequestHandler());

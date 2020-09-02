@@ -118,9 +118,9 @@ public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
         }
 
         // XXX Stepping workaround:
-            ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
-            System.err.println("am: " + am);
-            am.doAction("pauseInGraalScript");
+        //    ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
+        //    System.err.println("am: " + am);
+        //    am.doAction("pauseInGraalScript");
 
         DebuggingView.DVThread dvThread = threadsById.get(arguments.threadId);
         int from, to;
@@ -157,6 +157,13 @@ public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
     }
 
     private CompletableFuture<Response> pause(Requests.PauseArguments arguments, Response response, IDebugAdapterContext context) {
+        DebuggingView.DVThread dvThread = threadsById.get(arguments.threadId);
+        if (dvThread != null) {
+            dvThread.suspend();
+            context.getProtocolServer().sendEvent(new Events.StoppedEvent("pause", arguments.threadId));
+            return CompletableFuture.completedFuture(response);
+        }
+        
         ThreadReference thread = DebugUtility.getThread(context.getDebugSession(), arguments.threadId);
         if (thread != null) {
             thread.suspend();
@@ -169,6 +176,14 @@ public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
     }
 
     private CompletableFuture<Response> resume(Requests.ContinueArguments arguments, Response response, IDebugAdapterContext context) {
+        DebuggingView.DVThread dvThread = threadsById.get(arguments.threadId);
+        if (dvThread != null) {
+            dvThread.resume();
+            context.getRecyclableIdPool().removeObjectsByOwner(arguments.threadId);
+            response.body = new Responses.ContinueResponseBody(false);
+            return CompletableFuture.completedFuture(response);
+        }
+        
         boolean allThreadsContinued = true;
         ThreadReference thread = DebugUtility.getThread(context.getDebugSession(), arguments.threadId);
         /**

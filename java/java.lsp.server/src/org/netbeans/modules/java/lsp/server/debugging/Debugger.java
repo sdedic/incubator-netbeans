@@ -522,7 +522,7 @@ public class Debugger {
                                 sourceProvider.sources = properties != null ? (ClassPath) properties.getOrDefault("sourcepath", ClassPath.EMPTY) : ClassPath.EMPTY;
                                 d.setRunningCallback(vm -> {
                                     delegate = vm;
-                                    vm.resume();
+                                    //vm.resume();
                                     cdl.countDown();
                                 });
                             }

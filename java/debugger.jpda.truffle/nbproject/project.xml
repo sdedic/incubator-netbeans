@@ -270,7 +270,7 @@
                 </test-type>
             </test-dependencies>
             <public-packages>
-                <package>org.netbeans.modules.debugger.jpda.truffle.api</package>
+                <package>org.netbeans.modules.debugger.jpda.truffle.breakpoints</package>
                 <package>org.netbeans.modules.debugger.jpda.truffle.frames</package>
                 <package>org.netbeans.modules.debugger.jpda.truffle.source</package>
             </public-packages>
