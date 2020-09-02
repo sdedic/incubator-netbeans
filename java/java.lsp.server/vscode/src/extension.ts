@@ -168,7 +168,7 @@ export function activate(context: ExtensionContext) {
 
         let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory();
         context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('java', debugDescriptionFactory));
-        window.showErrorMessage('NB debug - all setup.');
+        window.showInformationMessage('Java Debug Adapter ready.');
 
         // register commands
         context.subscriptions.push(commands.registerCommand('java.workspace.compile', () => {
@@ -216,7 +216,6 @@ export function deactivate(): Thenable<void> {
 class NetBeansDebugAdapterDescriptionFactory implements vscode.DebugAdapterDescriptorFactory {
 
     createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
-        window.showErrorMessage('NB debug - debug adapter server.');
         return new vscode.DebugAdapterServer(debugPort);
     }
 }
@@ -225,7 +224,6 @@ class NetBeansDebugAdapterDescriptionFactory implements vscode.DebugAdapterDescr
 class NetBeansConfigurationProvider implements vscode.DebugConfigurationProvider {
 
     resolveDebugConfiguration(folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration, token?: vscode.CancellationToken): vscode.ProviderResult<vscode.DebugConfiguration> {
-        window.showErrorMessage('NB debug - resolveDebugConfiguration.');
         if (!config.type) {
             config.type = 'java';
         }
