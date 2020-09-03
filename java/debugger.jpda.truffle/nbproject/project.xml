@@ -273,6 +273,7 @@
                 <package>org.netbeans.modules.debugger.jpda.truffle.breakpoints</package>
                 <package>org.netbeans.modules.debugger.jpda.truffle.frames</package>
                 <package>org.netbeans.modules.debugger.jpda.truffle.source</package>
+                <package>org.netbeans.modules.debugger.jpda.truffle.vars</package>
             </public-packages>
             <extra-compilation-unit>
                 <package-root>truffle-backend</package-root>
