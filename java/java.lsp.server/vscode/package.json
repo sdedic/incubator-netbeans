@@ -91,6 +91,11 @@
 				"command": "java.workspace.compile",
 				"title": "Compile Workspace",
 				"category": "Java"
+			},
+			{
+				"command": "graalvm.pause.script",
+				"title": "Pause in Script",
+				"category": "GraalVM"
 			}
 		],
 		"keybindings": [
@@ -104,6 +109,10 @@
 			"commandPalette": [
 				{
 					"command": "java.workspace.compile",
+					"when": "nbJavaLSReady"
+				},
+				{
+					"command": "graalvm.pause.script",
 					"when": "nbJavaLSReady"
 				}
 			]

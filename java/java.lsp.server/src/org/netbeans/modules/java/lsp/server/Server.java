@@ -197,7 +197,7 @@ public class Server implements ArgsProcessor {
             capabilities.setDocumentSymbolProvider(true);
             capabilities.setDefinitionProvider(true);
             capabilities.setDocumentHighlightProvider(true);
-            capabilities.setExecuteCommandProvider(new ExecuteCommandOptions(Arrays.asList(JAVA_BUILD_WORKSPACE)));
+            capabilities.setExecuteCommandProvider(new ExecuteCommandOptions(Arrays.asList(JAVA_BUILD_WORKSPACE, GRAALVM_PAUSE_SCRIPT)));
             return CompletableFuture.completedFuture(new InitializeResult(capabilities));
         }
 
@@ -229,5 +229,6 @@ public class Server implements ArgsProcessor {
     }
 
     public static final String JAVA_BUILD_WORKSPACE =  "java.build.workspace";
+    public static final String GRAALVM_PAUSE_SCRIPT =  "graalvm.pause.script";
     static final String INDEXING_COMPLETED = "Indexing completed.";
 }

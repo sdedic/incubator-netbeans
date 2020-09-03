@@ -35,6 +35,8 @@ import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageClientAware;
 import org.eclipse.lsp4j.services.WorkspaceService;
+import org.netbeans.api.debugger.ActionsManager;
+import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.modules.java.lsp.server.Server;
@@ -66,6 +68,10 @@ public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAwa
     @Override
     public CompletableFuture<Object> executeCommand(ExecuteCommandParams params) {
         switch (params.getCommand()) {
+            case Server.GRAALVM_PAUSE_SCRIPT:
+                ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
+                am.doAction("pauseInGraalScript");
+                return CompletableFuture.completedFuture(true);
             case Server.JAVA_BUILD_WORKSPACE:
                 for (Project prj : OpenProjects.getDefault().getOpenProjects()) {
                     ActionProvider ap = prj.getLookup().lookup(ActionProvider.class);
