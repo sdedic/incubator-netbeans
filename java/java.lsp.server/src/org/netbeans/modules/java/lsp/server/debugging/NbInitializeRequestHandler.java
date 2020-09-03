@@ -64,6 +64,7 @@ public class NbInitializeRequestHandler implements IDebugRequestHandler {
         DebuggerManager.getDebuggerManager().addDebuggerListener(DebuggerManager.PROP_SESSIONS, new DebuggerManagerAdapter() {
             @Override
             public void sessionAdded(Session session) {
+                DebuggerManager.getDebuggerManager().removeDebuggerListener(DebuggerManager.PROP_SESSIONS, this);
                 JPDADebugger dbg = session.lookupFirst(null, JPDADebugger.class);
                 dbg.addPropertyChangeListener(new DebuggerPropertyChangeListener(context));
             }
@@ -83,15 +84,41 @@ public class NbInitializeRequestHandler implements IDebugRequestHandler {
             switch (propertyName) {
                 case JPDADebugger.PROP_STATE:
                     int newState = (int) evt.getNewValue();
-                    if (newState == JPDADebugger.STATE_STOPPED) {
-                        JPDADebugger debugger = (JPDADebugger) evt.getSource();
-                        JPDAThread currentThread = debugger.getCurrentThread();
-                        if (((JPDAThreadImpl) currentThread).isInStep()) {
-                            context.getProtocolServer().sendEvent(new Events.StoppedEvent("step", currentThread.getID()));
-                        } else {
-                            context.getProtocolServer().sendEvent(new Events.StoppedEvent("breakpoint", currentThread.getID()));
-                        }
+                    JPDADebugger debugger = (JPDADebugger) evt.getSource();
+                    switch (newState) {
+                        case JPDADebugger.STATE_STOPPED:
+                            JPDAThread currentThread = debugger.getCurrentThread();
+                            if (((JPDAThreadImpl) currentThread).isInStep()) {
+                                context.getProtocolServer().sendEvent(new Events.StoppedEvent("step", currentThread.getID()));
+                            } else if (currentThread.getCurrentBreakpoint() != null) {
+                                context.getProtocolServer().sendEvent(new Events.StoppedEvent("breakpoint", currentThread.getID()));
+                            } else {
+                                context.getProtocolServer().sendEvent(new Events.StoppedEvent("pause", currentThread.getID()));
+                            }
+                            break;
+                        case JPDADebugger.STATE_DISCONNECTED:
+                            debugger.removePropertyChangeListener(this);
+                            context.setVmTerminated();
+                            context.getProtocolServer().sendEvent(new Events.TerminatedEvent());
+                            // Terminate eventHub thread.
+                            try {
+                                context.getDebugSession().getEventHub().close();
+                            } catch (Exception e) {
+                                // do nothing.
+                            }
+                            break;
                     }
+                    break;
+                case JPDADebugger.PROP_THREAD_STARTED:
+                    JPDAThread thread = (JPDAThread) evt.getNewValue();
+                    Events.ThreadEvent threadStartEvent = new Events.ThreadEvent("started", thread.getID());
+                    context.getProtocolServer().sendEvent(threadStartEvent);
+                    break;
+                case JPDADebugger.PROP_THREAD_DIED:
+                    thread = (JPDAThread) evt.getOldValue();
+                    Events.ThreadEvent threadDeathEvent = new Events.ThreadEvent("exited", thread.getID());
+                    context.getProtocolServer().sendEvent(threadDeathEvent);
+                    break;
             }
         }
 
