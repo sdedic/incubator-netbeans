@@ -77,7 +77,7 @@ public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAwa
                     ActionProvider ap = prj.getLookup().lookup(ActionProvider.class);
                     if (ap != null && ap.isActionEnabled(ActionProvider.COMMAND_BUILD, Lookups.fixed())) {
                         Lookups.executeWith(new ProxyLookup(Lookups.fixed(ioProvider), Lookup.getDefault()), () -> {
-                            ap.invokeAction(ActionProvider.COMMAND_BUILD, Lookups.fixed());
+                            ap.invokeAction(ActionProvider.COMMAND_REBUILD, Lookups.fixed());
                         });
                     }
                 }
