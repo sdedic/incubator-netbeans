@@ -37,6 +37,8 @@ import java.util.TreeSet;
 import java.util.WeakHashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutionException;
@@ -52,9 +54,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.openide.util.lookup.Lookups;
+import org.openide.util.Task.Completable;
+import org.openide.util.Task.Privileged;
 
 /** Request processor is {@link Executor} (since version 7.16) capable to
  * perform asynchronous requests in a dedicated thread pool.
@@ -1083,7 +1091,7 @@ outer:  do {
         }
     }
 
-    private static abstract class TaskFutureWrapper implements ScheduledFuture<Void>, Runnable, RunnableWrapper {
+    private static abstract class TaskFutureWrapper extends CompletableFuture<Void> implements ScheduledFuture<Void>, Runnable, RunnableWrapper {
         volatile Task t;
         protected final Runnable toRun;
         protected final long initialDelay;
@@ -1299,11 +1307,71 @@ outer:  do {
             return delegate instanceof Cancellable ? ((Cancellable) delegate).cancel() : true;
         }
     }
+    
+    
+    /**
+     * Disallows calls to {@link #complete} or {@link #completeExceptionally} internally,
+     * as the completion is driven by the running Task. The task may be, however {@link #cancel(boolean)}led
+     * through this Future.
+     */
+    private static class CC<T> extends FutureOverrides.CompletionStageFuture<T> {
+        private final Future<T> delegate;
+        private final Task task;
+        
+        public CC(Executor commonExecutor, Future<T> delegate, Task task) {
+            super(commonExecutor);
+            this.delegate = delegate;
+            this.task = task;
+        }
+        
+        @Override
+        public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            if (timeout == 0) {
+                if (!isDone()) {
+                    throw new TimeoutException();
+                }
+            } else {
+                task.waitFinished(unit.toMillis(timeout));
+            }
+            if (isDone()) {
+                return super.get();
+            } else {
+                return super.get(0, TimeUnit.MILLISECONDS);
+            }
+        }
 
-    private static class RPFutureTask<T> extends FutureTask<T> implements RunnableWrapper {
+        @Override
+        public T get() throws InterruptedException, ExecutionException {
+            task.waitFinished();
+            return super.get();
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            // delegate back to the RPFutureTask itself
+            return delegate.cancel(mayInterruptIfRunning);
+        }
+    }
+    
+    public <T, R extends Future<T> & CompletionStage<T>> R requireCompletion(Future<T> taskFuture) {
+        if (taskFuture instanceof Completable) {
+            return (R)taskFuture;
+        } else {
+            throw new IllegalArgumentException();
+        }
+    } 
+
+    /**
+     * Handle to the running task returned from the RP Executor API. Clients prior to 9.17 may
+     * be coded to downcast the result to {@link #FutureTask}, so it does not directly extend {@link Completable} implementation
+     * like {@link FutureOverrides.FutureBase}, but rather delegates to it.
+     * @param <T> 
+     */
+    private static class RPFutureTask<T> extends FutureTask<T> implements RunnableWrapper, Completable<T> {
         protected volatile Task task;
         private final Runnable runnable;
         private final Cancellable cancellable;
+        
         RPFutureTask(Callable<T> c) {
             super (c);
             this.runnable = null;
@@ -1319,26 +1387,237 @@ outer:  do {
         void setTask(Task task) {
             this.task = task;
         }
-
-        RPFutureTask(Callable<T> c, T predefinedResult) {
-            this (c);
-            set(predefinedResult);
+        
+        Completable<T> completable() {
+            return (Completable<T>)task.getFutureInternal(true).future();
         }
-
+        
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             boolean result = cancellable == null ? true : cancellable.cancel();
             if (result) {
-                boolean taskCancelled = task.cancel();
-                boolean superCancel = super.cancel(mayInterruptIfRunning); //must call both!
+                // In a pathological case, task.cancel() is run first, it could succeed in interrupting
+                // and terminating the runnable NORMALLY, which will prevent FutureTask.cancel() from reporting true.
+                boolean superCancel = super.cancel(mayInterruptIfRunning);
+                boolean taskCancelled = task.cancel(mayInterruptIfRunning);
                 result = taskCancelled && superCancel;
             }
             return result;
         }
 
+        /**
+         * FutureTask.run always completes normally; need to report the 
+         * exceptional result before the runner calls task.notifyFinished().
+         */
+        @Override
+        public void run() {
+            super.run();
+            try {
+                this.get();
+            } catch (InterruptedException ex) {
+                // not important (?)
+            } catch (ExecutionException ex) {
+                task.notifyFinishedExceptionally(ex.getCause());
+            }
+        }
+
         @Override
         public Runnable getRunnable() {
             return this.runnable;
+        }
+
+        public T getNow(T valueIfAbsent) {
+            return completable().getNow(valueIfAbsent);
+        }
+
+        @Override
+        public <U> CompletionStage<U> thenApply(Function<? super T, ? extends U> fn) {
+            return completable().thenApply(fn);
+        }
+
+        @Override
+        public <U> CompletionStage<U> thenApplyAsync(Function<? super T, ? extends U> fn) {
+            return completable().thenApplyAsync(fn);
+        }
+
+        @Override
+        public <U> CompletionStage<U> thenApplyAsync(Function<? super T, ? extends U> fn, Executor executor) {
+            return completable().thenApplyAsync(fn, executor);
+        }
+
+        @Override
+        public CompletionStage<Void> thenAccept(Consumer<? super T> action) {
+            return completable().thenAccept(action);
+        }
+
+        @Override
+        public CompletionStage<Void> thenAcceptAsync(Consumer<? super T> action) {
+            return completable().thenAcceptAsync(action);
+        }
+
+        @Override
+        public CompletionStage<Void> thenAcceptAsync(Consumer<? super T> action, Executor executor) {
+            return completable().thenAcceptAsync(action, executor);
+        }
+
+        @Override
+        public CompletionStage<Void> thenRun(Runnable action) {
+            return completable().thenRun(action);
+        }
+
+        @Override
+        public CompletionStage<Void> thenRunAsync(Runnable action) {
+            return completable().thenRunAsync(action);
+        }
+
+        @Override
+        public CompletionStage<Void> thenRunAsync(Runnable action, Executor executor) {
+            return completable().thenRunAsync(action, executor);
+        }
+
+        @Override
+        public <U, V> CompletionStage<V> thenCombine(CompletionStage<? extends U> other, BiFunction<? super T, ? super U, ? extends V> fn) {
+            return completable().thenCombine(other, fn);
+        }
+
+        @Override
+        public <U, V> CompletionStage<V> thenCombineAsync(CompletionStage<? extends U> other, BiFunction<? super T, ? super U, ? extends V> fn) {
+            return completable().thenCombineAsync(other, fn);
+        }
+
+        @Override
+        public <U, V> CompletionStage<V> thenCombineAsync(CompletionStage<? extends U> other, BiFunction<? super T, ? super U, ? extends V> fn, Executor executor) {
+            return completable().thenCombineAsync(other, fn, executor);
+        }
+
+        @Override
+        public <U> CompletionStage<Void> thenAcceptBoth(CompletionStage<? extends U> other, BiConsumer<? super T, ? super U> action) {
+            return completable().thenAcceptBoth(other, action);
+        }
+
+        @Override
+        public <U> CompletionStage<Void> thenAcceptBothAsync(CompletionStage<? extends U> other, BiConsumer<? super T, ? super U> action) {
+            return completable().thenAcceptBothAsync(other, action);
+        }
+
+        @Override
+        public <U> CompletionStage<Void> thenAcceptBothAsync(CompletionStage<? extends U> other, BiConsumer<? super T, ? super U> action, Executor executor) {
+            return completable().thenAcceptBothAsync(other, action, executor);
+        }
+
+        @Override
+        public CompletionStage<Void> runAfterBoth(CompletionStage<?> other, Runnable action) {
+            return completable().runAfterBoth(other, action);
+        }
+
+        @Override
+        public CompletionStage<Void> runAfterBothAsync(CompletionStage<?> other, Runnable action) {
+            return completable().runAfterBothAsync(other, action);
+        }
+
+        @Override
+        public CompletionStage<Void> runAfterBothAsync(CompletionStage<?> other, Runnable action, Executor executor) {
+            return completable().runAfterBothAsync(other, action, executor);
+        }
+
+        @Override
+        public <U> CompletionStage<U> applyToEither(CompletionStage<? extends T> other, Function<? super T, U> fn) {
+            return completable().applyToEither(other, fn);
+        }
+
+        @Override
+        public <U> CompletionStage<U> applyToEitherAsync(CompletionStage<? extends T> other, Function<? super T, U> fn) {
+            return completable().applyToEitherAsync(other, fn);
+        }
+
+        @Override
+        public <U> CompletionStage<U> applyToEitherAsync(CompletionStage<? extends T> other, Function<? super T, U> fn, Executor executor) {
+            return completable().applyToEitherAsync(other, fn, executor);
+        }
+
+        @Override
+        public CompletionStage<Void> acceptEither(CompletionStage<? extends T> other, Consumer<? super T> action) {
+            return completable().acceptEither(other, action);
+        }
+
+        @Override
+        public CompletionStage<Void> acceptEitherAsync(CompletionStage<? extends T> other, Consumer<? super T> action) {
+            return completable().acceptEitherAsync(other, action);
+        }
+
+        @Override
+        public CompletionStage<Void> acceptEitherAsync(CompletionStage<? extends T> other, Consumer<? super T> action, Executor executor) {
+            return completable().acceptEitherAsync(other, action, executor);
+        }
+
+        @Override
+        public CompletionStage<Void> runAfterEither(CompletionStage<?> other, Runnable action) {
+            return completable().runAfterEither(other, action);
+        }
+
+        @Override
+        public CompletionStage<Void> runAfterEitherAsync(CompletionStage<?> other, Runnable action) {
+            return completable().runAfterEitherAsync(other, action);
+        }
+
+        @Override
+        public CompletionStage<Void> runAfterEitherAsync(CompletionStage<?> other, Runnable action, Executor executor) {
+            return completable().runAfterEitherAsync(other, action, executor);
+        }
+
+        @Override
+        public <U> CompletionStage<U> thenCompose(Function<? super T, ? extends CompletionStage<U>> fn) {
+            return completable().thenCompose(fn);
+        }
+
+        @Override
+        public <U> CompletionStage<U> thenComposeAsync(Function<? super T, ? extends CompletionStage<U>> fn) {
+            return completable().thenComposeAsync(fn);
+        }
+
+        @Override
+        public <U> CompletionStage<U> thenComposeAsync(Function<? super T, ? extends CompletionStage<U>> fn, Executor executor) {
+            return completable().thenComposeAsync(fn, executor);
+        }
+
+        @Override
+        public CompletionStage<T> whenComplete(BiConsumer<? super T, ? super Throwable> action) {
+            return completable().whenComplete(action);
+        }
+
+        @Override
+        public CompletionStage<T> whenCompleteAsync(BiConsumer<? super T, ? super Throwable> action) {
+            return completable().whenCompleteAsync(action);
+        }
+
+        @Override
+        public CompletionStage<T> whenCompleteAsync(BiConsumer<? super T, ? super Throwable> action, Executor executor) {
+            return completable().whenCompleteAsync(action, executor);
+        }
+
+        @Override
+        public <U> CompletionStage<U> handle(BiFunction<? super T, Throwable, ? extends U> fn) {
+            return completable().handle(fn);
+        }
+
+        @Override
+        public <U> CompletionStage<U> handleAsync(BiFunction<? super T, Throwable, ? extends U> fn) {
+            return completable().handleAsync(fn);
+        }
+
+        @Override
+        public <U> CompletionStage<U> handleAsync(BiFunction<? super T, Throwable, ? extends U> fn, Executor executor) {
+            return completable().handleAsync(fn, executor);
+        }
+
+        @Override
+        public CompletionStage<T> exceptionally(Function<Throwable, ? extends T> fn) {
+            return completable().exceptionally(fn);
+        }
+        
+        @Override
+        public CompletableFuture<T> toCompletableFuture() {
+            return completable().toCompletableFuture();
         }
     }
 
@@ -1357,7 +1636,7 @@ outer:  do {
         
         @Override
         public long getDelay(TimeUnit unit) {
-            return unit.convert(delayMillis, TimeUnit.MILLISECONDS);
+            return unit.convert(task.getDelay(), TimeUnit.MILLISECONDS);
         }
 
         @Override
@@ -1365,6 +1644,79 @@ outer:  do {
             //Can overflow, if one delay is, say, days, and the other, microseconds
             long otherDelayMillis = o.getDelay(TimeUnit.MILLISECONDS);
             return (int) (delayMillis - otherDelayMillis);
+        }
+    }
+    
+    
+    static class TaskFuture<T> extends FutureOverrides.CompletionStageFuture<T> implements ScheduledFuture<T>, Comparable<Delayed>, Completable<T> {
+        private final Task  task;
+
+        public TaskFuture(Task task, Executor exec) {
+            super(exec);
+            this.task = task;
+        }
+
+        @Override
+        public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            if (timeout == 0) {
+                if (!isDone()) {
+                    throw new TimeoutException();
+                }
+            } else {
+                task.waitFinished(unit.toMillis(timeout));
+            }
+            if (isDone()) {
+                return super.get();
+            } else {
+                return super.get(0, TimeUnit.MILLISECONDS);
+            }
+        }
+
+        @Override
+        public T get() throws InterruptedException, ExecutionException {
+            task.waitFinished();
+            return super.get();
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit) {
+            return unit.convert(task.getDelay(), TimeUnit.MILLISECONDS);
+        }
+
+        @Override
+        public int compareTo(Delayed o) {
+            long otherDelayMillis = o.getDelay(TimeUnit.MILLISECONDS);
+            return (int) (getDelay(TimeUnit.MILLISECONDS) - otherDelayMillis);
+        }
+
+        // allow to cancel externally, to be on par with Task interface.
+        @Override
+        public boolean cancel(boolean b) {
+            return superCancel(b);
+        }
+        
+        public Privileged<T> asPrivileged() {
+            return new org.openide.util.Task.Privileged<T>() {
+                @Override
+                public  Completable<T> future() {
+                    return TaskFuture.this;
+                }
+
+                @Override
+                public boolean cancel(boolean stopIfRunning) {
+                    return TaskFuture.this.superCancel(stopIfRunning);
+                }
+
+                @Override
+                public boolean complete(T val) {
+                    return superComplete(val);
+                }
+
+                @Override
+                public boolean completeExceptionally(Throwable e) {
+                    return superCompleteExceptionally(e);
+                }
+            };
         }
     }
 
@@ -1378,6 +1730,7 @@ outer:  do {
         private long time = 0;
         private Thread lastThread = null;
         private AtomicBoolean cancelled;
+        private final List<Consumer<CompletionStage>> stageCompleters = new ArrayList<>();
 
         /** @param run runnable to start
         * @param delay amount of millis to wait
@@ -1400,6 +1753,34 @@ outer:  do {
 
             this.priority = priority;
         }
+        
+        CompletableFuture<Void> f() {
+            return (CompletableFuture<Void>)asFuture();
+        }
+
+        @Override
+        protected <T> Privileged<T> createFutureBridge() {
+            TaskFuture fut;
+            List<Consumer<CompletionStage>> deco;
+            synchronized (this) {
+                fut = new TaskFuture(this, RequestProcessor.this);
+                if (stageCompleters.isEmpty()) {
+                    deco = Collections.emptyList();
+                } else {
+                    deco = new ArrayList<>(stageCompleters);
+                }
+            }
+            for (Consumer<CompletionStage> d : deco) {
+                try {
+                    d.accept(fut);
+                } catch (ThreadDeath ex) {
+                    throw ex;
+                } catch (Exception | Error e) {
+                    Processor.doNotify(this, e);
+                }
+            }
+            return fut.asPrivileged();
+        }
 
         @Override
         public void run() {
@@ -1416,6 +1797,11 @@ outer:  do {
                 }
                 notifyRunning();
                 run.run();
+            } catch (ThreadDeath e) {
+                // ignore / rethrow
+                throw e;
+            } catch (Exception | Error e) {
+                notifyFinishedExceptionally(e);
             } finally {
                 Item scheduled = this.item;
                 if (scheduled != null && !scheduled.isNew() && scheduled.getTask() == this) {
@@ -1542,6 +1928,7 @@ outer:  do {
          * @return true if cancellation occurred
          */
         boolean cancel (boolean interrupt) {
+            boolean success;
             synchronized (processorLock) {
                 if (cancelled != null) {
                     boolean wasCancelled = !cancelled.getAndSet(true);
@@ -1549,7 +1936,6 @@ outer:  do {
                         return false;
                     }
                 }
-                boolean success;
 
                 if (item == null) {
                     success = false;
@@ -1570,11 +1956,12 @@ outer:  do {
                         }
                     }
                 }
-                if (success) {
-                    notifyFinished(); // mark it as finished
-                }
-                return success;
             }
+            if (success) {
+                notifyFinishedExceptionally(new CancellationException());
+                notifyFinished(); // mark it as finished
+            }
+            return success;
         }
 
         /** Current priority of the task.
@@ -1688,6 +2075,7 @@ outer:  do {
         */
         @Override
         public boolean waitFinished(long timeout) throws InterruptedException {
+            CompletableFuture f;
             if (isRequestProcessorThread()) {
                 boolean toRun;
 
@@ -1715,6 +2103,23 @@ outer:  do {
         @Override
         public String toString() {
             return "RequestProcessor.Task [" + name + ", " + priority + "] for " + super.toString(); // NOI18N
+        }
+        
+        /**
+         * Ensures that each Task's run will be decorated by the decorator. The decorator
+         * may execute in any thread.
+         * @param decorator decorator to attach.
+         */
+        public Runnable onRun(Consumer<CompletionStage> decorator) {
+            synchronized (this) {
+                stageCompleters.add(decorator);
+            }
+            
+            return () -> {
+                synchronized (this) {
+                    stageCompleters.remove(decorator);
+                }
+            };
         }
     }
 

@@ -18,10 +18,23 @@
  */
 package org.openide.util;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.openide.util.FutureOverrides.CompletionStageDelegate;
+import org.openide.util.FutureOverrides.CompletionStageFuture;
 
 
 /** A task that may be executed in a separate thread and permits examination of its status.
@@ -63,12 +76,22 @@ public class Task extends Object implements Runnable {
 
     /** what to run */
     final Runnable run;
-
+    
+    final Callable<?> call;
+    
+    final Class<?> resultType;
+    
+    private Object resultValue;
+    
     /** flag if we have finished */
     private boolean finished;
 
     /** listeners for the finish of task (TaskListener) */
     private HashSet<TaskListener> list;
+    
+    private Privileged<?> futureBridge;
+    
+    private Throwable completedWithException;
 
     /** Create a new task.
     * The runnable should provide its own error-handling, as
@@ -81,6 +104,8 @@ public class Task extends Object implements Runnable {
         if (run == null) {
             finished = true;
         }
+        call = null;
+        resultType = null;
     }
 
     /** Constructor for subclasses that wants to control whole execution
@@ -89,6 +114,19 @@ public class Task extends Object implements Runnable {
     */
     protected Task() {
         this.run = null;
+        this.call = null;
+        resultType = null;
+    }
+    
+    /**
+     * Creates a Task that produces value of a certain type.
+     * @param call executable to produce the value
+     * @param resType result type.
+     */
+    public <T> Task(Callable<T> call, Class<T> resType) {
+        this.run = null;
+        this.call = call;
+        this.resultType = resType;
     }
 
     /** Test whether the task has finished running.
@@ -187,32 +225,101 @@ public class Task extends Object implements Runnable {
         synchronized (this) {
             RequestProcessor.logger().log(Level.FINE, "notifyRunning: {0}", this); // NOI18N
             this.finished = false;
+            completedWithException = null;
+            // reset the bridge, runs again for some reason.
+            if (futureBridge != null && futureBridge.future().isDone()) {
+                futureBridge = null;
+            }
             notifyAll();
         }
     }
-
+    
+    /**
+     * Returns preferred executor. The executor will be used in the by {@link Future}s and
+     * {@link CompletionStages} created by the Task for executing code. If {@code null} is
+     * returned, system default executor will be used.
+     * 
+     * @return preferred executor. 
+     */
+    protected Executor  preferredExecutor() {
+        return null;
+    }
+    
+    /**
+     * Records exceptional completion of the task. Called from the default {@link #run} 
+     * implementation, if the Runnable failed with an exception. Even if {@link #notifyFinished} 
+     * is called later, the Task will still report an exception. 
+     * <p>
+     * If a {@link Completable} is created for this Task, its {@link Future#get} will throw
+     * an {@link ExecutionException}.
+     * 
+     * @param exception exception.
+     * @since 9.17
+     */
+    protected final void notifyFinishedExceptionally(Throwable exception) {
+        Privileged fut;
+        synchronized (this) {
+            completedWithException = exception;
+            fut = futureBridge;
+        }
+        if (fut != null) {
+            fut.completeExceptionally(exception);
+        }
+    }
+    
+    /**
+     * Returns the exception thrown during this task's execution (if any).
+     * @return exception, or {@code null} if none.
+     * @since 9.17
+     */
+    public final Throwable getException() {
+        return completedWithException;
+    }
+    
     /** Notify all waiters that this task has finished.
     * @see #run
     */
     protected final void notifyFinished() {
+        notifyFinished(null);
+    }        
+    
+    protected final <T> void notifyFinished(T result) {
+        if (result != null && resultType != null) {
+            if (!resultType.isInstance(result)) {
+                throw new IllegalArgumentException("Invalid type: " + result.getClass() + ", Expected: " + resultType);
+            }
+        }
+        if (resultType == null & result != null) {
+            throw new IllegalStateException("Unexpected result value: " + result.getClass());
+        }
         Iterator<TaskListener> it;
-
+        Privileged priv;
+        
         synchronized (this) {
             finished = true;
+            resultValue = result;
             RequestProcessor.logger().log(Level.FINE, "notifyFinished: {0}", this); // NOI18N
             notifyAll();
 
+            priv = this.futureBridge;
             // fire the listeners
             if (list == null) {
-                return;
+                if (priv == null) {
+                    return;
+                } else {
+                    it = Collections.<TaskListener>emptyList().iterator();
+                }
+            } else {
+                it = ((HashSet) list.clone()).iterator();
             }
-
-            it = ((HashSet) list.clone()).iterator();
         }
-
+        
         while (it.hasNext()) {
             TaskListener l = it.next();
             l.taskFinished(this);
+        }
+        if (priv != null && !priv.future().isDone()) {
+            priv.complete(result);
         }
     }
 
@@ -225,14 +332,25 @@ public class Task extends Object implements Runnable {
     * of the task will call this method in a separate thread.
     */
     public void run() {
+        Object result = null;
         try {
             notifyRunning();
 
+            if (call != null) {
+                try {
+                    result = call.call();
+                } catch (Exception ex) {
+                    notifyFinishedExceptionally(ex);
+                    return;
+                }
+            }
             if (run != null) {
                 run.run();
             }
+        } catch (RuntimeException | Error x) {
+            notifyFinishedExceptionally(x);
         } finally {
-            notifyFinished();
+            notifyFinished(result);
         }
     }
 
@@ -322,5 +440,246 @@ public class Task extends Object implements Runnable {
      */
     String debug() {
         return (run == null) ? "null" : run.getClass().getName();
+    }
+    
+    /**
+     * This interface provides access to the CompletableFuture's termination methods.
+     * If the implementation blocks these calls for clients, the creator should be still
+     * able to terminate the Future as needed.
+     * <p>
+     * The methods are extracted from {@link CompletableFuture} interface.
+     * 
+     * @param <T> type of Future's data
+     */
+    public static interface Privileged<T> {
+        public Completable<T> future();
+        
+        /**
+         * Marks the future as cancelled.
+         * @param stopIfRunning 
+         * @return true, if successful
+         */
+        public boolean cancel(boolean stopIfRunning);
+        
+        /**
+         * Completes the Future normally, with the given value.
+         * @param val
+         * @return true, if successful
+         */
+        public boolean complete(T val);
+        
+        /**
+         * Completes the Future exceptionally.
+         * @param e the thrown exception.
+         * @return true, if successful.
+         */
+        public boolean completeExceptionally(Throwable e);
+    }
+    
+    /**
+     * Creates a bridge to a {@link CompletableFuture} JDK API. The default implementation
+     * ensures that {@link Future#cancel} and {@link CompletableFuture#complete} have no effect and
+     * that {@link Future#get} waits for the task's completion. It is strongly recommended that
+     * the returned object implements {@link Completable}, otherwise it will be wrapped before
+     * returning to API clients.
+     * <p>
+     * The method may be called on any thread, even if a Future for the task already exists, and is called without
+     * holding any processing locks on the task. The implementation must provide appropriate
+     * synchronization. The returned value may be thrown away and an Future instance created by another
+     * call to this method may be ultimately returned to the API client.
+     * @param <T>
+     * @return future instance.
+     * @since 9.17
+     */
+    protected <T> Privileged<T> createFutureBridge() {
+        FutureOverrides.CompletionStageFuture<T> fut;
+        
+        synchronized (this) {
+            fut = new FutureOverrides.CompletionStageFuture<T>(RP) {
+                @Override
+                public T get() throws InterruptedException, ExecutionException {
+                    waitFinished();
+                    return super.get();
+                }
+                
+                @Override
+                public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+                    if (timeout > 0) {
+                        waitFinished(unit.toMillis(timeout));
+                    }
+                    return super.get(0, TimeUnit.MILLISECONDS);
+                }
+            };
+        }
+        return new Privileged<T>() {
+            @Override
+            public CompletionStageFuture<T> future() {
+                return fut;
+            }
+
+            @Override
+            public boolean cancel(boolean stopIfRunning) {
+                return fut.superCancel(stopIfRunning);
+            }
+
+            @Override
+            public boolean complete(T val) {
+                return fut.superComplete(val);
+            }
+
+            @Override
+            public boolean completeExceptionally(Throwable e) {
+                return fut.superCompleteExceptionally(e);
+            }
+        };
+    }
+    
+    /**
+     * Converts this Task to a {@link CompletionStage} + {@link Future} implementation,
+     * which completes at the time this Task completes. The returned API will refuse
+     * {@link Future#cancel} requests. {@link Future#get} will behave as if {@link #waitFinished}
+     * was called, but if the Task completes with an exception, {@link Future#get} will throw
+     * an {@link ExecutionException}.
+     * <p>
+     * Additional {@link CompletionStage}s added to the returned Future 
+     * run after TaskListeners.
+     * <p>
+     * Task subclasses may extend the semantics.
+     * @return completable task.
+     */
+    public final Completable<Void> asFuture() {
+        return asFuture(Void.class);
+    }
+    
+    /**
+     * Returns a Future that represents this task and its result. If the result is not
+     * compatible with the passed type, the resulting Future will only report {@code null} from
+     * its {@link Future#get} method. Tasks created without result always report {@code null}: the
+     * value is not useful, except to know that the task has completed normally.
+     * 
+     * @param <T> type of the result
+     * @param rt expected type
+     * @return Future that represents this task.
+     */
+    public final <T> Completable<T> asFuture(Class<T> rt) {
+        Privileged<T> p = getFutureInternal(true);
+        if (rt == null || resultType == null) {
+            return p.future();
+        } else if (rt.isAssignableFrom(resultType)) {
+            return p.future();
+        } else {
+            CompletionStage<T> ff = p.future().handle((Object o, Throwable t) -> {
+                if (t != null) {
+                    throw new CompletionException(t);
+                } else if (o != null && resultType.isInstance(o)) {
+                    return (T)o;
+                } else {
+                    return (T)null;
+                }
+            });
+            return asCompletable(ff);
+        }
+    }
+    
+    /**
+     * Convenience method, that creates a CompletableFuture that cannot be cancelled or completed. This
+     * prevents clients from completing a task, the only one who can really complete is the caller that
+     * stores the {@link Privileged} handle.
+     * 
+     * @param <T> result type
+     * @param fut original Future
+     * @return restricted Future
+     */
+    protected final <T> Privileged<T> restrictedFuture(CompletableFuture<T> fut, Executor asyncExecutor) {
+        return new Privileged<T>() {
+            @Override
+            public CompletionStageDelegate<T> future() {
+                return new CompletionStageDelegate<>(asyncExecutor == null ? RP : asyncExecutor, fut);
+            }
+
+            @Override
+            public boolean cancel(boolean stopIfRunning) {
+                return fut.cancel(stopIfRunning);
+            }
+
+            @Override
+            public boolean complete(T val) {
+                return fut.complete(val);
+            }
+
+            @Override
+            public boolean completeExceptionally(Throwable e) {
+                return fut.completeExceptionally(e);
+            }
+        };
+    }
+    
+    /**
+     * Provides privileged access to the Future exposed to the clients,
+     * that allows to terminate the Future.
+     * @return privileged object.
+     */
+    protected final <T> Privileged<T> getFutureInternal(boolean create) {
+        CompletableFuture<T> f;
+        synchronized (this) {
+            if (futureBridge != null) {
+                return (Privileged<T>)futureBridge;
+            }
+        }
+        Privileged<T> priv = createFutureBridge();
+        Throwable err;
+        synchronized (this) {
+            if (futureBridge == null) {
+                futureBridge = priv;
+            } else {
+                return (Privileged<T>)futureBridge;
+            }
+            err = this.completedWithException;
+        }
+        if (isFinished()) {
+            if (err != null) {
+                priv.completeExceptionally(err);
+            } else {
+                priv.complete((T)resultValue);
+            }
+        }
+        return (Privileged<T>)priv;
+    }
+    
+    /**
+     * Wraps the CompletableFuture into type-compatible delegation wrapper, if not
+     * already Completable.
+     * @param f the future
+     * @return Completable instance
+     */
+    private final <T, R extends Future<T> & CompletionStage<T>> R asCompletable(CompletionStage f) {
+        if (f instanceof Completable) {
+            return (R)f;
+        } else {
+            return (R)new FutureOverrides.CompletionStageDelegate<>(preferredExecutor(), (CompletableFuture<T>)f);
+        }
+    }
+
+    /**
+     * Allows access to both {@link Future} and {@link CompletionStage} APIs. In addition,
+     * it provides access to {@link CompletableFuture#getNow} API for convenience. Clients of
+     * API prior to 9.17 may have typecasted the returned Future to a {@link FutureTask},
+     * newer clients may typecast it to the {@link Completable}.
+     * <p>
+     * The class serves as a bridge between {@link Task}, {@link RequestProcessor#Task} and JDK
+     * concurrent APIs. It allows code to work against {@link CompletionStage} API rather than
+     * using {@link TaskListener}s, eliminating unnecessary dependencies on NetBeans APIs. {@link CompletionState}
+     * also provides more facilities for task chaining and scheduling than the NetBeans native API.
+     * <p>
+     * The Completable will complete whenever its {@link Task} completes its pending run. 
+     * <p>
+     * <b>Warning: it is only safe</b> to use methods of Java 8 API's {@link CompletionStage}; newer
+     * methods will not be properly delegated.
+     *
+     * @param <T> the Future's value type.
+     * @since 9.17
+     */
+    public interface Completable<T> extends Future<T>, CompletionStage<T> {
+        public T getNow(T missingValue);
     }
 }
