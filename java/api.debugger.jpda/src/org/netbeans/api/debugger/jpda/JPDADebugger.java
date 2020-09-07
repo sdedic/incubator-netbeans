@@ -626,6 +626,14 @@ public abstract class JPDADebugger {
     public ThreadsCollector getThreadsCollector() {
         return null;
     }
+
+    public void finish() {
+        throw new AbstractMethodError();
+    }
+
+    public void resumeCurrentThread() {
+        throw new AbstractMethodError();
+    }
     
     /**
      * Creates a deadlock detector.

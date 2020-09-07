@@ -29,14 +29,12 @@ import com.microsoft.java.debug.core.protocol.Requests.ScopesArguments;
 import com.microsoft.java.debug.core.protocol.Responses;
 import com.microsoft.java.debug.core.protocol.Types;
 import com.sun.jdi.ThreadReference;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.netbeans.modules.debugger.jpda.models.JPDAThreadImpl;
 import org.netbeans.modules.debugger.jpda.util.WeakCacheMap;
-import org.netbeans.spi.debugger.ui.DebuggingView;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
@@ -61,6 +59,7 @@ public class NbScopesRequestHandler implements IDebugRequestHandler {
             return CompletableFuture.completedFuture(response);
         }
         DVThread thread = stackFrame.getThread();
+        // XXX: remove dependency on debugger impl
         JPDAThreadImpl jpdaThread = (JPDAThreadImpl) ((WeakCacheMap.KeyedValue) thread).getKey();
         ThreadReference threadRef = jpdaThread.getThreadReference();
         VariableProxy localScope = new VariableProxy(threadRef, "Local", new StackFrameReference(threadRef, 0));

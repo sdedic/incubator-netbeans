@@ -33,7 +33,6 @@ import org.netbeans.api.debugger.DebuggerManagerAdapter;
 import org.netbeans.api.debugger.Session;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
 import org.netbeans.api.debugger.jpda.JPDAThread;
-import org.netbeans.modules.debugger.jpda.models.JPDAThreadImpl;
 
 /**
  *
@@ -88,7 +87,7 @@ public class NbInitializeRequestHandler implements IDebugRequestHandler {
                     switch (newState) {
                         case JPDADebugger.STATE_STOPPED:
                             JPDAThread currentThread = debugger.getCurrentThread();
-                            if (((JPDAThreadImpl) currentThread).isInStep()) {
+                            if (currentThread.isInStep()) {
                                 context.getProtocolServer().sendEvent(new Events.StoppedEvent("step", currentThread.getID()));
                             } else if (currentThread.getCurrentBreakpoint() != null) {
                                 context.getProtocolServer().sendEvent(new Events.StoppedEvent("breakpoint", currentThread.getID()));
