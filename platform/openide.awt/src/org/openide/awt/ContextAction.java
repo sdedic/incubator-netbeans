@@ -35,13 +35,12 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.Action;
-import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import org.openide.util.BaseUtilities;
 import org.openide.util.ContextAwareAction;
 import org.openide.util.Lookup;
 import org.openide.util.Mutex;
-import org.openide.util.WeakListeners;
 
 /** A delegate action that is usually associated with a specific lookup and
  * listens on certain classes to appear and disappear there.
@@ -175,7 +174,6 @@ implements Action, ContextAwareAction, ChangeListener, Runnable {
     }
     
     protected void startListeners() {
-        performer.startListeners();
         global.registerListener(type, this);
         if (enableMonitor != null) {
             fetchEnabledValue();
@@ -185,7 +183,6 @@ implements Action, ContextAwareAction, ChangeListener, Runnable {
     
     protected void stopListeners() {
         global.unregisterListener(type, this);
-        performer.stopListeners();
         if (enableMonitor != null) {
             enableMonitor.removeChangeListener(this);
         }
@@ -296,15 +293,39 @@ implements Action, ContextAwareAction, ChangeListener, Runnable {
         return false;
     }
     
-    private static final Reference<Object> NONE = new WeakReference<>(null);
+    static class R extends WeakReference<Object> implements Runnable {
+        private Object key;
+        private static final List ALL = Collections.emptyList();
+        
+        public R(Object referent, Object k) {
+            super(referent, BaseUtilities.activeReferenceQueue());
+            this.key = k == null ? ALL : k;
+        }
+
+        @Override
+        public void run() {
+            key = null;
+        }
+        
+        public Object get(List data) {
+            if (key != ALL && !key.equals(data)) {
+                this.key = null;
+                return null;
+            } else {
+                Object o = get();
+                if (o == null) {
+                    this.key = null;
+                }
+                return o;
+            }
+        }
+    }
     
-    static class Performer<Data> implements ChangeListener {
+    private static final R NONE = new R(null, null);
+    
+    static class Performer<Data> {
         final Map delegate;
-        Reference<ContextAction>    owner;
-        Reference<Object>   instDelegate = null;
-        StatefulMonitor enabler = null;
-        ChangeListener weakEnableListener;
-        PropertyChangeListener weakActionListener;
+        R   instDelegate = null;
         
         public Performer(Map delegate) {
             this.delegate = delegate;
@@ -321,7 +342,6 @@ implements Action, ContextAwareAction, ChangeListener, Runnable {
         }
         
         void clear() {
-            stopListeners();
             Reference<Object> r = instDelegate;
             instDelegate = null;
             if (r != null) {
@@ -330,10 +350,6 @@ implements Action, ContextAwareAction, ChangeListener, Runnable {
                     ((Performer)o).clear();
                 }
             }
-        }
-        
-        void attach(ContextAction a) {
-            this.owner = new WeakReference<>(a);
         }
         
         /**
@@ -347,7 +363,7 @@ implements Action, ContextAwareAction, ChangeListener, Runnable {
         }
         
         private Object delegate0(Lookup.Provider everything, List<?> data, boolean getAction) {
-            Object d = instDelegate != null ? instDelegate.get() : null;
+            Object d = instDelegate != null ? instDelegate.get(data) : null;
             if (d != null) {
                 if (getAction && (d instanceof Performer)) {
                     return ((Performer)d).delegate0(everything, data, getAction);
@@ -358,45 +374,19 @@ implements Action, ContextAwareAction, ChangeListener, Runnable {
             if (d != null) {
                 if (getAction && (d instanceof Performer)) {
                     final Object fd = d;
-                    instDelegate = new WeakReference<Object>(d) { private Object hardRef = fd; };
+                    instDelegate = new R(d, null) { private Object hardRef = fd; };
                     return ((Performer)d).delegate0(everything, data, getAction);
                 }
                 if (d instanceof ContextAwareAction) {
                     d = ((ContextAwareAction)d).createContextAwareInstance(everything.getLookup());
                 }
-                instDelegate = new WeakReference<>(d);
+                instDelegate = new R(d, data);
             } else {
                 instDelegate = NONE;
             }
             return d;
         }
         
-        void stopListeners() {
-            if (enabler != null) {
-                enabler.removeChangeListener(weakEnableListener);
-                weakEnableListener = null;
-            }
-        }
-
-        void startListeners() {
-            if (enabler != null) {
-                weakEnableListener = WeakListeners.change(this, enabler);
-                enabler.addChangeListener(weakEnableListener);
-            }
-        }
-        
-        /**
-         * Called when the manager decides that the action should not be enabled at all.
-         * The Performer should detach from the delegate and enabler.
-         */
-        void detach() {
-            stopListeners();
-            Object inst = instDelegate != null ? instDelegate.get() : null;
-            if (inst instanceof Action) {
-                ((Action)inst).removePropertyChangeListener(weakActionListener);
-            }
-        }
-
         @SuppressWarnings("unchecked")
         public boolean enabled(List<? extends Object> data, Lookup.Provider everything) {
             Object o = delegate.get("enabler"); // NOI18N
@@ -464,14 +454,6 @@ implements Action, ContextAwareAction, ChangeListener, Runnable {
             return false;
         }
 
-        @Override
-        public void stateChanged(ChangeEvent e) {
-            ContextAction a = owner.get();
-            if (a != null) {
-                a.updateState();
-            }
-        }
-        
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();

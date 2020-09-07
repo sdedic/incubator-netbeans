@@ -67,7 +67,7 @@ final class InjectorExactlyOne extends ContextAction.Performer<Object> {
         if (o == null) {
             o = delegate.get(ACTION_COMMAND_KEY);
         }
-        Object d= instDelegate == null ? null : instDelegate.get();
+        Object d = instDelegate == null ? null : instDelegate.get();
         sb.append("PerformerONE{id = ").append(Objects.toString(o))
                 .append(", del = ").append(Objects.toString(d))
                 .append(", injectable = ").append(delegate.get("injectable"))

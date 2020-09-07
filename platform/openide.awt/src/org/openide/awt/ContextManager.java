@@ -35,7 +35,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.Action;
 import org.openide.util.Lookup;
 import org.openide.util.Lookup.Item;
 import org.openide.util.Lookup.Provider;
@@ -139,13 +138,9 @@ class ContextManager extends Object {
         Lookup.Result<T> result = findResult(type);
         
         boolean e = isEnabledOnData(result, type, selectMode);
-        if (enabler != null) {
-            if (e) {
-                List<? extends T> all = listFromResult(result);
-                e = enabler.enabled(all, new LkpAE(all, type));
-            } else if (enabler != null) {
-                enabler.detach();
-            }
+        if (e && enabler != null) {
+            List<? extends T> all = listFromResult(result);
+            e = enabler.enabled(all, new LkpAE(all, type));
         }
         
         return e;
