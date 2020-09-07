@@ -88,7 +88,6 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.lang.model.element.TypeElement;
-import org.apache.tools.ant.module.api.AntProjectCookie;
 import org.netbeans.api.annotations.common.CheckForNull;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.DebuggerManagerAdapter;
@@ -110,7 +109,6 @@ import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.filesystems.URLMapper;
 import org.openide.util.Lookup;
-import org.openide.util.NbPreferences;
 import org.openide.util.Pair;
 import org.openide.util.lookup.Lookups;
 import org.openide.util.lookup.ProxyLookup;
@@ -125,7 +123,6 @@ public class Debugger {
     private static final Logger LOG = Logger.getLogger(Debugger.class.getName());
 
     public static int startDebugger() throws IOException {
-        NbPreferences.forModule(AntProjectCookie.class).putBoolean("autoCloseTabs", false);
         ServerSocket vsCodeSide = new ServerSocket(0, 1, Inet4Address.getLoopbackAddress());
         final int port = vsCodeSide.getLocalPort();
         LOG.log(Level.INFO, "Debugger listens on port: {0}", port);
