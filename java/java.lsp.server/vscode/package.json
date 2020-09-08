@@ -45,8 +45,8 @@
 		],
 		"debuggers": [
 			{
-				"type": "java",
-				"label": "Java (NetBeans)",
+				"type": "java-polyglot",
+				"label": "Java (Polyglot)",
 				"runtime": "node",
 				"configurationAttributes": {
 					"launch": {
@@ -78,9 +78,9 @@
 				},
 				"initialConfigurations": [
 					{
-						"type": "java",
+						"type": "java-polyglot",
 						"request": "launch",
-						"name": "Java (NetBeans)",
+						"name": "Java (Polyglot)",
 						"mainClass": "${file}"
 					}
 				]

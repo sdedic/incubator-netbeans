@@ -164,11 +164,11 @@ export function activate(context: ExtensionContext) {
 
         //register debugger:
         let configProvider = new NetBeansConfigurationProvider();
-        context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('java', configProvider));
+        context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('java-polyglot', configProvider));
 
         let debugDescriptionFactory = new NetBeansDebugAdapterDescriptionFactory();
-        context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('java', debugDescriptionFactory));
-        window.showInformationMessage('Java Debug Adapter ready.');
+        context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('java-polyglot', debugDescriptionFactory));
+        window.showInformationMessage('Java Polyglot Debug Adapter ready.');
 
         // register commands
         context.subscriptions.push(commands.registerCommand('java.workspace.compile', () => {
@@ -225,7 +225,7 @@ class NetBeansConfigurationProvider implements vscode.DebugConfigurationProvider
 
     resolveDebugConfiguration(folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration, token?: vscode.CancellationToken): vscode.ProviderResult<vscode.DebugConfiguration> {
         if (!config.type) {
-            config.type = 'java';
+            config.type = 'java-polyglot';
         }
         if (!config.request) {
             config.request = 'launch';
