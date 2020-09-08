@@ -48,6 +48,9 @@
 				"type": "java-polyglot",
 				"label": "Java (Polyglot)",
 				"runtime": "node",
+				"languages": [
+					"java"
+				],
 				"configurationAttributes": {
 					"launch": {
 						"required": ["mainClass"],
