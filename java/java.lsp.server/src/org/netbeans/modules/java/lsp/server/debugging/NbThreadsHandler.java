@@ -37,6 +37,7 @@ import com.microsoft.java.debug.core.protocol.Responses;
 import com.microsoft.java.debug.core.protocol.Types;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
 import org.netbeans.api.debugger.jpda.JPDAThread;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 import org.netbeans.spi.viewmodel.Models;
 import org.netbeans.spi.viewmodel.UnknownTypeException;
@@ -55,7 +56,7 @@ public class NbThreadsHandler implements IDebugRequestHandler {
             return AdapterUtils.createAsyncErrorResponse(response, ErrorCode.EMPTY_DEBUG_SESSION, "Debug Session doesn't exist.");
         }
 
-        JPDADebugger jpdaDebugger = Debugger.findJPDADebugger(context.getDebugSession());
+        JPDADebugger jpdaDebugger = ((NbDebugSession) context.getDebugSession()).getDebugger();
 
         switch (command) {
             case THREADS: {

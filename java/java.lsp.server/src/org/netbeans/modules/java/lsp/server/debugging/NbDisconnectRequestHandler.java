@@ -28,6 +28,8 @@ import com.microsoft.java.debug.core.protocol.Requests.DisconnectArguments;
 import org.netbeans.api.debugger.Breakpoint;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
 
 /**
  *
@@ -40,8 +42,8 @@ final class NbDisconnectRequestHandler extends AbstractDisconnectRequestHandler 
         DisconnectArguments disconnectArguments = (DisconnectArguments) arguments;
         IDebugSession debugSession = context.getDebugSession();
         if (debugSession != null) {
-            JPDADebugger dbg = Debugger.findJPDADebugger(context.getDebugSession());
-            dbg.finish();
+            JPDADebugger dbg = ((NbDebugSession) context.getDebugSession()).getDebugger();
+            ((JPDADebuggerImpl) dbg).finish();
             cleanBreakpoints();
         }
     }

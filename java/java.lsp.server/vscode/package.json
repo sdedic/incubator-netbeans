@@ -53,7 +53,9 @@
 				],
 				"configurationAttributes": {
 					"launch": {
-						"required": ["mainClass"],
+						"required": [
+							"mainClass"
+						],
 						"properties": {
 							"mainClass": {
 								"type": "string",
@@ -63,7 +65,7 @@
 							"classPaths": {
 								"type": "array",
 								"items": {
-								  "type": "string"
+									"type": "string"
 								},
 								"description": "The classpaths for launching the JVM.",
 								"default": []
@@ -71,11 +73,11 @@
 							"console": {
 								"type": "string",
 								"enum": [
-								  "internalConsole"
+									"internalConsole"
 								],
 								"description": "The specified console to launch the program.",
 								"default": "internalConsole"
-							  }
+							}
 						}
 					}
 				},

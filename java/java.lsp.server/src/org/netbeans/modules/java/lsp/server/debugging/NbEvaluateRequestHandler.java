@@ -38,6 +38,7 @@ import org.netbeans.api.debugger.jpda.JPDAThread;
 import org.netbeans.api.debugger.jpda.ObjectVariable;
 import org.netbeans.api.debugger.jpda.Variable;
 import org.netbeans.modules.debugger.jpda.truffle.vars.TruffleVariable;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
 
 /**
  *
@@ -62,7 +63,7 @@ final class NbEvaluateRequestHandler implements IDebugRequestHandler {
                 "Failed to evaluate. Reason: Empty expression cannot be evaluated.",
                 ErrorCode.EVALUATION_COMPILE_ERROR));
         }
-        JPDADebugger dbg = Debugger.findJPDADebugger(context.getDebugSession());
+        JPDADebugger dbg = ((NbDebugSession) context.getDebugSession()).getDebugger();
         JPDAThread currentThread = dbg.getCurrentThread();
         if (currentThread == null) {
             throw new CompletionException(AdapterUtils.createUserErrorDebugException(

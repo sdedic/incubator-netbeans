@@ -32,11 +32,9 @@ import com.microsoft.java.debug.core.adapter.handler.AttachRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.CompletionsHandler;
 import com.microsoft.java.debug.core.adapter.handler.DisconnectRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.DisconnectRequestWithoutDebuggingHandler;
-import com.microsoft.java.debug.core.adapter.handler.EvaluateRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.ExceptionInfoRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.HotCodeReplaceHandler;
 import com.microsoft.java.debug.core.adapter.handler.InitializeRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.LaunchRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.RestartFrameHandler;
 import com.microsoft.java.debug.core.adapter.handler.SetExceptionBreakpointsRequestHandler;
 import com.microsoft.java.debug.core.adapter.handler.SetVariableRequestHandler;
@@ -66,6 +64,7 @@ public class NbDebugAdapter implements IDebugAdapter {
 
     @Override
     public CompletableFuture<Messages.Response> dispatchRequest(Messages.Request request) {
+        System.out.println("REQUEST: " + request.command + " " + request.arguments);
         Messages.Response response = new Messages.Response();
         response.request_seq = request.seq;
         response.command = request.command;
@@ -99,16 +98,15 @@ public class NbDebugAdapter implements IDebugAdapter {
         // When there are multiple handlers registered for the same request, follow the rule "first register, first execute".
         registerHandler(new InitializeRequestHandler());
         registerHandler(new NbInitializeRequestHandler());
-        registerHandler(new LaunchRequestHandler());
+        registerHandler(new NbLaunchRequestHandler());
 
         // DEBUG node only
         registerHandlerForDebug(new AttachRequestHandler());
-        //registerHandlerForDebug(new ConfigurationDoneRequestHandler());
         registerHandlerForDebug(new NbConfigurationDoneRequestHandler());
         registerHandlerForDebug(new NbDisconnectRequestHandler());
         registerHandlerForDebug(new DisconnectRequestHandler());
         registerHandlerForDebug(new NbSetBreakpointsRequestHandler());
-        registerHandlerForDebug(new SetExceptionBreakpointsRequestHandler());
+        registerHandlerForDebug(new NbSetExceptionBreakpointsRequestHandler());
         registerHandlerForDebug(new SourceRequestHandler());
         registerHandlerForDebug(new NbStepRequestHandler());
         registerHandlerForDebug(new NbThreadsAndStacksRequestHandler());

@@ -75,18 +75,21 @@ public class NbProtocolServer extends AbstractProtocolServer {
 
     @Override
     public CompletableFuture<Messages.Response> sendRequest(Messages.Request request) {
+        System.out.println("SEND REQUEST: " + request.command + " " + request.arguments);
         usageDataSession.recordRequest(request);
         return super.sendRequest(request);
     }
 
     @Override
     public CompletableFuture<Messages.Response> sendRequest(Messages.Request request, long timeout) {
+        System.out.println("SEND REQUEST: " + request.command + " " + request.arguments);
         usageDataSession.recordRequest(request);
         return super.sendRequest(request, timeout);
     }
 
     @Override
     public void sendEvent(DebugEvent event) {
+        System.out.println("SEND Event: " + event.type + " " + event);
         // See the two bugs https://github.com/Microsoft/java-debug/issues/134 and https://github.com/Microsoft/vscode/issues/58327,
         // it requires the java-debug to send the StoppedEvent after ContinueResponse/StepResponse is received by DA.
         if (event instanceof StoppedEvent) {
@@ -122,6 +125,7 @@ public class NbProtocolServer extends AbstractProtocolServer {
             debugAdapter.dispatchRequest(request).thenCompose((response) -> {
                 CompletableFuture<Void> future = new CompletableFuture<>();
                 if (response != null) {
+                    System.out.println("Response: " + response.command + " " + response.message + " body = " + response.body);
                     sendResponse(response);
                     future.complete(null);
                 } else {
