@@ -22,19 +22,14 @@ import com.microsoft.java.debug.core.protocol.Events.OutputEvent.Category;
 import io.reactivex.Observable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.stream.Stream;
 import org.openide.util.Pair;
 
-/**
- *
- * @author martin
- */
 public final class NbProcessConsole {
     private InputStreamObservable stdoutStream;
     private InputStreamObservable stderrStream;
@@ -75,14 +70,6 @@ public final class NbProcessConsole {
 
     public Observable<ConsoleMessage> messages() {
         return observable;
-    }
-
-    public Observable<ConsoleMessage> stdoutMessages() {
-        return this.messages().filter((message) -> message.category == Category.stdout);
-    }
-
-    public Observable<ConsoleMessage> stderrMessages() {
-        return this.messages().filter((message) -> message.category == Category.stderr);
     }
 
     /**
@@ -135,7 +122,7 @@ public final class NbProcessConsole {
         }
 
         private void monitor(InputStream input, PublishSubject<String> subject) {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(input, encoding));
+            Reader reader = new InputStreamReader(input, encoding);
             final int BUFFERSIZE = 4096;
             char[] buffer = new char[BUFFERSIZE];
             while (true) {

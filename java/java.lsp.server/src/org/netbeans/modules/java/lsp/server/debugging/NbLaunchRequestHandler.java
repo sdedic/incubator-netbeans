@@ -157,7 +157,7 @@ final class NbLaunchRequestHandler implements IDebugRequestHandler {
                     : packageName.replace('.', File.separatorChar) + File.separatorChar + sourceName;
             Types.Source source = null;
             try {
-                source = StackTraceRequestHandler.convertDebuggerSourceToClient(fullyQualifiedName, sourceName, sourcePath, context);
+                source = NbStackTraceRequestHandler.convertDebuggerSourceToClient(fullyQualifiedName, sourceName, sourcePath, context);
             } catch (URISyntaxException e) {
                 // do nothing.
             }

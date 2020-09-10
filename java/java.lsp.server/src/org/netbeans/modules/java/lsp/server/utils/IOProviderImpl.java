@@ -22,11 +22,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.io.Reader;
 import java.io.Writer;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.openide.util.Lookup;
 import org.openide.util.Pair;
 import org.openide.windows.IOProvider;
@@ -56,58 +56,13 @@ public final class IOProviderImpl extends IOProvider {
     }
 
     public static Pair<InputStream, OutputStream> createCopyingStreams() {
-        List<Integer> data = new LinkedList<>();
-        AtomicBoolean closed = new AtomicBoolean();
-        InputStream in = new InputStream() {
-            @Override
-            public int read() throws IOException {
-                synchronized (data) {
-                    try {
-                        while (data.isEmpty() && !closed.get()) {
-                            data.wait();
-                        }
-                    } catch (InterruptedException ex) {
-                        //ignore
-                    }
-                    if (data.isEmpty() && closed.get()) {
-                        return -1;
-                    }
-                    return data.remove(0);
-                }
-            }
-            @Override
-            public int read(byte[] b, int off, int len) throws IOException {
-                int l = 0;
-                while (l < len) {
-                    int r = read();
-                    if (r == -1) {
-                        if (l == 0) return -1;
-                        break;
-                    }
-                    b[off + l] = (byte) r;
-                    l++;
-                    if (r == '\n') break;
-                }
-                return l;
-            }
-        };
-        OutputStream out = new OutputStream() {
-            @Override
-            public void write(int b) throws IOException {
-                synchronized (data) {
-                    data.add(b);
-                    data.notifyAll();
-                }
-            }
-
-            @Override
-            public void close() throws IOException {
-                synchronized (data) {
-                    closed.set(true);
-                    data.notifyAll();
-                }
-            }
-        };
+        PipedInputStream in = new PipedInputStream();
+        OutputStream out;
+        try {
+            out = new PipedOutputStream(in);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex); // Can not happen
+        }
         return Pair.of(in, out);
     }
 
