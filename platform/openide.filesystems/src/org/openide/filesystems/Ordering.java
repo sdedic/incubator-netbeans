@@ -165,7 +165,7 @@ class Ordering {
             }
         }
         if (logWarnings && /* #201893*/ !parent.getPath().matches("Projects/.+/Lookup") && !childrenByPosition.isEmpty() && childrenByPosition.size() < children.size() && 
-                ((ordered ^ unordered) > 0)) {
+                ((ordered & unordered) > 0)) {
             List<FileObject> missingPositions = new ArrayList<FileObject>(children);
             for (ChildAndPosition cap : childrenByPosition) {
                 missingPositions.remove(cap.child);
