@@ -47,11 +47,11 @@ public class TestCreatorProviderProcessor extends LayerGeneratingProcessor {
             if(registration == null) {
                 continue;
             }
-            File f = layer(e).instanceFile("Services", null);
+            File f = layer(e).instanceFile("Services/TestCreatorProviders", null);
             f.stringvalue("instanceOf", TestCreatorProvider.class.getName());
             f.bundlevalue("displayName", registration.displayName());
             f.bundlevalue("identifier", registration.identifier());
-            if (registration.position() != -1) {
+            if (registration.position() != -1 && registration.position() != Integer.MAX_VALUE) {
                 f.intvalue("position", registration.position());
             }
             f.write();
