@@ -53,6 +53,17 @@ export function activate(context: ExtensionContext) {
         options: { cwd: workspace.rootPath },
     }
 
+    vscode.extensions.all.forEach((e, index) => {
+        if (e.extensionPath.indexOf("redhat.java") >= 0) {
+            vscode.window.showInformationMessage(`redhat.java found at ${e.extensionPath} - supressing`);
+            workspace.getConfiguration().update('java.completion.enabled', false, false).then((ok) => {
+                vscode.window.showInformationMessage('Disabling redhat.java code completion');
+            }, (reason) => {
+                vscode.window.showInformationMessage('Disabling redhat.java code completion failed ' + reason);
+            });
+        }
+    });
+
     // give the process some reasonable command
     ideArgs.push("--modules");
     ideArgs.push("--list");
