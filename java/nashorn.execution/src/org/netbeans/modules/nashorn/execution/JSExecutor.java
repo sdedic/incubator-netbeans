@@ -40,21 +40,26 @@ import org.openide.LifecycleManager;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileStateInvalidException;
 import org.openide.filesystems.JarFileSystem;
+import org.openide.util.NbBundle;
 
 /**
  *
  * @author Martin
  */
 public class JSExecutor {
-    
+    private static final String MODULE_GRAALJS = "org.netbeans.libs.graaljs"; // NOI18N
     private static final String NASHORN_SHELL = "jdk.nashorn.tools.Shell";      // NOI18N
     private static final String JS_SHELL = "com.oracle.truffle.js.shell.JSLauncher";      // NOI18N
     
+    @NbBundle.Messages({
+        "# {0} - platform's name",
+        "ERR_JavascriptUnavailable=Javascript shell is not available on platform {0}.",
+        "NAME_GraalJSModule=GraalVM.js Integration"
+    })
     public static void run(JavaPlatform javaPlatform, FileObject js, boolean debug) throws IOException, UnsupportedOperationException {
         LifecycleManager.getDefault().saveAll();
         Map<String, Object> properties = new HashMap<>();
         properties.put(JavaRunner.PROP_PLATFORM, javaPlatform);
-        final ClassPath path = getClassPath(js);
         final Preferences p = Settings.getPreferences();
         boolean preferNashorn = NashornPlatform.isNashornSupported(javaPlatform);
         if (p.get(Settings.PREF_NASHORN, null) != null) {
@@ -72,9 +77,15 @@ public class JSExecutor {
                 properties.put(JavaRunner.PROP_CLASSNAME, NASHORN_SHELL);
             } catch (ClassNotFoundException ex) {
                 properties.put(JavaRunner.PROP_CLASSNAME, JS_SHELL);
+                preferNashorn = false;
             }
         } else {
             properties.put(JavaRunner.PROP_CLASSNAME, JS_SHELL);
+        }
+        final ClassPath path = getClassPath(js, preferNashorn);
+        if (path == null) {
+            throw new ModuleRequestException(Bundle.ERR_JavascriptUnavailable(javaPlatform.getDisplayName()), MODULE_GRAALJS, 
+            Bundle.NAME_GraalJSModule());
         }
         properties.put(JavaRunner.PROP_EXECUTE_CLASSPATH, path);
         properties.put(JavaRunner.PROP_WORK_DIR, js.getParent());
@@ -86,13 +97,20 @@ public class JSExecutor {
         }
     }
     
-    private static ClassPath getClassPath(FileObject js) {
+    private static ClassPath getClassPath(FileObject js, boolean includedInPlatform) throws UnsupportedOperationException {
         ClassPath cp = ClassPath.getClassPath(js, ClassPath.EXECUTE);
         if (cp == null) {
             cp = ClassPath.EMPTY;
         }
-        ClassPath engine = findGraalJsClassPath();
-        return ClassPathSupport.createProxyClassPath(cp, engine);
+        if (includedInPlatform) {
+            return cp;
+        } else {
+            ClassPath engine = findGraalJsClassPath();
+            if (engine == null) {
+                return null;
+            }
+            return ClassPathSupport.createProxyClassPath(cp, engine);
+        }
     }
     
     private static List<String> getApplicationArgs(FileObject js) {
@@ -116,6 +134,9 @@ public class JSExecutor {
     static ClassPath findGraalJsClassPath() {
         List<URL> urls;
         Library graalJsLib = LibraryManager.getDefault().getLibrary("graaljs");
+        if (graalJsLib == null) {
+            return null;
+        }
         urls = graalJsLib.getContent("classpath");
         ClassPath nbInstCp = ClassPathSupport.createClassPath(urls.toArray(new URL[0]));
         urls = new ArrayList<>();
