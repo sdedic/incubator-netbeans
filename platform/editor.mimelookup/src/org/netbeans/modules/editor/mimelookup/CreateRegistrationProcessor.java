@@ -44,6 +44,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
+import org.openide.filesystems.annotations.LayerBuilder.File;
 import org.openide.filesystems.annotations.LayerGeneratingProcessor;
 import org.openide.filesystems.annotations.LayerGenerationException;
 import org.openide.util.Exceptions;
@@ -58,7 +59,8 @@ import org.openide.util.lookup.ServiceProvider;
 @SupportedAnnotationTypes({"org.netbeans.api.editor.mimelookup.MimeRegistration", "org.netbeans.api.editor.mimelookup.MimeRegistrations", "org.netbeans.spi.editor.mimelookup.MimeLocation"})
 @ServiceProvider(service=Processor.class)
 public class CreateRegistrationProcessor extends LayerGeneratingProcessor {
-
+    private static final int MIME_SLOT_SIZE = 100000;
+    
     @Override
     protected boolean handleProcess(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) throws LayerGenerationException {
         TypeElement mimeRegistration = processingEnv.getElementUtils().getTypeElement("org.netbeans.api.editor.mimelookup.MimeRegistration");
@@ -145,7 +147,17 @@ public class CreateRegistrationProcessor extends LayerGeneratingProcessor {
             }
 
             instantiableClassOrMethod(toRegister, apiTE);
-            layer(toRegister).instanceFile("Editors" + mimeType + folder, null, null).position(position).stringvalue("instanceOf", processingEnv.getElementUtils().getBinaryName(apiTE).toString()).write();    //NOI18N
+            File f = layer(toRegister).instanceFile("Editors" + mimeType + folder, null, null);
+            if (position == Integer.MAX_VALUE && !"".equals(folder)) {
+                // always in Editors at least, slash will be there
+                int lsl = f.getPath().lastIndexOf("/"); // NOI18N
+                String hashDiscr = f.getPath().substring(lsl + 1);
+                // will be >= 1, so positions >= 100k
+                int depth = mimeType.split("/").length; // NOI18N
+                // favour the most specific registrations (i.e. text/x-ant+xml/xml > text/x-ant+xml > /)
+                position = ((10 - depth) * MIME_SLOT_SIZE) + (((7 * mimeType.hashCode()) ^ hashDiscr.hashCode()) % MIME_SLOT_SIZE);
+            }
+            f.position(position).stringvalue("instanceOf", processingEnv.getElementUtils().getBinaryName(apiTE).toString()).write();    //NOI18N
         }
     }
 
