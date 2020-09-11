@@ -607,7 +607,11 @@ public class ValidateLayerConsistencyTest extends NbTestCase {
                         overrides = new TreeMap<String,ContentAndAttrs>();
                         files.put(weightedPath, overrides);
                     }
-                    overrides.put(module, new ContentAndAttrs(fo.asBytes(), attributes, layerURL));
+                    try {
+                        overrides.put(module, new ContentAndAttrs(fo.asBytes(), attributes, layerURL));
+                    } catch (IOException ex) {
+                        // will be reported by a different test
+                    }
                 }
                 // make sure the filesystem closes the stream
                 connect.getInputStream ().close ();

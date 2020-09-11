@@ -160,6 +160,8 @@ implements PropertyChangeListener, LookupListener {
                     }
                 }
             }
+            // special hack for GraalJS, which is enabled because of PAC configurator (core platform) needs it for secure PAC processing:
+            enabled.remove("org.netbeans.libs.graaljs");
             if (enabled.isEmpty() && disabled.isEmpty()) {
                 FoDLayersProvider.LOG.log(withLevel, info.clusterName + " not present"); // NOTICES
                 continue;

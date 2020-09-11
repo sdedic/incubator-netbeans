@@ -252,9 +252,12 @@ public class LanguageRegistrationProcessor extends LayerGeneratingProcessor {
     }
 
     private static void registerCodeCompletion(LayerBuilder b, String mimeType) {
-        instanceFile(b, "Editors/" + mimeType + "/CompletionProviders", null, CodeTemplateCompletionProvider.class, null).write(); //NOI18N
-        instanceFile(b, "Editors/" + mimeType + "/CompletionProviders", null, GsfCompletionProvider.class, null).write(); //NOI18N
-        instanceFile(b, "Editors/" + mimeType + "/CompletionProviders", null, "org.netbeans.modules.parsing.ui.WaitScanFinishedCompletionProvider", null).write(); //NOI18N
+        instanceFile(b, "Editors/" + mimeType + "/CompletionProviders", null, CodeTemplateCompletionProvider.class, null).
+                position(900).write(); //NOI18N
+        instanceFile(b, "Editors/" + mimeType + "/CompletionProviders", null, GsfCompletionProvider.class, null).
+                position(940).write(); //NOI18N
+        instanceFile(b, "Editors/" + mimeType + "/CompletionProviders", null, "org.netbeans.modules.parsing.ui.WaitScanFinishedCompletionProvider", null).
+                position(980).write(); //NOI18N
 //        // Code Completion
 //        Element completionFolder = mkdirs(doc, "Editors/" + mimeType + "/CompletionProviders"); // NOI18N
 //        createFile(doc, completionFolder, "org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance"); // NOI18N
@@ -290,7 +293,8 @@ public class LanguageRegistrationProcessor extends LayerGeneratingProcessor {
     }
 
     private static void registerHyperlinks(LayerBuilder b, String mimeType) {
-        instanceFile(b, "Editors/" + mimeType + "/HyperlinkProviders", null, GsfHyperlinkProvider.class, null, 1000, HyperlinkProviderExt.class).write(); //NOI18N
+        instanceFile(b, "Editors/" + mimeType + "/HyperlinkProviders", null, GsfHyperlinkProvider.class, null, 1000, HyperlinkProviderExt.class).
+                intvalue("position", 900).write(); //NOI18N
 //
 //        // Hyperlinks
 //        if (hasDeclarationFinder) {
@@ -323,6 +327,12 @@ public class LanguageRegistrationProcessor extends LayerGeneratingProcessor {
     private static void registerUpToDateStatus(LayerBuilder b, String mimeType) {
         instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, GsfUpToDateStateProviderFactory.class, null, UpToDateStatusProviderFactory.class).write(); //NOI18N
         instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, OccurrencesMarkProviderCreator.class, null, MarkProviderCreator.class).write(); //NOI18N
+/*
+        instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, GsfUpToDateStateProviderFactory.class, null, UpToDateStatusProviderFactory.class).
+                intvalue("position", 900).write(); //NOI18N
+        instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, OccurrencesMarkProviderCreator.class, null, MarkProviderCreator.class).
+                intvalue("position", 940).write(); //NOI18N
+*/
 //
 //        // UpToDateStatusProviders
 //        Element upToDateFolder = mkdirs(doc, "Editors/" + mimeType + "/UpToDateStatusProvider"); // NOI18N
