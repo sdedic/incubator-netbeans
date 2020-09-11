@@ -31,7 +31,6 @@ import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -45,7 +44,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Random;
 import java.util.logging.Level;
@@ -461,29 +459,16 @@ public abstract class CLIHandler extends Object {
     
     /** Enhanced search for localhost address that works also behind VPN
      */
-    private static InetAddress localHostAddress() throws IOException {
-        return localHostAddresses().get(0);
-    }
-
-    private static List<InetAddress> localHostAddresses() throws IOException {
+    private static InetAddress localHostAddress () throws IOException {
         java.net.NetworkInterface net = java.net.NetworkInterface.getByName ("lo");
         if (net == null || !net.getInetAddresses().hasMoreElements()) {
             net = java.net.NetworkInterface.getByInetAddress(InetAddress.getByAddress(new byte[] { 127, 0, 0, 1 }));
         }
         if (net == null || !net.getInetAddresses().hasMoreElements()) {
-            return Collections.singletonList(InetAddress.getLocalHost());
-        } else {
-            List<InetAddress> arr = new ArrayList<>();
-            Enumeration<InetAddress> en = net.getInetAddresses();
-            while (en.hasMoreElements()) {
-                InetAddress addr = en.nextElement();
-                if (addr instanceof Inet4Address) {
-                    arr.add(0, addr);
-                } else {
-                    arr.add(addr);
-                }
-            }
-            return arr;
+            return InetAddress.getLocalHost();
+        }
+        else {
+            return net.getInetAddresses().nextElement();
         }
     }
     

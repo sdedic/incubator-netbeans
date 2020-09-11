@@ -28,7 +28,7 @@ import {
 
 import * as net from 'net';
 import * as path from 'path';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, SpawnOptions } from 'child_process';
 import * as vscode from 'vscode';
 
 let client: LanguageClient;
@@ -50,7 +50,10 @@ export function activate(context: ExtensionContext) {
     let serverOptions = {
         command: serverPath,
         args: serverArgs,
-        options: { cwd: workspace.rootPath },
+        options: {
+            stdio : ["ignore", "pipe", "ignore"],
+            cwd: workspace.rootPath
+        } as SpawnOptions
     }
 
     vscode.extensions.all.forEach((e, index) => {
@@ -131,6 +134,11 @@ export function activate(context: ExtensionContext) {
                 if (!srv) {
                     reject();
                 } else {
+                    if (!srv.stdout) {
+                        reject(`No stdout to parse!`);
+                        srv.disconnect();
+                        return;
+                    }
                     srv.stdout.on("data", (chunk) => {
                         if (debugPort < 0) {
                             const info = chunk.toString().match(/Debug Server Adapter listening at port (\d*)/);
