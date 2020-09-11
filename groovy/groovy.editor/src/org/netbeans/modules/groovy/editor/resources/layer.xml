@@ -120,7 +120,8 @@
                 </folder>
 
                 <file name="JavaIndexer.shadow">
-                    <attr name="originalFile" stringvalue="Editors/text/x-java/JavaIndexer.instance"/>
+                    <!-- Ugly hack to make commit-validation work. Must change when NETBEANS-4795 is implemented -->
+                    <attr name="originalFile" stringvalue="Editors/text/x-java/org-netbeans-modules-java-source-indexing-JavaCustomIndexer$Factory-register.instance"/>
                 </file>
 
             </folder>

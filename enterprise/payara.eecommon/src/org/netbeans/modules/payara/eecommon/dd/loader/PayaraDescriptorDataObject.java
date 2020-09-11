@@ -113,7 +113,7 @@ import org.xml.sax.SAXParseException;
     ),
     @ActionReference(
             path = DD_ACTION_PATH,
-            id = @ActionID(category = "Edit", id = "org.openide.actions.RenameAction"),
+            id = @ActionID(category = "System", id = "org.openide.actions.RenameAction"),
             position = 950,
             separatorAfter = 1000
     ),
