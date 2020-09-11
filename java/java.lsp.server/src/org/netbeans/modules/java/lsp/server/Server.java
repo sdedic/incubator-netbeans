@@ -21,10 +21,7 @@ package org.netbeans.modules.java.lsp.server;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintStream;
-import java.net.InetAddress;
 import java.net.MalformedURLException;
-import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -57,71 +54,30 @@ import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.api.project.Sources;
 import org.netbeans.api.project.ui.OpenProjects;
-import org.netbeans.api.sendopts.CommandException;
-import org.netbeans.modules.java.lsp.server.debugging.Debugger;
 import org.netbeans.modules.java.lsp.server.text.TextDocumentServiceImpl;
 import org.netbeans.modules.java.lsp.server.workspace.WorkspaceServiceImpl;
-import org.netbeans.spi.sendopts.Arg;
-import org.netbeans.spi.sendopts.ArgsProcessor;
-import org.netbeans.spi.sendopts.Description;
-import org.netbeans.spi.sendopts.Env;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Exceptions;
 import org.openide.util.Lookup;
-import org.openide.util.NbBundle.Messages;
 
 /**
  *
  * @author lahvac
  */
-public class Server implements ArgsProcessor {
-
-    @Arg(longName="start-java-language-server", defaultValue = "-1")
-    @Description(shortDescription="#DESC_StartJavaLanguageServer")
-    @Messages("DESC_StartJavaLanguageServer=Starts the Java Language Server")
-    public String lsPort;
-
-    @Override
-    public void process(Env env) throws CommandException {
-        if (lsPort != null) {
-            try {
-                int connectTo = Integer.parseInt(lsPort);
-                if (connectTo == -1) {
-                    launchServer(env.getInputStream(), env.getOutputStream());
-                } else {
-                    final Socket socket = new Socket(InetAddress.getLoopbackAddress(), connectTo);
-                    Thread languageServerThread = new Thread("Java Language Server:" + connectTo) {
-                        @Override
-                        public void run() {
-                            try {
-                                launchServer(socket.getInputStream(), socket.getOutputStream());
-                            } catch (Exception ex) {
-                                Exceptions.printStackTrace(ex);
-                            }
-                        }
-                    };
-                    languageServerThread.start();
-                }
-            } catch (Exception ex) {
-                throw (CommandException) new CommandException(1).initCause(ex);
-            }
-        }
-        try {
-            int port = Debugger.startDebugger();
-            PrintStream ps = new PrintStream(env.getOutputStream());
-            ps.println("Debug Server Adapter listening at port " + port); // NOI18N
-            ps.flush();
-        } catch (IOException ex) {
-            throw (CommandException) new CommandException(1).initCause(ex);
-        }
+public final class Server {
+    private Server() {
     }
     
-    private static void launchServer(InputStream in, OutputStream out) throws Exception {
+    static void launchServer(InputStream in, OutputStream out) {
         LanguageServerImpl server = new LanguageServerImpl();
         Launcher<LanguageClient> serverLauncher = LSPLauncher.createServerLauncher(server, in, out);
         ((LanguageClientAware) server).connect(serverLauncher.getRemoteProxy());
         Future<Void> runningServer = serverLauncher.startListening();
-        runningServer.get();
+        try {
+            runningServer.get();
+        } catch (InterruptedException | ExecutionException ex) {
+            Exceptions.printStackTrace(ex);
+        }
     }
 
     private static class LanguageServerImpl implements LanguageServer, LanguageClientAware {

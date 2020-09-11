@@ -39,9 +39,8 @@ import com.sun.jdi.VirtualMachineManager;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
 import java.io.IOException;
-import java.net.Inet4Address;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -56,117 +55,99 @@ public class Debugger {
 
     private static final Logger LOG = Logger.getLogger(Debugger.class.getName());
 
-    public static int startDebugger() throws IOException {
-        ServerSocket vsCodeSide = new ServerSocket(0, 1, Inet4Address.getLoopbackAddress());
-        final int port = vsCodeSide.getLocalPort();
-        LOG.log(Level.INFO, "Debugger listens on port: {0}", port);
-        new Thread("Java Debug Server Adapter: " + port) {
-            @Override            
-            public void run() {
-                while (true) {
-                    try {
-                        Socket vsCodeSocket = vsCodeSide.accept();
+    public static void startDebugger(InputStream in, OutputStream out) {
+        LOG.info("debugging requestaccepted....");
+        NbSourceProvider sourceProvider = new NbSourceProvider();
+        ProviderContext context = new ProviderContext();
+        context.registerProvider(IVirtualMachineManagerProvider.class, new IVirtualMachineManagerProvider() {
+            @Override
+            public VirtualMachineManager getVirtualMachineManager() {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
 
-                        LOG.info("debugging requestaccepted....");
-                        NbSourceProvider sourceProvider = new NbSourceProvider();
-                        ProviderContext context = new ProviderContext();
-                        context.registerProvider(IVirtualMachineManagerProvider.class, new IVirtualMachineManagerProvider() {
-                            @Override
-                            public VirtualMachineManager getVirtualMachineManager() {
-                                throw new UnsupportedOperationException("Not supported yet.");
-                            }
+        });
+        context.registerProvider(IHotCodeReplaceProvider.class, new IHotCodeReplaceProvider() {
+            @Override
+            public void onClassRedefined(Consumer<List<String>> arg0) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
 
-                        });
-                        context.registerProvider(IHotCodeReplaceProvider.class, new IHotCodeReplaceProvider() {
-                            @Override
-                            public void onClassRedefined(Consumer<List<String>> arg0) {
-                                throw new UnsupportedOperationException("Not supported yet.");
-                            }
+            @Override
+            public CompletableFuture<List<String>> redefineClasses() {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
 
-                            @Override
-                            public CompletableFuture<List<String>> redefineClasses() {
-                                throw new UnsupportedOperationException("Not supported yet.");
-                            }
+            @Override
+            public Observable<HotCodeReplaceEvent> getEventHub() {
+                return new Observable<HotCodeReplaceEvent>() {
+                    @Override
+                    protected void subscribeActual(Observer<? super HotCodeReplaceEvent> arg0) {
+                        LOG.log(Level.INFO, "arg0= {0}", arg0);
+                    }
+                };
+            }
+        });
+        context.registerProvider(ISourceLookUpProvider.class, sourceProvider);
+        context.registerProvider(IEvaluationProvider.class, new IEvaluationProvider() {
+            @Override
+            public boolean isInEvaluation(ThreadReference thread) {
+                return false;
+            }
 
-                            @Override
-                            public Observable<HotCodeReplaceEvent> getEventHub() {
-                                return new Observable<HotCodeReplaceEvent>() {
-                                    @Override
-                                    protected void subscribeActual(Observer<? super HotCodeReplaceEvent> arg0) {
-                                        LOG.log(Level.INFO, "arg0= {0}", arg0);
-                                    }
-                                };
-                            }
-                        });
-                        context.registerProvider(ISourceLookUpProvider.class, sourceProvider);
-                        context.registerProvider(IEvaluationProvider.class, new IEvaluationProvider() {
-                            @Override
-                            public boolean isInEvaluation(ThreadReference thread) {
-                                return false;
-                            }
+            @Override
+            public CompletableFuture<Value> evaluate(String arg0, ThreadReference arg1, int arg2) {
+                return CompletableFuture.completedFuture(new Value() {
+                    @Override
+                    public Type type() {
+                        return null;
+                    }
 
-                            @Override
-                            public CompletableFuture<Value> evaluate(String arg0, ThreadReference arg1, int arg2) {
-                                return CompletableFuture.completedFuture(new Value() {
-                                    @Override
-                                    public Type type() {
-                                        return null;
-                                    }
+                    @Override
+                    public VirtualMachine virtualMachine() {
+                        return null;
+                    }
+                });
+            }
 
-                                    @Override
-                                    public VirtualMachine virtualMachine() {
-                                        return null;
-                                    }
-                                });
-                            }
+            @Override
+            public CompletableFuture<Value> evaluate(String arg0, ObjectReference arg1, ThreadReference arg2) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
 
-                            @Override
-                            public CompletableFuture<Value> evaluate(String arg0, ObjectReference arg1, ThreadReference arg2) {
-                                throw new UnsupportedOperationException("Not supported yet.");
-                            }
+            @Override
+            public CompletableFuture<Value> evaluateForBreakpoint(IEvaluatableBreakpoint arg0, ThreadReference arg1) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
 
-                            @Override
-                            public CompletableFuture<Value> evaluateForBreakpoint(IEvaluatableBreakpoint arg0, ThreadReference arg1) {
-                                throw new UnsupportedOperationException("Not supported yet.");
-                            }
+            @Override
+            public CompletableFuture<Value> invokeMethod(ObjectReference arg0, String arg1, String arg2, Value[] arg3, ThreadReference arg4, boolean arg5) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
 
-                            @Override
-                            public CompletableFuture<Value> invokeMethod(ObjectReference arg0, String arg1, String arg2, Value[] arg3, ThreadReference arg4, boolean arg5) {
-                                throw new UnsupportedOperationException("Not supported yet.");
-                            }
-
-                            @Override
-                            public void clearState(ThreadReference arg0) {
-                            }
-                        });
-                        context.registerProvider(ICompletionsProvider.class, new ICompletionsProvider() {
-                            @Override
-                            public List<Types.CompletionItem> codeComplete(StackFrame arg0, String arg1, int arg2, int arg3) {
-                                throw new UnsupportedOperationException("Not supported yet.");
-                            }
-                        });
-                        context.registerProvider(IExecuteProvider.class, new IExecuteProvider() {
-                            @Override
-                            public Process launch(Requests.LaunchArguments la) throws IOException {
+            @Override
+            public void clearState(ThreadReference arg0) {
+            }
+        });
+        context.registerProvider(ICompletionsProvider.class, new ICompletionsProvider() {
+            @Override
+            public List<Types.CompletionItem> codeComplete(StackFrame arg0, String arg1, int arg2, int arg3) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+        });
+        context.registerProvider(IExecuteProvider.class, new IExecuteProvider() {
+            @Override
+            public Process launch(Requests.LaunchArguments la) throws IOException {
                                 throw new IOException();
                                 /*
-                                String filePath = la.mainClass;
-                                FileObject file = filePath != null ? FileUtil.toFileObject(new File(filePath)) : null;
-                                if (file == null) {
-                                    throw new IOException("Missing file: " + la.mainClass);
-                                }
-                                return new LaunchingVirtualMachine(file, sourceProvider).runWithoutDebugger();*/
-                            }
-                        });
-                        NbProtocolServer server = new NbProtocolServer(vsCodeSocket.getInputStream(), vsCodeSocket.getOutputStream(), context);
-                        server.run();
-                    } catch (Throwable t) {
-                        t.printStackTrace();
-                    }
+                String filePath = la.mainClass;
+                FileObject file = filePath != null ? FileUtil.toFileObject(new File(filePath)) : null;
+                if (file == null) {
+                    throw new IOException("Missing file: " + la.mainClass);
                 }
+                return new LaunchingVirtualMachine(file, sourceProvider).runWithoutDebugger();*/
             }
-        }.start();
-        return port;
+        });
+        NbProtocolServer server = new NbProtocolServer(in, out, context);
+        server.run();
     }
-
 }

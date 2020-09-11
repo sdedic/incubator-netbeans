@@ -125,7 +125,8 @@ export function activate(context: ExtensionContext) {
             });
             server.listen(() => {
                 const address: any = server.address();
-                serverOptions.args.push(`--start-java-language-server=${address.port}`);
+                serverOptions.args.push(`--start-java-language-server=connect:${address.port}`);
+                serverOptions.args.push(`--start-java-debug-adapter-server=listen:0`);
                 const srv = spawn(serverOptions.command, serverOptions.args, serverOptions.options);
                 if (!srv) {
                     reject();
