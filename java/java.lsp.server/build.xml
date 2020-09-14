@@ -29,21 +29,8 @@
         <setproxy proxyhost="${proxyHost}" proxyPort="${proxyPort}"/>
     </target>
     <target name="build-lsp-server" depends="-set-use-jdk-javac,build,test-init,proxy-setup" description="Prepares NetBeans bits for vscode extensions">
-        <copy todir="${lsp.build.dir}/platform" failonerror="false">
-            <fileset dir="${netbeans.dest.dir}/platform" />
-        </copy>
-        <copy todir="${lsp.build.dir}/ide" failonerror="false">
-            <fileset dir="${netbeans.dest.dir}/ide" />
-        </copy>
-        <copy todir="${lsp.build.dir}/extide" failonerror="false">
-            <fileset dir="${netbeans.dest.dir}/extide" />
-        </copy>
-        <copy todir="${lsp.build.dir}/webcommon" failonerror="false">
-            <fileset dir="${netbeans.dest.dir}/webcommon" includes="**/*truffle*api*"/>
-        </copy>
-        <copy todir="${lsp.build.dir}/java" failonerror="false">
-            <fileset dir="${netbeans.dest.dir}/java" excludes="**/org-netbeans-modules-java-hints-test.jar" />
-        </copy>
+        <ant dir="vscapp" target="build-zip" inheritall="false" inheritrefs="false" />
+        <unzip src="vscapp/dist/nb-java-lsp-server.zip" dest="${lsp.build.dir}/../" />
         <mkdir dir="${lsp.build.dir}/bin" />
         <copy todir="${lsp.build.dir}/bin" file="script/bin/nb-java-lsp-server" />
         <mkdir dir="${lsp.build.dir}/etc" />
