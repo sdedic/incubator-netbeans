@@ -973,7 +973,9 @@ public final class ParseProjectXml extends Task {
             File depJar = computeClasspathModuleLocation(modules, cnb, clusterPath, excludedModules, runtime);
 
             List<File> additions = new ArrayList<>();
-            additions.add(depJar);
+            if (!depJar.getName().equals("org-netbeans-libs-javafx.jar")) {
+                additions.add(depJar);
+            }
             if (recursive) {
                 addRecursiveDeps(additions, modules, cnb, clusterPath, excludedModules, new HashSet<>(), runtime);
             }
@@ -1071,7 +1073,9 @@ public final class ParseProjectXml extends Task {
             log("  Added dep " + nextModule + " due to " + cnb, Project.MSG_DEBUG);
             File depJar = computeClasspathModuleLocation(modules, nextModule, clusterPath, excludedModules, true);
             if (!additions.contains(depJar)) {
-                additions.add(depJar);
+                if (!depJar.getName().equals("org-netbeans-libs-javafx.jar")) {
+                    additions.add(depJar);
+                }
             }
             addRecursiveDeps(additions, modules, nextModule, clusterPath, excludedModules, skipCnb, runtime);
         }
@@ -1278,7 +1282,7 @@ public final class ParseProjectXml extends Task {
                } else {
                    builder.append("\nYou need to download and install org-netbeans-libs-junit4.nbm into the platform to run tests.");
                    builder.append("\nIf you have Maven and agree to http://www.opensource.org/licenses/cpl1.0.txt it suffices to run:");
-                   builder.append("\nmvn dependency:get -Dartifact=junit:junit:4.8.2 -DrepoUrl=http://repo1.maven.org/maven2/");
+                   builder.append("\nmvn dependency:get -Dartifact=junit:junit:4.8.2 -DrepoUrl=https://repo1.maven.org/maven2/");
                }
            }
            if (!missingEntries.isEmpty()) {
