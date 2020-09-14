@@ -24,7 +24,6 @@ import java.awt.event.ActionListener;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.prefs.Preferences;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JComponent;
@@ -32,26 +31,17 @@ import javax.swing.JMenuItem;
 import javax.swing.KeyStroke;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
-import org.netbeans.api.autoupdate.InstallSupport;
-import org.netbeans.api.autoupdate.UpdateManager;
 import org.netbeans.api.java.platform.JavaPlatform;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
-import org.netbeans.modules.autoupdate.ui.api.PluginManager;
-import org.netbeans.modules.nashorn.execution.ModuleRequestException;
 import org.netbeans.modules.nashorn.execution.NashornPlatform;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ui.support.FileSensitiveActions;
-import org.openide.DialogDisplayer;
-import org.openide.NotifyDescriptor;
 import org.openide.awt.DynamicMenuContent;
-import org.openide.awt.StatusDisplayer;
 import org.openide.filesystems.FileObject;
 import org.openide.util.ContextAwareAction;
 import org.openide.util.Exceptions;
 import org.openide.util.Lookup;
-import org.openide.util.NbBundle;
-import org.openide.util.NbPreferences;
 import org.openide.util.Utilities;
 import org.openide.util.actions.Presenter;
 
@@ -91,48 +81,13 @@ abstract class ExecJSAction extends AbstractAction implements ContextAwareAction
         if (file == null) {
             return ;
         }
-        boolean tryAgain = false;
-        int repeats = 0;
-        do {
-            repeats++;
             try {
                 exec(javaPlatform, file);
             } catch (IOException ex) {
                 Exceptions.printStackTrace(ex);
-            } catch (ModuleRequestException ex) {
-                tryAgain = maybeInstallModule(ex);
             } catch (UnsupportedOperationException ex) {
                 Exceptions.printStackTrace(ex);
             }
-        } while (tryAgain && repeats < 2);
-    }
-    
-    @NbBundle.Messages({
-        "TITLE_CannotRunScript=Execution failed",
-        "# {0} - JDK name",
-        "ERR_CannotRunScriptQuestion=Could not run the script: {0}. Javascript implementation may be downloaded as a module, do you want to install it ?",
-        "# {0} - JDK name",
-        "ERR_CannotRunScript=Could not run the script: {0}."
-    })
-    private boolean maybeInstallModule(ModuleRequestException e) {
-        Preferences p = NbPreferences.forModule(ExecJSAction.class);
-        if (p.getBoolean(e.getModuleName(), false)) {
-            StatusDisplayer.getDefault().setStatusText(Bundle.ERR_CannotRunScript(e.getMessage()), 1);
-            return false;
-        }
-        NotifyDescriptor.Confirmation conf = new NotifyDescriptor.Confirmation(
-                Bundle.ERR_CannotRunScriptQuestion(e.getMessage()), 
-                Bundle.TITLE_CannotRunScript(), NotifyDescriptor.YES_NO_CANCEL_OPTION);
-        Object o = DialogDisplayer.getDefault().notify(conf);
-        if (o == NotifyDescriptor.CANCEL_OPTION) {
-            return false;
-        }
-        if (o == NotifyDescriptor.NO_OPTION) {
-            p.putBoolean(e.getModuleName(), true);
-            return false;
-        }
-        Object res = PluginManager.installSingle(e.getModuleName(), e.getModuleDescription());
-        return res == null;
     }
     
     private FileObject getCurrentFile() {
