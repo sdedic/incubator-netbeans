@@ -24,8 +24,10 @@ import com.microsoft.java.debug.core.IEventHub;
 import com.sun.jdi.ThreadReference;
 import com.sun.jdi.VirtualMachine;
 import java.util.List;
+
+import org.netbeans.api.debugger.Breakpoint;
+import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
-import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
 
 /**
  *
@@ -60,12 +62,13 @@ public final class NbDebugSession implements IDebugSession {
 
     @Override
     public void detach() {
-        throw new UnsupportedOperationException("Not supported.");
+        terminate(); // NetBeans takes care about not killing the debuggee when attached.
     }
 
     @Override
     public void terminate() {
-        ((JPDADebuggerImpl) debugger).finish();
+        debugger.finish();
+        cleanBreakpoints();
     }
 
     @Override
@@ -97,5 +100,16 @@ public final class NbDebugSession implements IDebugSession {
     public VirtualMachine getVM() {
         throw new UnsupportedOperationException("Not supported.");
     }
-    
+
+    /**
+     * Breakpoints are always being set from the client. We must clean them so that
+     * they are not duplicated on the next start.
+     */
+    private static void cleanBreakpoints() {
+        DebuggerManager debuggerManager = DebuggerManager.getDebuggerManager();
+        for (Breakpoint breakpoint : debuggerManager.getBreakpoints()) {
+            debuggerManager.removeBreakpoint(breakpoint);
+        }
+        debuggerManager.removeAllWatches();
+    }
 }

@@ -25,11 +25,6 @@ import com.microsoft.java.debug.core.protocol.Messages.Response;
 import com.microsoft.java.debug.core.protocol.Requests.Arguments;
 import com.microsoft.java.debug.core.protocol.Requests.Command;
 import com.microsoft.java.debug.core.protocol.Requests.DisconnectArguments;
-import org.netbeans.api.debugger.Breakpoint;
-import org.netbeans.api.debugger.DebuggerManager;
-import org.netbeans.api.debugger.jpda.JPDADebugger;
-import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
-import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
 
 /**
  *
@@ -42,21 +37,11 @@ final class NbDisconnectRequestHandler extends AbstractDisconnectRequestHandler 
         DisconnectArguments disconnectArguments = (DisconnectArguments) arguments;
         IDebugSession debugSession = context.getDebugSession();
         if (debugSession != null) {
-            JPDADebugger dbg = ((NbDebugSession) context.getDebugSession()).getDebugger();
-            ((JPDADebuggerImpl) dbg).finish();
-            cleanBreakpoints();
+            if (disconnectArguments.terminateDebuggee && !context.isAttached()) {
+                debugSession.terminate();
+            } else {
+                debugSession.detach();
+            }
         }
-    }
-
-    /**
-     * Breakpoints are always being set from the client. We must clean them so that
-     * they are not duplicated on the next start.
-     */
-    private static void cleanBreakpoints() {
-        DebuggerManager debuggerManager = DebuggerManager.getDebuggerManager();
-        for (Breakpoint breakpoint : debuggerManager.getBreakpoints()) {
-            debuggerManager.removeBreakpoint(breakpoint);
-        }
-        debuggerManager.removeAllWatches();
     }
 }

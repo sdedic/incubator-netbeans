@@ -554,14 +554,6 @@ public abstract class JPDADebugger {
         return false;
     }
 
-    public void suspend() {
-        throw new AbstractMethodError();
-    }
-    
-    public void resume() {
-        throw new AbstractMethodError();
-    }
-    
     /**
      * Get the list of all classes in the debuggee.
      * @return The list of all classes.

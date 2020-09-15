@@ -264,6 +264,4 @@ public interface JPDAThread {
      * @since 2.16
      */
     List<MonitorInfo> getOwnedMonitorsAndFrames();
-
-    boolean isInStep();
 }
