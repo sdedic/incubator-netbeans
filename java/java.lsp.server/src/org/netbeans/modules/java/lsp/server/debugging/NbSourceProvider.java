@@ -19,16 +19,21 @@
 package org.netbeans.modules.java.lsp.server.debugging;
 
 import com.microsoft.java.debug.core.DebugException;
+import com.microsoft.java.debug.core.adapter.AdapterUtils;
+import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
 import com.microsoft.java.debug.core.adapter.ISourceLookUpProvider;
+import com.microsoft.java.debug.core.protocol.Types;
 import com.sun.source.util.TreePath;
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.lang.model.element.TypeElement;
+import org.apache.commons.lang3.StringUtils;
 import org.netbeans.api.java.classpath.ClassPath;
 import org.netbeans.api.java.source.CompilationController;
 import org.netbeans.api.java.source.JavaSource;
@@ -111,4 +116,40 @@ public final class NbSourceProvider implements ISourceLookUpProvider {
         throw new UnsupportedOperationException("Not supported yet.");
     }
     
+    /**
+     * Find the source mapping for the specified source file name.
+     */
+    public static Types.Source convertDebuggerSourceToClient(String fullyQualifiedName, String sourceName, String relativeSourcePath,
+            IDebugAdapterContext context) throws URISyntaxException {
+        // use a lru cache for better performance
+        String uri = context.getSourceLookupCache().computeIfAbsent(fullyQualifiedName, key -> {
+            String fromProvider = context.getProvider(ISourceLookUpProvider.class).getSourceFileURI(key, relativeSourcePath);
+            // avoid return null which will cause the compute function executed again
+            return StringUtils.isBlank(fromProvider) ? "" : fromProvider;
+        });
+
+        if (!StringUtils.isBlank(uri)) {
+            // The Source.path could be a file system path or uri string.
+            if (uri.startsWith("file:")) {
+                String clientPath = AdapterUtils.convertPath(uri, context.isDebuggerPathsAreUri(), context.isClientPathsAreUri());
+                return new Types.Source(sourceName, clientPath, 0);
+            } else {
+                // If the debugger returns uri in the Source.path for the StackTrace response, VSCode client will try to find a TextDocumentContentProvider
+                // to render the contents.
+                // Language Support for Java by Red Hat extension has already registered a jdt TextDocumentContentProvider to parse the jdt-based uri.
+                // The jdt uri looks like 'jdt://contents/rt.jar/java.io/PrintStream.class?=1.helloworld/%5C/usr%5C/lib%5C/jvm%5C/java-8-oracle%5C/jre%5C/
+                // lib%5C/rt.jar%3Cjava.io(PrintStream.class'.
+                return new Types.Source(sourceName, uri, 0);
+            }
+        } else {
+            // If the source lookup engine cannot find the source file, then lookup it in the source directories specified by user.
+            String absoluteSourcepath = AdapterUtils.sourceLookup(context.getSourcePaths(), relativeSourcePath);
+            if (absoluteSourcepath != null) {
+                return new Types.Source(sourceName, absoluteSourcepath, 0);
+            } else {
+                return null;
+            }
+        }
+    }
+
 }

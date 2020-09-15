@@ -25,7 +25,6 @@ import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
 import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
 import com.microsoft.java.debug.core.adapter.LaunchMode;
 import com.microsoft.java.debug.core.adapter.handler.ILaunchDelegate;
-import com.microsoft.java.debug.core.adapter.handler.StackTraceRequestHandler;
 import com.microsoft.java.debug.core.protocol.Events;
 import com.microsoft.java.debug.core.protocol.Events.OutputEvent;
 import com.microsoft.java.debug.core.protocol.Events.OutputEvent.Category;
@@ -38,7 +37,7 @@ import java.io.File;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -66,7 +65,7 @@ final class NbLaunchRequestHandler implements IDebugRequestHandler {
 
     @Override
     public List<Command> getTargetCommands() {
-        return Arrays.asList(Command.LAUNCH);
+        return Collections.singletonList(Command.LAUNCH);
     }
 
     @Override
@@ -157,7 +156,7 @@ final class NbLaunchRequestHandler implements IDebugRequestHandler {
                     : packageName.replace('.', File.separatorChar) + File.separatorChar + sourceName;
             Types.Source source = null;
             try {
-                source = NbStackTraceRequestHandler.convertDebuggerSourceToClient(fullyQualifiedName, sourceName, sourcePath, context);
+                source = NbSourceProvider.convertDebuggerSourceToClient(fullyQualifiedName, sourceName, sourcePath, context);
             } catch (URISyntaxException e) {
                 // do nothing.
             }

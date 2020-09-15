@@ -29,7 +29,6 @@ import com.microsoft.java.debug.core.protocol.Requests.ScopesArguments;
 import com.microsoft.java.debug.core.protocol.Responses;
 import com.microsoft.java.debug.core.protocol.Types;
 import com.sun.jdi.ThreadReference;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -46,28 +45,25 @@ public class NbScopesRequestHandler implements IDebugRequestHandler {
 
     @Override
     public List<Command> getTargetCommands() {
-        return Arrays.asList(Command.SCOPES);
+        return Collections.singletonList(Command.SCOPES);
     }
 
     @Override
     public CompletableFuture<Response> handle(Command command, Arguments arguments, Response response, IDebugAdapterContext context) {
         ScopesArguments scopesArgs = (ScopesArguments) arguments;
-        //List<Types.Scope> scopes = new ArrayList<>();
-        DVFrame stackFrame = (DVFrame) context.getRecyclableIdPool().getObjectById(scopesArgs.frameId);
+        NbFrame stackFrame = (NbFrame) context.getRecyclableIdPool().getObjectById(scopesArgs.frameId);
         if (stackFrame == null) {
             response.body = new Responses.ScopesResponseBody(Collections.emptyList());
             return CompletableFuture.completedFuture(response);
         }
-        DVThread thread = stackFrame.getThread();
-        // XXX: remove dependency on debugger impl
-        JPDAThreadImpl jpdaThread = (JPDAThreadImpl) ((WeakCacheMap.KeyedValue) thread).getKey();
-        ThreadReference threadRef = jpdaThread.getThreadReference();
-        VariableProxy localScope = new VariableProxy(threadRef, "Local", new StackFrameReference(threadRef, 0));
-        int localScopeId = context.getRecyclableIdPool().addObject(thread.getId(), localScope);
-        List<Types.Scope> scopes = Collections.singletonList(new Types.Scope("Local", localScopeId, false));//localScope.getScope(), localScopeId, false));
+        stackFrame.getDVFrame().makeCurrent(); // The scopes and variables are always provided with respect to the current frame
+        // TODO: Provide Truffle scopes.
+        NbScope localScope = new NbScope(stackFrame, "Local");
+        int localScopeId = context.getRecyclableIdPool().addObject(stackFrame.getThreadId(), localScope);
+        List<Types.Scope> scopes = Collections.singletonList(new Types.Scope(localScope.getName(), localScopeId, false));
 
         response.body = new Responses.ScopesResponseBody(scopes);
         return CompletableFuture.completedFuture(response);
     }
-    
+
 }

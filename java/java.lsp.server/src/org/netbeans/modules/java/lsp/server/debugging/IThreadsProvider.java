@@ -18,18 +18,19 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
+import com.microsoft.java.debug.core.adapter.IProvider;
+import java.util.function.BiConsumer;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
 /**
  *
  * @author martin
  */
-final class StateChangeListener implements PropertyChangeListener {
+public interface IThreadsProvider extends IProvider {
 
-    @Override
-    public void propertyChange(PropertyChangeEvent evt) {
-        
-    }
-    
+    DVThread getThread(long threadId);
+
+    void visitThreads(BiConsumer<Long, DVThread> threadsConsumer);
+
+    long getId(DVThread dvThread);
 }

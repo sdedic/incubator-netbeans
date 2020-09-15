@@ -1243,14 +1243,7 @@ public class JPDADebuggerImpl extends JPDADebugger {
         this.attachingCookie = cookie;
     }
 
-    Consumer<VirtualMachine> callback;
-    public void setRunningCallback(Consumer<VirtualMachine> callback) {
-        this.callback = callback;
-    }
     public void setRunning (VirtualMachine vm, Operator o) {
-        if (callback != null) {
-            callback.accept(vm);
-        }
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Start - JPDADebuggerImpl.setRunning ()");
             JPDAUtils.printFeatures (logger, vm);
@@ -1982,15 +1975,6 @@ public class JPDADebuggerImpl extends JPDADebugger {
 
     public JPDAThreadImpl getThread (ThreadReference tr) {
         return (JPDAThreadImpl) threadsTranslation.translate (tr);
-    }
-    
-    public JPDAThread getThread(long id) {
-        for (JPDAThread t : getAllThreads()) {
-            if (t.getID() == id) {
-                return t;
-            }
-        }
-        return null;
     }
 
     public JPDAThreadImpl getExistingThread (ThreadReference tr) {

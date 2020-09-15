@@ -19,7 +19,6 @@
 package org.netbeans.modules.java.lsp.server.debugging;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
@@ -38,6 +37,9 @@ import com.microsoft.java.debug.core.protocol.Requests.Command;
 import com.microsoft.java.debug.core.protocol.Requests.VariablesArguments;
 import com.microsoft.java.debug.core.protocol.Responses;
 import com.microsoft.java.debug.core.protocol.Types;
+import java.util.Collections;
+import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
 import org.netbeans.spi.viewmodel.Models;
 import org.netbeans.spi.viewmodel.UnknownTypeException;
 
@@ -45,19 +47,22 @@ import org.netbeans.spi.viewmodel.UnknownTypeException;
  *
  * @author martin
  */
-public class NbVariablesRequestHandler implements IDebugRequestHandler {
+final class NbVariablesRequestHandler implements IDebugRequestHandler {
     protected static final Logger logger = Logger.getLogger(Configuration.LOGGER_NAME);
 
     private static final String LOCALS_VIEW_NAME = "LocalsView";
     private static final String LOCALS_TO_STRING_COLUMN_ID = "LocalsToString";
     private static final String LOCALS_TYPE_COLUMN_ID = "LocalsType";
-    private static final String LOCALS_VALUE_COLUMN_ID = "LocalsValue";
 
-    private final ViewModel localsView = new ViewModel(LOCALS_VIEW_NAME);
+    private final ViewModel.Provider localsModelProvider;
+
+    NbVariablesRequestHandler() {
+        this.localsModelProvider = new ViewModel.Provider(LOCALS_VIEW_NAME);
+    }
 
     @Override
     public List<Command> getTargetCommands() {
-        return Arrays.asList(Command.VARIABLES);
+        return Collections.singletonList(Command.VARIABLES);
     }
 
     @Override
@@ -66,10 +71,6 @@ public class NbVariablesRequestHandler implements IDebugRequestHandler {
         VariablesArguments varArgs = (VariablesArguments) arguments;
 
         boolean showStaticVariables = DebugSettings.getCurrent().showStaticVariables;
-
-        //Map<String, Object> options = variableFormatter.getDefaultOptions();
-        //VariableUtils.applyFormatterOptions(options, varArgs.format != null && varArgs.format.hex);
-        IEvaluationProvider evaluationEngine = context.getProvider(IEvaluationProvider.class);
 
         List<Types.Variable> list = new ArrayList<>();
         Object container = context.getRecyclableIdPool().getObjectById(varArgs.variablesReference);
@@ -80,9 +81,9 @@ public class NbVariablesRequestHandler implements IDebugRequestHandler {
             return CompletableFuture.completedFuture(response);
         }
 
-        Models.CompoundModel localsModel = localsView.createModel();
-
-        if (container instanceof VariableProxy) {
+        JPDADebugger debugger = ((NbDebugSession) context.getDebugSession()).getDebugger();
+        Models.CompoundModel localsModel = localsModelProvider.getModel(debugger.getSession());
+        if (container instanceof NbScope) {
             container = localsModel.getRoot();
         }
 

@@ -229,11 +229,6 @@ public final class JPDAThreadImpl implements JPDAThread, Customizer, BeanContext
         return threadName;
     }
 
-    @Override
-    public long getID() {
-        return threadReference.uniqueID();
-    }
-    
     /**
     * Returns parent thread group.
     *

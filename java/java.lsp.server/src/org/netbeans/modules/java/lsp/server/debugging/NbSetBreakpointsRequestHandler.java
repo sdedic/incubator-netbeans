@@ -37,6 +37,7 @@ import com.microsoft.java.debug.core.protocol.Types;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
@@ -58,23 +59,7 @@ final class NbSetBreakpointsRequestHandler implements IDebugRequestHandler {
 
     @Override
     public List<Command> getTargetCommands() {
-        return Arrays.asList(Command.SETBREAKPOINTS);
-    }
-
-    @Override
-    public void initialize(IDebugAdapterContext context) {
-        IDebugRequestHandler.super.initialize(context);
-        IHotCodeReplaceProvider provider = context.getProvider(IHotCodeReplaceProvider.class);
-        provider.getEventHub()
-            .filter(event -> event.getEventType() == EventType.END)
-            .subscribe(event -> {
-                try {
-                    List<String> classNames = (List<String>) event.getData();
-                    reinstallBreakpoints(context, classNames);
-                } catch (Exception e) {
-                    logger.severe(e.toString());
-                }
-            });
+        return Collections.singletonList(Command.SETBREAKPOINTS);
     }
 
     @Override
@@ -167,24 +152,4 @@ final class NbSetBreakpointsRequestHandler implements IDebugRequestHandler {
         return breakpoints;
     }
 
-    private void reinstallBreakpoints(IDebugAdapterContext context, List<String> typenames) {
-        if (typenames == null || typenames.isEmpty()) {
-            return;
-        }
-        IBreakpoint[] breakpoints = manager.getBreakpoints();
-
-        for (IBreakpoint breakpoint : breakpoints) {
-            if (typenames.contains(breakpoint.className())) {
-                try {
-                    breakpoint.close();
-                    breakpoint.install().thenAccept(bp -> {
-                        Events.BreakpointEvent bpEvent = new Events.BreakpointEvent("new", this.convertDebuggerBreakpointToClient(bp, context));
-                        context.getProtocolServer().sendEvent(bpEvent);
-                    });
-                } catch (Exception e) {
-                    logger.log(Level.SEVERE, String.format("Remove breakpoint exception: %s", e.toString()), e);
-                }
-            }
-        }
-    }
 }

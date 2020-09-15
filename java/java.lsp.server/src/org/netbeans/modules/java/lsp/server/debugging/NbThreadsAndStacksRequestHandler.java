@@ -18,17 +18,18 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import com.microsoft.java.debug.core.DebugUtility;
 import com.microsoft.java.debug.core.adapter.AdapterUtils;
 import com.microsoft.java.debug.core.adapter.ErrorCode;
 import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
 import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.adapter.IEvaluationProvider;
 import com.microsoft.java.debug.core.protocol.Events;
 import com.microsoft.java.debug.core.protocol.Messages.Response;
 import com.microsoft.java.debug.core.protocol.Requests;
@@ -40,27 +41,18 @@ import com.microsoft.java.debug.core.protocol.Requests.StackTraceArguments;
 import com.microsoft.java.debug.core.protocol.Requests.ThreadsArguments;
 import com.microsoft.java.debug.core.protocol.Responses;
 import com.microsoft.java.debug.core.protocol.Types;
-import com.sun.jdi.ObjectCollectedException;
-import com.sun.jdi.ThreadReference;
-import com.sun.jdi.VMDisconnectedException;
-import java.net.URI;
-import java.util.HashMap;
-import java.util.Map;
-import org.netbeans.api.debugger.ActionsManager;
-import org.netbeans.api.debugger.DebuggerEngine;
-import org.netbeans.api.debugger.DebuggerManager;
-import org.netbeans.spi.debugger.ui.DebuggingView;
+
+import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVSupport;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
 /**
  *
  * @author martin
  */
 public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
-
-    private static final String THREADS_VIEW_NAME = "DebuggingView";
-
-    private final ViewModel threadsView = new ViewModel(THREADS_VIEW_NAME);
-    private final Map<Long, DebuggingView.DVThread> threadsById = new HashMap<>();
 
     @Override
     public List<Command> getTargetCommands() {
@@ -89,24 +81,11 @@ public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
     }
 
     private CompletableFuture<Response> threads(Requests.ThreadsArguments arguments, Response response, IDebugAdapterContext context) {
-        ArrayList<Types.Thread> threads = new ArrayList<>();
-        DebuggerEngine currentEngine = DebuggerManager.getDebuggerManager().getCurrentEngine();
-        DebuggingView.DVSupport dvSupport;
-        if (currentEngine != null) {
-            dvSupport = currentEngine.lookupFirst(null, DebuggingView.DVSupport.class);
-        } else {
-            return CompletableFuture.completedFuture(response);
-        }
-        threadsById.clear();
-        long tid = 1L;
-        List<DebuggingView.DVThread> allThreads = dvSupport.getAllThreads();
-        for (DebuggingView.DVThread dvThread : allThreads) {
-            long id = dvThread.getId();//tid++;
-            Types.Thread clientThread = new Types.Thread(id, dvThread.getName());
-            threads.add(clientThread);
-            threadsById.put(id, dvThread);
-        }
-        response.body = new Responses.ThreadsResponseBody(threads);
+        List<Types.Thread> arr = new ArrayList<>();
+        context.getProvider(IThreadsProvider.class).visitThreads((id, dvThread) -> {
+            arr.add(new Types.Thread(id, dvThread.getName()));
+        });
+        response.body = new Responses.ThreadsResponseBody(arr);
         return CompletableFuture.completedFuture(response);
     }
 
@@ -117,12 +96,11 @@ public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
             return CompletableFuture.completedFuture(response);
         }
 
-        // XXX Stepping workaround:
-        //    ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
-        //    System.err.println("am: " + am);
-        //    am.doAction("pauseInGraalScript");
-
-        DebuggingView.DVThread dvThread = threadsById.get(arguments.threadId);
+        DVThread dvThread = context.getProvider(IThreadsProvider.class).getThread(arguments.threadId);
+        if (dvThread == null) {
+            response.body = new Responses.StackTraceResponseBody(result, 0);
+            return CompletableFuture.completedFuture(response);
+        }
         int from, to;
         if (arguments.levels > 0) {
             from = arguments.startFrame;
@@ -131,9 +109,9 @@ public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
             from = 0;
             to = Integer.MAX_VALUE;
         }
-        List<DebuggingView.DVFrame> stackFrames = dvThread.getFrames(from, to);
-        for (DebuggingView.DVFrame frame : stackFrames) {
-            int frameId = context.getRecyclableIdPool().addObject(arguments.threadId, frame);
+        List<DVFrame> stackFrames = dvThread.getFrames(from, to);
+        for (DVFrame frame : stackFrames) {
+            int frameId = context.getRecyclableIdPool().addObject(arguments.threadId, new NbFrame(arguments.threadId, frame));
             int line = frame.getLine();
             if (line < 0) { // unknown
                 line = 0;
@@ -157,74 +135,42 @@ public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
     }
 
     private CompletableFuture<Response> pause(Requests.PauseArguments arguments, Response response, IDebugAdapterContext context) {
-        DebuggingView.DVThread dvThread = threadsById.get(arguments.threadId);
-        if (dvThread != null) {
-            dvThread.suspend();
-            context.getProtocolServer().sendEvent(new Events.StoppedEvent("pause", arguments.threadId));
-            return CompletableFuture.completedFuture(response);
-        }
-        
-        ThreadReference thread = DebugUtility.getThread(context.getDebugSession(), arguments.threadId);
-        if (thread != null) {
-            thread.suspend();
-            context.getProtocolServer().sendEvent(new Events.StoppedEvent("pause", arguments.threadId));
+        final Events.StoppedEvent ev;
+        if (arguments.threadId > 0) {
+            DVThread dvThread = context.getProvider(IThreadsProvider.class).getThread(arguments.threadId);
+            if (dvThread != null) {
+                dvThread.suspend();
+                ev = new Events.StoppedEvent("pause", arguments.threadId, false);
+            } else {
+                ev = null;
+            }
         } else {
-            context.getDebugSession().suspend();
-            context.getProtocolServer().sendEvent(new Events.StoppedEvent("pause", arguments.threadId, true));
+            JPDADebugger debugger = ((NbDebugSession) context.getDebugSession()).getDebugger();
+            debugger.getSession().getCurrentEngine().getActionsManager().doAction("pause");
+            ev = new Events.StoppedEvent("pause", 0, true);
+        }
+        if (ev != null) {
+            context.getProtocolServer().sendEvent(ev);
         }
         return CompletableFuture.completedFuture(response);
     }
 
     private CompletableFuture<Response> resume(Requests.ContinueArguments arguments, Response response, IDebugAdapterContext context) {
-        DebuggingView.DVThread dvThread = threadsById.get(arguments.threadId);
-        if (dvThread != null) {
-            dvThread.resume();
-            context.getRecyclableIdPool().removeObjectsByOwner(arguments.threadId);
+        if (arguments.threadId != 0) {
+            DVThread dvThread = context.getProvider(IThreadsProvider.class).getThread(arguments.threadId);
+            if (dvThread != null) {
+                dvThread.resume();
+                context.getRecyclableIdPool().removeObjectsByOwner(arguments.threadId);
+            }
             response.body = new Responses.ContinueResponseBody(false);
             return CompletableFuture.completedFuture(response);
-        }
-        
-        boolean allThreadsContinued = true;
-        ThreadReference thread = DebugUtility.getThread(context.getDebugSession(), arguments.threadId);
-        /**
-         * See the jdi doc https://docs.oracle.com/javase/7/docs/jdk/api/jpda/jdi/com/sun/jdi/ThreadReference.html#resume(),
-         * suspends of both the virtual machine and individual threads are counted. Before a thread will run again, it must
-         * be resumed (through ThreadReference#resume() or VirtualMachine#resume()) the same number of times it has been suspended.
-         */
-        if (thread != null) {
-            context.getExceptionManager().removeException(arguments.threadId);
-            allThreadsContinued = false;
-            DebugUtility.resumeThread(thread);
-            checkThreadRunningAndRecycleIds(thread, context);
         } else {
-            context.getExceptionManager().removeAllExceptions();
-            context.getDebugSession().resume();
+            JPDADebugger debugger = ((NbDebugSession) context.getDebugSession()).getDebugger();
+            debugger.getSession().getCurrentEngine().getActionsManager().doAction("continue");
             context.getRecyclableIdPool().removeAllObjects();
+            response.body = new Responses.ContinueResponseBody(true);
+            return CompletableFuture.completedFuture(response);
         }
-        response.body = new Responses.ContinueResponseBody(allThreadsContinued);
-        return CompletableFuture.completedFuture(response);
     }
 
-    /**
-     * Recycle the related ids owned by the specified thread.
-     */
-    public static void checkThreadRunningAndRecycleIds(ThreadReference thread, IDebugAdapterContext context) {
-        try {
-            IEvaluationProvider engine = context.getProvider(IEvaluationProvider.class);
-            engine.clearState(thread);
-            boolean allThreadsRunning = !DebugUtility.getAllThreadsSafely(context.getDebugSession()).stream()
-                    .anyMatch(ThreadReference::isSuspended);
-            if (allThreadsRunning) {
-                context.getRecyclableIdPool().removeAllObjects();
-            } else {
-                context.getRecyclableIdPool().removeObjectsByOwner(thread.uniqueID());
-            }
-        } catch (VMDisconnectedException ex) {
-            // isSuspended may throw VMDisconnectedException when the VM terminates
-            context.getRecyclableIdPool().removeAllObjects();
-        } catch (ObjectCollectedException collectedEx) {
-            // isSuspended may throw ObjectCollectedException when the thread terminates
-            context.getRecyclableIdPool().removeObjectsByOwner(thread.uniqueID());
-        }
-    }
 }

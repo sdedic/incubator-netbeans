@@ -25,7 +25,9 @@ import com.microsoft.java.debug.core.protocol.Requests;
 import com.sun.jdi.connect.IllegalConnectorArgumentsException;
 import com.sun.jdi.connect.VMStartException;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
+import org.netbeans.modules.java.lsp.server.debugging.IThreadsProvider;
 
 /**
  *
@@ -47,6 +49,7 @@ public class NbLaunchWithDebuggingDelegate extends NbLaunchDelegate {
 
     @Override
     public void postLaunch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context) {
+        //context.getProvider(IThreadsProvider.class).initialize(context, Collections.emptyMap());
         // send an InitializedEvent to indicate that the debugger is ready to accept
         // configuration requests (e.g. SetBreakpointsRequest, SetExceptionBreakpointsRequest).
         context.getProtocolServer().sendEvent(new Events.InitializedEvent());

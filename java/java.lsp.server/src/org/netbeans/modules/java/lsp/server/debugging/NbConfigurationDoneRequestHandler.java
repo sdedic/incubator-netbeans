@@ -27,7 +27,7 @@ import com.microsoft.java.debug.core.protocol.Messages.Response;
 import com.microsoft.java.debug.core.protocol.Requests.Arguments;
 import com.microsoft.java.debug.core.protocol.Requests.Command;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,27 +35,21 @@ import java.util.concurrent.CompletableFuture;
  *
  * @author martin
  */
-public class NbConfigurationDoneRequestHandler implements IDebugRequestHandler {
+final class NbConfigurationDoneRequestHandler implements IDebugRequestHandler {
 
     @Override
     public List<Command> getTargetCommands() {
-        return Arrays.asList(Command.CONFIGURATIONDONE);
+        return Collections.singletonList(Command.CONFIGURATIONDONE);
     }
 
     @Override
     public CompletableFuture<Response> handle(Command command, Arguments arguments, Response response, IDebugAdapterContext context) {
         IDebugSession debugSession = context.getDebugSession();
         if (debugSession != null) {
-            // This is a global event handler to handle the JDI Event from Virtual Machine.
-            // It's too late to register JPDA event handler.
-            // No-op
-
-            // configuration is done, and start debug session.
-            //debugSession.start();
-            //dbg.resume();
+            // Breakpoints were submitted, we can resume the debugger
+            context.getProvider(IConfigurationSemaphore.class).notifyCongigurationDone();;
             return CompletableFuture.completedFuture(response);
         } else {
-            //context.getProtocolServer().sendEvent(new Events.TerminatedEvent());
             return AdapterUtils.createAsyncErrorResponse(response, ErrorCode.EMPTY_DEBUG_SESSION, "Failed to launch debug session, the debugger will exit.");
         }
     }

@@ -25,7 +25,7 @@ import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
 import com.microsoft.java.debug.core.protocol.Messages;
 import com.microsoft.java.debug.core.protocol.Requests;
 import com.microsoft.java.debug.core.protocol.Types;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.ArrayUtils;
@@ -34,7 +34,7 @@ final class NbSetExceptionBreakpointsRequestHandler implements IDebugRequestHand
 
     @Override
     public List<Requests.Command> getTargetCommands() {
-        return Arrays.asList(Requests.Command.SETEXCEPTIONBREAKPOINTS);
+        return Collections.singletonList(Requests.Command.SETEXCEPTIONBREAKPOINTS);
     }
 
     @Override

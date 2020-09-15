@@ -26,7 +26,7 @@ import com.microsoft.java.debug.core.adapter.variables.VariableUtils;
 import com.microsoft.java.debug.core.protocol.Messages;
 import com.microsoft.java.debug.core.protocol.Requests;
 import com.microsoft.java.debug.core.protocol.Responses;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +39,8 @@ import org.netbeans.api.debugger.jpda.ObjectVariable;
 import org.netbeans.api.debugger.jpda.Variable;
 import org.netbeans.modules.debugger.jpda.truffle.vars.TruffleVariable;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVSupport;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
 /**
  *
@@ -48,7 +50,7 @@ final class NbEvaluateRequestHandler implements IDebugRequestHandler {
 
     @Override
     public List<Requests.Command> getTargetCommands() {
-        return Arrays.asList(Requests.Command.EVALUATE);
+        return Collections.singletonList(Requests.Command.EVALUATE);
     }
 
     @Override
@@ -63,17 +65,20 @@ final class NbEvaluateRequestHandler implements IDebugRequestHandler {
                 "Failed to evaluate. Reason: Empty expression cannot be evaluated.",
                 ErrorCode.EVALUATION_COMPILE_ERROR));
         }
-        JPDADebugger dbg = ((NbDebugSession) context.getDebugSession()).getDebugger();
-        JPDAThread currentThread = dbg.getCurrentThread();
-        if (currentThread == null) {
+        NbFrame stackFrame = (NbFrame) context.getRecyclableIdPool().getObjectById(evalArguments.frameId);
+        if (stackFrame == null) {
             throw new CompletionException(AdapterUtils.createUserErrorDebugException(
-                "Failed to evaluate. Reason: No current thread.",
+                "Failed to evaluate. Reason: Unknown frame " + evalArguments.frameId,
                 ErrorCode.EVALUATION_COMPILE_ERROR));
         }
+        stackFrame.getDVFrame().makeCurrent(); // The evaluation is always performed with respect to the current frame
+        DVThread dvThread = stackFrame.getDVFrame().getThread();
+        long threadId = context.getProvider(IThreadsProvider.class).getId(dvThread);
+        JPDADebugger debugger = ((NbDebugSession) context.getDebugSession()).getDebugger();
         return CompletableFuture.supplyAsync(() -> {
             Variable variable;
             try {
-                variable = dbg.evaluate(expression);
+                variable = debugger.evaluate(expression);
             } catch (InvalidExpressionException ex) {
             throw new CompletionException(AdapterUtils.createUserErrorDebugException(
                 "Failed to evaluate. Reason: " + ex.getLocalizedMessage(),
@@ -82,12 +87,12 @@ final class NbEvaluateRequestHandler implements IDebugRequestHandler {
             Responses.EvaluateResponseBody responseBody;
             TruffleVariable truffleVariable = TruffleVariable.get(variable);
             if (truffleVariable != null) {
-                int referenceId = context.getRecyclableIdPool().addObject(currentThread.getID(), truffleVariable);
+                int referenceId = context.getRecyclableIdPool().addObject(threadId, truffleVariable);
                 responseBody = new Responses.EvaluateResponseBody(truffleVariable.getDisplayValue(),
                         referenceId, truffleVariable.getType(), truffleVariable.isLeaf() ? 0 : Integer.MAX_VALUE);
             } else {
                 if (variable instanceof ObjectVariable) {
-                    int referenceId = context.getRecyclableIdPool().addObject(currentThread.getID(), variable);
+                    int referenceId = context.getRecyclableIdPool().addObject(threadId, variable);
                     int indexedVariables = ((ObjectVariable) variable).getFieldsCount();
                     String toString;
                     try {

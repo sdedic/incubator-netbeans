@@ -23,6 +23,8 @@ import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
 import com.microsoft.java.debug.core.adapter.ISourceLookUpProvider;
 import com.microsoft.java.debug.core.adapter.handler.ILaunchDelegate;
 import com.sun.jdi.VMDisconnectedException;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,6 +46,7 @@ import org.netbeans.api.java.queries.UnitTestForSourceQuery;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
 import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
+import org.netbeans.modules.java.lsp.server.debugging.IConfigurationSemaphore;
 import org.netbeans.modules.java.lsp.server.debugging.NbSourceProvider;
 import org.netbeans.modules.java.lsp.server.utils.IOProviderImpl;
 import org.netbeans.spi.project.ActionProgress;
@@ -96,34 +99,41 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
                     }*/
                 }
             };
-            Lookups.executeWith(new ProxyLookup(Lookups.fixed(ioProvider), Lookup.getDefault()), () -> {
-                providerAndCommand.first().invokeAction(providerAndCommand.second(), Lookups.fixed(toRun, ioProvider, progress));
-            });
-
-            CompletableFuture<NbProcessConsole> consoleFuture = new CompletableFuture<>();
+            CompletableFuture<NbProcessConsole> launchFuture = new CompletableFuture<>();
             if (debug) {
                 DebuggerManager.getDebuggerManager().addDebuggerListener(new DebuggerManagerAdapter() {
                     @Override
                     public void sessionAdded(Session session) {
-                        JPDADebuggerImpl d = (JPDADebuggerImpl) session.lookupFirst(null, JPDADebugger.class);
-                        if (d != null) {
+                        JPDADebugger debugger = session.lookupFirst(null, JPDADebugger.class);
+                        if (debugger != null) {
                             Map properties = session.lookupFirst(null, Map.class);
                             NbSourceProvider sourceProvider = (NbSourceProvider) context.getProvider(ISourceLookUpProvider.class);
                             sourceProvider.setSourcePath(properties != null ? (ClassPath) properties.getOrDefault("sourcepath", ClassPath.EMPTY) : ClassPath.EMPTY);
-                            // XXX: remove dependency on debugger impl
-                            d.setRunningCallback(vm -> {
-                                IDebugSession debugSession = new NbDebugSession(d);
-                                context.setDebugSession(debugSession);
-                                NbProcessConsole console = new NbProcessConsole(Pair.of(out, err), "Debuggee", context.getDebuggeeEncoding());
-                                consoleFuture.complete(console);
+                            debugger.addPropertyChangeListener(JPDADebugger.PROP_STATE, new PropertyChangeListener() {
+                                @Override
+                                public void propertyChange(PropertyChangeEvent evt) {
+                                    int newState = (int) evt.getNewValue();
+                                    if (newState == JPDADebugger.STATE_RUNNING) {
+                                        debugger.removePropertyChangeListener(JPDADebugger.PROP_STATE, this);
+                                        IDebugSession debugSession = new NbDebugSession(debugger);
+                                        context.setDebugSession(debugSession);
+                                        NbProcessConsole console = new NbProcessConsole(Pair.of(out, err), "Debuggee", context.getDebuggeeEncoding());
+                                        launchFuture.complete(console);
+                                        context.getProvider(IConfigurationSemaphore.class).waitForConfigutaionDone();
+                                    }
+                                }
                             });
                         }
                     }
                 });
             } else {
-                consoleFuture.complete(new NbProcessConsole(Pair.of(out, err), "Run", context.getDebuggeeEncoding()));
+                launchFuture.complete(new NbProcessConsole(Pair.of(out, err), "Run", context.getDebuggeeEncoding()));
             }
-            return consoleFuture;
+
+            Lookups.executeWith(new ProxyLookup(Lookups.fixed(ioProvider), Lookup.getDefault()), () -> {
+                providerAndCommand.first().invokeAction(providerAndCommand.second(), Lookups.fixed(toRun, ioProvider, progress));
+            });
+            return launchFuture;
     }
 
     

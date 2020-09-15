@@ -38,6 +38,7 @@ import java.util.Map;
 import org.netbeans.api.debugger.DebuggerEngine;
 import org.netbeans.api.debugger.DebuggerInfo;
 import org.netbeans.api.debugger.DebuggerManager;
+import org.netbeans.api.debugger.Session;
 import org.netbeans.api.debugger.jpda.event.JPDABreakpointEvent;
 import org.netbeans.api.java.classpath.ClassPath;
 
@@ -553,10 +554,6 @@ public abstract class JPDADebugger {
         return false;
     }
 
-    public JPDAThread getThread(long id) {
-        return null;
-    }
-    
     public void suspend() {
         throw new AbstractMethodError();
     }
@@ -631,10 +628,13 @@ public abstract class JPDADebugger {
         throw new AbstractMethodError();
     }
 
-    public void resumeCurrentThread() {
+    /**
+     * Get the session associated with this debugger.
+     */
+    public Session getSession() {
         throw new AbstractMethodError();
     }
-    
+
     /**
      * Creates a deadlock detector.
      * @return deadlock detector with automatic detection of deadlock among suspended threads

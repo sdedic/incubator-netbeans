@@ -20,6 +20,7 @@ package org.netbeans.modules.java.lsp.server.debugging;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.netbeans.api.debugger.DebuggerEngine;
 import org.netbeans.api.debugger.DebuggerManager;
@@ -67,19 +68,17 @@ final class ViewModel {
 
     private static final Class[] TABLE_MODELS = { TableModel.class, TableHTMLModel.class };
 
-    private String viewType;
-
-    private Session currentSession;
+    private final String viewType;
 
     private SessionProvider providerToDisplay;
 
     private final String propertiesHelpID = null;
 
-    ViewModel(String viewType) {
+    private ViewModel(String viewType) {
         this.viewType = viewType;
     }
 
-    Models.CompoundModel createModel() {
+    private Models.CompoundModel createModel(DebuggerEngine e) {
         List<? extends SessionProvider> sessionProviders;
         List[] treeModels = new List[TREE_MODELS.length];
         List[] treeModelFilters = new List[TREE_MODEL_FILTERS.length];
@@ -102,7 +101,6 @@ final class ViewModel {
         List hyperModels;
 
         DebuggerManager dm = DebuggerManager.getDebuggerManager ();
-        DebuggerEngine e = dm.getCurrentEngine ();
         if (e == null) {
             sessionProviders = dm.lookup (viewType, SessionProvider.class);
         } else {
@@ -124,8 +122,6 @@ final class ViewModel {
             cp = e != null ? DebuggerManager.join(e, dm) : dm;
             viewPath = viewType;
         }
-
-        currentSession =        dm.getCurrentSession();
 
         getMultiModels(cp, viewPath, treeModels, TREE_MODELS);
         getMultiModels(cp, viewPath, treeModelFilters, TREE_MODEL_FILTERS);
@@ -282,4 +278,32 @@ final class ViewModel {
         return models;
     }
 
+    static final class Provider {
+
+        private final ViewModel viewModel;
+        private volatile Models.CompoundModel modelCached;
+        private volatile String languageCached;
+
+        Provider(String viewType) {
+            this.viewModel = new ViewModel(viewType);
+        }
+
+        /**
+         * Get a view model updated for the provided Session. Do not store the returned model
+         * persistently. It's cached and updated according to the provided session's engine.
+         */
+        Models.CompoundModel getModel(Session session) {
+            Models.CompoundModel model = modelCached;
+            boolean refresh = !Objects.equals(session.getCurrentLanguage(), languageCached);
+            if (refresh || model == null) {
+                synchronized (this) {
+                    if (refresh || (model = modelCached) == null) {
+                        modelCached = model = viewModel.createModel(session.getCurrentEngine());
+                        languageCached = session.getCurrentLanguage();
+                    }
+                }
+            }
+            return model;
+        }
+    }
 }

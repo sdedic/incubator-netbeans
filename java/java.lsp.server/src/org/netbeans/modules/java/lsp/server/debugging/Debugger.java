@@ -147,6 +147,8 @@ public class Debugger {
                 return new LaunchingVirtualMachine(file, sourceProvider).runWithoutDebugger();*/
             }
         });
+        context.registerProvider(IConfigurationSemaphore.class, new NBConfigurationSemaphore());
+        context.registerProvider(IThreadsProvider.class, new NbThreads());
         NbProtocolServer server = new NbProtocolServer(in, out, context);
         server.run();
     }
