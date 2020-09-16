@@ -16,44 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging;
-
-import com.microsoft.java.debug.core.Configuration;
-import com.microsoft.java.debug.core.IBreakpoint;
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.BreakpointManager;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.HotCodeReplaceEvent.EventType;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.adapter.IHotCodeReplaceProvider;
-import com.microsoft.java.debug.core.protocol.Events;
-import com.microsoft.java.debug.core.protocol.Messages.Response;
-import com.microsoft.java.debug.core.protocol.Requests.Arguments;
-import com.microsoft.java.debug.core.protocol.Requests.Command;
-import com.microsoft.java.debug.core.protocol.Requests.SetBreakpointArguments;
-import com.microsoft.java.debug.core.protocol.Responses;
-import com.microsoft.java.debug.core.protocol.Types;
+package org.netbeans.modules.java.lsp.server.debugging.requests;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
+import org.netbeans.modules.java.lsp.server.debugging.breakpoints.BreakpointManager;
+import org.netbeans.modules.java.lsp.server.debugging.breakpoints.IBreakpoint;
 import org.netbeans.modules.java.lsp.server.debugging.breakpoints.NbBreakpoint;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Events;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages.Response;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.SetBreakpointArguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Responses;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Types;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
+import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
 /**
  *
  * @author martin
  */
-final class NbSetBreakpointsRequestHandler implements IDebugRequestHandler {
-
-    private static final Logger logger = Logger.getLogger(Configuration.LOGGER_NAME);
+final class NbSetBreakpointsRequestHandler implements DebuggerRequestHandler {
 
     private final BreakpointManager manager = new BreakpointManager();
 

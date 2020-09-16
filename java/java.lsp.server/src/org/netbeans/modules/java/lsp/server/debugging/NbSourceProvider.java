@@ -18,11 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import com.microsoft.java.debug.core.DebugException;
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.ISourceLookUpProvider;
-import com.microsoft.java.debug.core.protocol.Types;
 import com.sun.source.util.TreePath;
 import java.io.File;
 import java.io.IOException;
@@ -39,6 +34,8 @@ import org.netbeans.api.java.source.CompilationController;
 import org.netbeans.api.java.source.JavaSource;
 import org.netbeans.api.java.source.Task;
 import org.netbeans.api.java.source.TreeUtilities;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Types;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.URLMapper;
 

@@ -16,43 +16,41 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging;
+package org.netbeans.modules.java.lsp.server.debugging.requests;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.protocol.Events;
-import com.microsoft.java.debug.core.protocol.Messages.Response;
-import com.microsoft.java.debug.core.protocol.Requests;
-import com.microsoft.java.debug.core.protocol.Requests.Arguments;
-import com.microsoft.java.debug.core.protocol.Requests.Command;
-import com.microsoft.java.debug.core.protocol.Requests.ContinueArguments;
-import com.microsoft.java.debug.core.protocol.Requests.PauseArguments;
-import com.microsoft.java.debug.core.protocol.Requests.StackTraceArguments;
-import com.microsoft.java.debug.core.protocol.Requests.ThreadsArguments;
-import com.microsoft.java.debug.core.protocol.Responses;
-import com.microsoft.java.debug.core.protocol.Types;
-
 import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
+import org.netbeans.modules.java.lsp.server.debugging.IThreadsProvider;
+import org.netbeans.modules.java.lsp.server.debugging.NbFrame;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Events;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages.Response;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.ContinueArguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.PauseArguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.StackTraceArguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.ThreadsArguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Responses;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Types;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
-import org.netbeans.spi.debugger.ui.DebuggingView.DVSupport;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
+import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
 /**
  *
  * @author martin
  */
-public class NbThreadsAndStacksRequestHandler implements IDebugRequestHandler {
+public class NbThreadsAndStacksRequestHandler implements DebuggerRequestHandler {
 
     @Override
     public List<Command> getTargetCommands() {

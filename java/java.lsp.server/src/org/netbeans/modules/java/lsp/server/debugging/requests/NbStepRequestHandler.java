@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging;
+package org.netbeans.modules.java.lsp.server.debugging.requests;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.protocol.Messages.Response;
-import com.microsoft.java.debug.core.protocol.Requests.Arguments;
-import com.microsoft.java.debug.core.protocol.Requests.Command;
 import org.netbeans.api.debugger.ActionsManager;
 import org.netbeans.api.debugger.DebuggerManager;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages.Response;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
+import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
-public class NbStepRequestHandler implements IDebugRequestHandler {
+public class NbStepRequestHandler implements DebuggerRequestHandler {
 
     @Override
     public List<Command> getTargetCommands() {

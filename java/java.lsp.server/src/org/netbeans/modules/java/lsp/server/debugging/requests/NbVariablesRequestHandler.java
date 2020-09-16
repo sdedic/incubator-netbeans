@@ -16,39 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging;
+package org.netbeans.modules.java.lsp.server.debugging.requests;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Logger;
-
-import com.microsoft.java.debug.core.Configuration;
-import com.microsoft.java.debug.core.DebugSettings;
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.adapter.IEvaluationProvider;
-import com.microsoft.java.debug.core.adapter.variables.VariableProxy;
-import com.microsoft.java.debug.core.protocol.Messages.Response;
-import com.microsoft.java.debug.core.protocol.Requests.Arguments;
-import com.microsoft.java.debug.core.protocol.Requests.Command;
-import com.microsoft.java.debug.core.protocol.Requests.VariablesArguments;
-import com.microsoft.java.debug.core.protocol.Responses;
-import com.microsoft.java.debug.core.protocol.Types;
 import java.util.Collections;
+
 import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
+import org.netbeans.modules.java.lsp.server.debugging.NbScope;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages.Response;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.VariablesArguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Responses;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Types;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
 import org.netbeans.spi.viewmodel.Models;
 import org.netbeans.spi.viewmodel.UnknownTypeException;
+import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
 /**
  *
  * @author martin
  */
-final class NbVariablesRequestHandler implements IDebugRequestHandler {
-    protected static final Logger logger = Logger.getLogger(Configuration.LOGGER_NAME);
+final class NbVariablesRequestHandler implements DebuggerRequestHandler {
 
     private static final String LOCALS_VIEW_NAME = "LocalsView";
     private static final String LOCALS_TO_STRING_COLUMN_ID = "LocalsToString";
@@ -70,7 +65,7 @@ final class NbVariablesRequestHandler implements IDebugRequestHandler {
         //IVariableFormatter variableFormatter = context.getVariableFormatter();
         VariablesArguments varArgs = (VariablesArguments) arguments;
 
-        boolean showStaticVariables = DebugSettings.getCurrent().showStaticVariables;
+        // boolean showStaticVariables = DebugSettings.getCurrent().showStaticVariables;
 
         List<Types.Variable> list = new ArrayList<>();
         Object container = context.getRecyclableIdPool().getObjectById(varArgs.variablesReference);

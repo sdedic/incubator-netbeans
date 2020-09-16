@@ -27,12 +27,12 @@ public final class NbScope {
     private final NbFrame frame;
     private final String name;
 
-    NbScope(NbFrame frame, String name) {
+    public NbScope(NbFrame frame, String name) {
         this.frame = frame;
         this.name = name;
     }
 
-    String getName() {
+    public String getName() {
         return name;
     }
 }

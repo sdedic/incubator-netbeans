@@ -18,16 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import com.google.gson.JsonObject;
-import com.microsoft.java.debug.core.Configuration;
-import com.microsoft.java.debug.core.DebugException;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.handler.LaunchRequestHandler;
-import com.microsoft.java.debug.core.protocol.Events;
-import com.microsoft.java.debug.core.protocol.JsonUtils;
-import com.microsoft.java.debug.core.protocol.Messages;
-import com.microsoft.java.debug.core.protocol.Requests;
 import com.sun.jdi.connect.IllegalConnectorArgumentsException;
 import com.sun.jdi.connect.VMStartException;
 import java.io.IOException;
@@ -36,16 +26,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests;
 
 /**
  *
  * @author martin
  */
 public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
-    protected static final Logger logger = Logger.getLogger(Configuration.LOGGER_NAME);
+
+    private static final Logger LOGGER = Logger.getLogger(NbLaunchWithoutDebuggingDelegate.class.getName());
+
     protected static final String TERMINAL_TITLE = "Java Process Console";
     protected static final long RUNINTERMINAL_TIMEOUT = 10 * 1000;
     private Consumer<IDebugAdapterContext> terminateHandler;
@@ -73,7 +67,7 @@ public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
             }
             // For duplicated variables, show a warning message.
             if (!duplicated.isEmpty()) {
-                logger.warning(String.format("There are duplicated environment variables. The values specified in launch.json will be used. "
+                LOGGER.warning(String.format("There are duplicated environment variables. The values specified in launch.json will be used. "
                         + "Here are the duplicated entries: %s.", String.join(",", duplicated)));
             }
 
@@ -101,53 +95,7 @@ public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
     // XXX TODO:
     public CompletableFuture<Messages.Response> launchInTerminal(Requests.LaunchArguments launchArguments, Messages.Response response,
             IDebugAdapterContext context) {
-        CompletableFuture<Messages.Response> resultFuture = new CompletableFuture<>();
-
-        final String launchInTerminalErrorFormat = "Failed to launch debuggee in terminal. Reason: %s";
-
-        String[] cmds = LaunchRequestHandler.constructLaunchCommands(launchArguments, false, null);
-        Requests.RunInTerminalRequestArguments requestArgs = null;
-        if (launchArguments.console == Requests.CONSOLE.integratedTerminal) {
-            requestArgs = Requests.RunInTerminalRequestArguments.createIntegratedTerminal(cmds, launchArguments.cwd,
-                    launchArguments.env, TERMINAL_TITLE);
-        } else {
-            requestArgs = Requests.RunInTerminalRequestArguments.createExternalTerminal(cmds, launchArguments.cwd,
-                    launchArguments.env, TERMINAL_TITLE);
-        }
-        Messages.Request request = new Messages.Request(Requests.Command.RUNINTERMINAL.getName(),
-                (JsonObject) JsonUtils.toJsonTree(requestArgs, Requests.RunInTerminalRequestArguments.class));
-
-        // Notes: In windows (reference to
-        // https://support.microsoft.com/en-us/help/830473/command-prompt-cmd--exe-command-line-string-limitation),
-        // when launching the program in cmd.exe, if the command line length exceed the
-        // threshold value (8191 characters),
-        // it will be automatically truncated so that launching in terminal failed.
-        // Especially, for maven project, the class path contains
-        // the local .m2 repository path, it may exceed the limit.
-        context.getProtocolServer().sendRequest(request, RUNINTERMINAL_TIMEOUT).whenComplete((runResponse, ex) -> {
-            if (runResponse != null) {
-                if (runResponse.success) {
-                    // Without knowing the pid, debugger has lost control of the process.
-                    // So simply send `terminated` event to end the session.
-                    context.getProtocolServer().sendEvent(new Events.TerminatedEvent());
-                    resultFuture.complete(response);
-                } else {
-                    resultFuture.completeExceptionally(
-                            new DebugException(String.format(launchInTerminalErrorFormat, runResponse.message),
-                                    ErrorCode.LAUNCH_IN_TERMINAL_FAILURE.getId()));
-                }
-            } else {
-                if (ex instanceof CompletionException && ex.getCause() != null) {
-                    ex = ex.getCause();
-                }
-                String errorMessage = String.format(launchInTerminalErrorFormat,
-                        ex != null ? ex.toString() : "Null response");
-                resultFuture.completeExceptionally(
-                        new DebugException(String.format(launchInTerminalErrorFormat, errorMessage),
-                                ErrorCode.LAUNCH_IN_TERMINAL_FAILURE.getId()));
-            }
-        });
-        return resultFuture;
+        throw new UnsupportedOperationException();
     }
 
     @Override

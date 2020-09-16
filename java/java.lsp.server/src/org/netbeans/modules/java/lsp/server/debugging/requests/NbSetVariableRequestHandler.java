@@ -16,26 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging;
+package org.netbeans.modules.java.lsp.server.debugging.requests;
 
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.adapter.variables.VariableProxy;
-import com.microsoft.java.debug.core.protocol.Messages;
-import com.microsoft.java.debug.core.protocol.Requests;
-import com.microsoft.java.debug.core.protocol.Responses;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
 import org.apache.commons.lang3.StringUtils;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
+import org.netbeans.modules.java.lsp.server.debugging.NbScope;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Responses;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
 import org.netbeans.spi.viewmodel.Models;
 import org.netbeans.spi.viewmodel.UnknownTypeException;
+import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
-final class NbSetVariableRequestHandler implements IDebugRequestHandler {
+final class NbSetVariableRequestHandler implements DebuggerRequestHandler {
 
     private static final String LOCALS_VIEW_NAME = "LocalsView";
     private static final String LOCALS_VALUE_COLUMN_ID = "LocalsValue";

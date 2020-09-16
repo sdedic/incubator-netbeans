@@ -18,7 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import com.microsoft.java.debug.core.protocol.Events.OutputEvent.Category;
 import io.reactivex.Observable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
@@ -28,6 +27,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.Charset;
 import java.util.stream.Stream;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Events.OutputEvent.Category;
 import org.openide.util.Pair;
 
 public final class NbProcessConsole {

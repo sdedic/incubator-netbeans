@@ -11,55 +11,33 @@
 
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.microsoft.java.debug.core.Configuration;
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.DebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.IDebugAdapter;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.adapter.IProviderContext;
-import com.microsoft.java.debug.core.adapter.LaunchMode;
-import com.microsoft.java.debug.core.adapter.handler.AttachRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.CompletionsHandler;
-import com.microsoft.java.debug.core.adapter.handler.DisconnectRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.DisconnectRequestWithoutDebuggingHandler;
-import com.microsoft.java.debug.core.adapter.handler.ExceptionInfoRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.HotCodeReplaceHandler;
-import com.microsoft.java.debug.core.adapter.handler.InitializeRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.RestartFrameHandler;
-import com.microsoft.java.debug.core.adapter.handler.SetExceptionBreakpointsRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.SetVariableRequestHandler;
-import com.microsoft.java.debug.core.adapter.handler.SourceRequestHandler;
-import com.microsoft.java.debug.core.protocol.IProtocolServer;
-import com.microsoft.java.debug.core.protocol.JsonUtils;
-import com.microsoft.java.debug.core.protocol.Messages;
-import com.microsoft.java.debug.core.protocol.Requests.Arguments;
-import com.microsoft.java.debug.core.protocol.Requests.Command;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.IProtocolServer;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.JsonUtils;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
+import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
+import org.netbeans.modules.java.lsp.server.debugging.requests.HandlersCollection;
 
 public class NbDebugAdapter implements IDebugAdapter {
-    private static final Logger logger = Logger.getLogger(Configuration.LOGGER_NAME);
+
+    private static final Logger LOGGER = Logger.getLogger(NbDebugAdapter.class.getName());
 
     private final IDebugAdapterContext debugContext;
-    private Map<Command, List<IDebugRequestHandler>> requestHandlersForDebug = null;
-    private Map<Command, List<IDebugRequestHandler>> requestHandlersForNoDebug = null;
+    private final HandlersCollection handlers;
 
     /**
      * Constructor.
      */
     public NbDebugAdapter(IProtocolServer server, IProviderContext providerContext) {
         this.debugContext = new DebugAdapterContext(server, providerContext);
-        requestHandlersForDebug = new HashMap<>();
-        requestHandlersForNoDebug = new HashMap<>();
-        initialize();
+        this.handlers = new HandlersCollection();
     }
 
     @Override
@@ -76,76 +54,14 @@ public class NbDebugAdapter implements IDebugAdapter {
         if (debugContext.isVmTerminated() && command != Command.DISCONNECT) {
             return CompletableFuture.completedFuture(response);
         }
-        List<IDebugRequestHandler> handlers = this.debugContext.getLaunchMode() == LaunchMode.DEBUG
-                ? requestHandlersForDebug.get(command) : requestHandlersForNoDebug.get(command);
-        if (handlers != null && !handlers.isEmpty()) {
-            CompletableFuture<Messages.Response> future = CompletableFuture.completedFuture(response);
-            for (IDebugRequestHandler handler : handlers) {
-                future = future.thenCompose((res) -> {
-                    return handler.handle(command, cmdArgs, res, debugContext);
-                });
-            }
-            return future;
+        DebuggerRequestHandler handler = handlers.getHandler(command, debugContext.getLaunchMode());
+        if (handler != null) {
+            return handler.handle(command, cmdArgs, response, debugContext);
         } else {
             final String errorMessage = String.format("Unrecognized request: { _request: %s }", request.command);
-            logger.log(Level.SEVERE, errorMessage);
+            LOGGER.log(Level.SEVERE, errorMessage);
             return AdapterUtils.createAsyncErrorResponse(response, ErrorCode.UNRECOGNIZED_REQUEST_FAILURE, errorMessage);
         }
     }
 
-    private void initialize() {
-        // Register request handlers.
-        // When there are multiple handlers registered for the same request, follow the rule "first register, first execute".
-        registerHandler(new InitializeRequestHandler());
-        registerHandler(new NbInitializeRequestHandler());
-        registerHandler(new NbLaunchRequestHandler());
-
-        // DEBUG node only
-        registerHandlerForDebug(new AttachRequestHandler());
-        registerHandlerForDebug(new NbConfigurationDoneRequestHandler());
-        registerHandlerForDebug(new NbDisconnectRequestHandler());
-        registerHandlerForDebug(new DisconnectRequestHandler());
-        registerHandlerForDebug(new NbSetBreakpointsRequestHandler());
-        registerHandlerForDebug(new NbSetExceptionBreakpointsRequestHandler());
-        registerHandlerForDebug(new SourceRequestHandler());
-        registerHandlerForDebug(new NbStepRequestHandler());
-        registerHandlerForDebug(new NbThreadsAndStacksRequestHandler());
-        registerHandlerForDebug(new NbScopesRequestHandler());
-        registerHandlerForDebug(new NbVariablesRequestHandler());
-        registerHandlerForDebug(new NbSetVariableRequestHandler());
-        registerHandlerForDebug(new NbEvaluateRequestHandler());
-        registerHandlerForDebug(new HotCodeReplaceHandler());
-        registerHandlerForDebug(new RestartFrameHandler());
-        registerHandlerForDebug(new CompletionsHandler());
-        registerHandlerForDebug(new ExceptionInfoRequestHandler());
-
-        // NO_DEBUG mode only
-        registerHandlerForNoDebug(new DisconnectRequestWithoutDebuggingHandler());
-
-    }
-
-    private void registerHandlerForDebug(IDebugRequestHandler handler) {
-        registerHandler(requestHandlersForDebug, handler);
-    }
-
-    private void registerHandlerForNoDebug(IDebugRequestHandler handler) {
-        registerHandler(requestHandlersForNoDebug, handler);
-    }
-
-    private void registerHandler(IDebugRequestHandler handler) {
-        registerHandler(requestHandlersForDebug, handler);
-        registerHandler(requestHandlersForNoDebug, handler);
-    }
-
-    private void registerHandler(Map<Command, List<IDebugRequestHandler>> requestHandlers, IDebugRequestHandler handler) {
-        for (Command command : handler.getTargetCommands()) {
-            List<IDebugRequestHandler> handlerList = requestHandlers.get(command);
-            if (handlerList == null) {
-                handlerList = new ArrayList<>();
-                requestHandlers.put(command, handlerList);
-            }
-            handler.initialize(debugContext);
-            handlerList.add(handler);
-        }
-    }
 }

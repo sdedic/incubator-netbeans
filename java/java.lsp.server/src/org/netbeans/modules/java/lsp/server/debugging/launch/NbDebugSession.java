@@ -18,9 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import com.microsoft.java.debug.core.IBreakpoint;
-import com.microsoft.java.debug.core.IDebugSession;
-import com.microsoft.java.debug.core.IEventHub;
 import com.sun.jdi.ThreadReference;
 import com.sun.jdi.VirtualMachine;
 import java.util.List;
@@ -28,6 +25,7 @@ import java.util.List;
 import org.netbeans.api.debugger.Breakpoint;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugSession;
 
 /**
  *
@@ -72,11 +70,6 @@ public final class NbDebugSession implements IDebugSession {
     }
 
     @Override
-    public IBreakpoint createBreakpoint(String className, int lineNumber, int hitCount, String condition, String logMessage) {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
-    @Override
     public void setExceptionBreakpoints(boolean notifyCaught, boolean notifyUncaught) {
         throw new UnsupportedOperationException("Not supported.");
     }
@@ -88,11 +81,6 @@ public final class NbDebugSession implements IDebugSession {
 
     @Override
     public List<ThreadReference> getAllThreads() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
-    @Override
-    public IEventHub getEventHub() {
         throw new UnsupportedOperationException("Not supported.");
     }
 

@@ -18,20 +18,19 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.protocol.Events;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
+
 import org.netbeans.api.debugger.DebuggerEngine;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.DebuggerManagerAdapter;
 import org.netbeans.api.debugger.Session;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Events;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVSupport;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
@@ -66,12 +65,6 @@ public final class NbThreads implements IThreadsProvider {
                     //debugger.removePropertyChangeListener(this);
                     context.setVmTerminated();
                     context.getProtocolServer().sendEvent(new Events.TerminatedEvent());
-                    // Terminate eventHub thread.
-                    try {
-                        context.getDebugSession().getEventHub().close();
-                    } catch (Exception e) {
-                        // do nothing.
-                    }
                     break;
             }
         });

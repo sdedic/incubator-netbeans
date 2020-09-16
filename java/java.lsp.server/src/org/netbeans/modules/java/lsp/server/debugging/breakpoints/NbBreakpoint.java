@@ -18,8 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.breakpoints;
 
-import com.microsoft.java.debug.core.Configuration;
-import com.microsoft.java.debug.core.IBreakpoint;
 import com.sun.jdi.request.EventRequest;
 import io.reactivex.disposables.Disposable;
 import java.net.MalformedURLException;
@@ -35,7 +33,6 @@ import java.util.logging.Logger;
 
 import org.netbeans.api.debugger.Breakpoint;
 import org.netbeans.api.debugger.DebuggerManager;
-import org.netbeans.api.debugger.jpda.JPDABreakpoint;
 import org.netbeans.api.debugger.jpda.LineBreakpoint;
 import org.netbeans.modules.debugger.jpda.truffle.breakpoints.TruffleLineBreakpoint;
 
@@ -45,7 +42,7 @@ import org.netbeans.modules.debugger.jpda.truffle.breakpoints.TruffleLineBreakpo
  */
 public final class NbBreakpoint implements IBreakpoint {
 
-    private static final Logger LOGGER = Logger.getLogger(Configuration.LOGGER_NAME);
+    private static final Logger LOGGER = Logger.getLogger(NbBreakpoint.class.getName());
 
     private final String sourceURL;
     private final int line;

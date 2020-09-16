@@ -11,6 +11,7 @@
 
 package org.netbeans.modules.java.lsp.server.debugging;
 
+import com.sun.jdi.VMDisconnectedException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
@@ -18,22 +19,17 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.microsoft.java.debug.core.Configuration;
-import com.microsoft.java.debug.core.DebugException;
-import com.microsoft.java.debug.core.UsageDataSession;
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.IDebugAdapter;
-import com.microsoft.java.debug.core.adapter.IProviderContext;
-import com.microsoft.java.debug.core.protocol.AbstractProtocolServer;
-import com.microsoft.java.debug.core.protocol.Events.DebugEvent;
-import com.microsoft.java.debug.core.protocol.Events.StoppedEvent;
-import com.microsoft.java.debug.core.protocol.Messages;
-import com.sun.jdi.VMDisconnectedException;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.AbstractProtocolServer;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Events.DebugEvent;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Events.StoppedEvent;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
+import org.netbeans.modules.java.lsp.server.debugging.utils.UsageDataSession;
 
 public class NbProtocolServer extends AbstractProtocolServer {
-    private static final Logger logger = Logger.getLogger(Configuration.LOGGER_NAME);
+
+    private static final Logger LOGGER = Logger.getLogger(NbProtocolServer.class.getName());
 
     private IDebugAdapter debugAdapter;
     private UsageDataSession usageDataSession = new UsageDataSession();
@@ -150,7 +146,7 @@ public class NbProtocolServer extends AbstractProtocolServer {
                     if (isUserError) {
                         usageDataSession.recordUserError(errorCode);
                     } else {
-                        logger.log(Level.SEVERE, String.format("[error response][%s]: %s", request.command, exceptionMessage), ex);
+                        LOGGER.log(Level.SEVERE, String.format("[error response][%s]: %s", request.command, exceptionMessage), ex);
                     }
 
                     sendResponse(AdapterUtils.setErrorResponse(response,

@@ -18,16 +18,17 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.protocol.Events;
-import com.microsoft.java.debug.core.protocol.Messages;
-import com.microsoft.java.debug.core.protocol.Requests;
 import com.sun.jdi.connect.IllegalConnectorArgumentsException;
 import com.sun.jdi.connect.VMStartException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
+
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
 import org.netbeans.modules.java.lsp.server.debugging.IThreadsProvider;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Events;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests;
 
 /**
  *
@@ -57,5 +58,11 @@ public class NbLaunchWithDebuggingDelegate extends NbLaunchDelegate {
 
     @Override
     public void preLaunch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context) {
+        // debug only
+        context.setAttached(false);
+        context.setSourcePaths(launchArguments.sourcePaths);
+        context.setVmStopOnEntry(launchArguments.stopOnEntry);
+        //context.setMainClass(LaunchRequestHandler.parseMainClassWithoutModuleName(launchArguments.mainClass));
+        context.setStepFilters(launchArguments.stepFilters);
     }
 }

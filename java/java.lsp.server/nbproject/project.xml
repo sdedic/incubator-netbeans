@@ -491,10 +491,6 @@
                 <binary-origin>external/org.eclipse.lsp4j-0.5.0.jar</binary-origin>
             </class-path-extension>
             <class-path-extension>
-                <runtime-relative-path>ext/com.microsoft.java.debug.core-0.22.0.jar</runtime-relative-path>
-                <binary-origin>external/com.microsoft.java.debug.core-0.22.0.jar</binary-origin>
-            </class-path-extension>
-            <class-path-extension>
                 <runtime-relative-path>ext/commons-io-2.5.jar</runtime-relative-path>
                 <binary-origin>external/commons-io-2.5.jar</binary-origin>
             </class-path-extension>

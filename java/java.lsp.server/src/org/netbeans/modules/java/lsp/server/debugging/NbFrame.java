@@ -18,7 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import java.util.concurrent.atomic.AtomicLong;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
 
 public final class NbFrame {
@@ -26,7 +25,7 @@ public final class NbFrame {
     private final DVFrame dvFrame;
     private final long threadId;
 
-    NbFrame(long threadId, DVFrame dvFrame) {
+    public NbFrame(long threadId, DVFrame dvFrame) {
         this.threadId = threadId;
         this.dvFrame = dvFrame;
     }

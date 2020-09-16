@@ -16,37 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging;
+package org.netbeans.modules.java.lsp.server.debugging.requests;
 
-import com.microsoft.java.debug.core.adapter.AdapterUtils;
-import com.microsoft.java.debug.core.adapter.ErrorCode;
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.adapter.variables.VariableUtils;
-import com.microsoft.java.debug.core.protocol.Messages;
-import com.microsoft.java.debug.core.protocol.Requests;
-import com.microsoft.java.debug.core.protocol.Responses;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+
 import org.apache.commons.lang3.StringUtils;
 import org.netbeans.api.debugger.jpda.InvalidExpressionException;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
-import org.netbeans.api.debugger.jpda.JPDAThread;
 import org.netbeans.api.debugger.jpda.ObjectVariable;
 import org.netbeans.api.debugger.jpda.Variable;
 import org.netbeans.modules.debugger.jpda.truffle.vars.TruffleVariable;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
+import org.netbeans.modules.java.lsp.server.debugging.IThreadsProvider;
+import org.netbeans.modules.java.lsp.server.debugging.NbFrame;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
-import org.netbeans.spi.debugger.ui.DebuggingView.DVSupport;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Responses;
+import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
+import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
 /**
  *
  * @author martin
  */
-final class NbEvaluateRequestHandler implements IDebugRequestHandler {
+final class NbEvaluateRequestHandler implements DebuggerRequestHandler {
 
     @Override
     public List<Requests.Command> getTargetCommands() {
@@ -56,8 +56,6 @@ final class NbEvaluateRequestHandler implements IDebugRequestHandler {
     @Override
     public CompletableFuture<Messages.Response> handle(Requests.Command command, Requests.Arguments arguments, Messages.Response response, IDebugAdapterContext context) {
         Requests.EvaluateArguments evalArguments = (Requests.EvaluateArguments) arguments;
-        Map<String, Object> options = context.getVariableFormatter().getDefaultOptions();
-        VariableUtils.applyFormatterOptions(options, evalArguments.format != null && evalArguments.format.hex);
         String expression = evalArguments.expression;
 
         if (StringUtils.isBlank(expression)) {

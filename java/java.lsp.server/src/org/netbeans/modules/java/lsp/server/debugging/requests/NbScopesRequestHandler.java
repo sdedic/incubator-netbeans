@@ -16,32 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging;
+package org.netbeans.modules.java.lsp.server.debugging.requests;
 
-import com.microsoft.java.debug.core.adapter.IDebugAdapterContext;
-import com.microsoft.java.debug.core.adapter.IDebugRequestHandler;
-import com.microsoft.java.debug.core.adapter.variables.StackFrameReference;
-import com.microsoft.java.debug.core.adapter.variables.VariableProxy;
-import com.microsoft.java.debug.core.protocol.Messages.Response;
-import com.microsoft.java.debug.core.protocol.Requests.Arguments;
-import com.microsoft.java.debug.core.protocol.Requests.Command;
-import com.microsoft.java.debug.core.protocol.Requests.ScopesArguments;
-import com.microsoft.java.debug.core.protocol.Responses;
-import com.microsoft.java.debug.core.protocol.Types;
-import com.sun.jdi.ThreadReference;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import org.netbeans.modules.debugger.jpda.models.JPDAThreadImpl;
-import org.netbeans.modules.debugger.jpda.util.WeakCacheMap;
-import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
-import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
+import org.netbeans.modules.java.lsp.server.debugging.NbFrame;
+import org.netbeans.modules.java.lsp.server.debugging.NbScope;
+
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages.Response;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.ScopesArguments;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Responses;
+import org.netbeans.modules.java.lsp.server.debugging.protocol.Types;
+import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
 /**
  *
  * @author martin
  */
-public class NbScopesRequestHandler implements IDebugRequestHandler {
+public class NbScopesRequestHandler implements DebuggerRequestHandler {
 
     @Override
     public List<Command> getTargetCommands() {

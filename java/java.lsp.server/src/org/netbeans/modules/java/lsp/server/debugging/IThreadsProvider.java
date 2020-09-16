@@ -18,7 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import com.microsoft.java.debug.core.adapter.IProvider;
 import java.util.function.BiConsumer;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 

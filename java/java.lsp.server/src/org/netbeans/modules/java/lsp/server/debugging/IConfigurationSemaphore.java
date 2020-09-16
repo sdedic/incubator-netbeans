@@ -18,8 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import com.microsoft.java.debug.core.adapter.IProvider;
-
 /**
  *
  * @author martin
