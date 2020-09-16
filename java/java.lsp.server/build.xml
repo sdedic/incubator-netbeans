@@ -50,6 +50,8 @@
     </target>
     <target name="clean" depends="projectized.clean">
         <delete dir="${lsp.build.dir}" />
+        <delete dir="vscode/node_modules" />
+        <ant dir="vscapp" target="clean" inheritall="false" inheritrefs="false"/>
     </target>
     <target name="build-vscode-ext" depends="build-lsp-server" description="Build the Visual Studio Code extension.">
         <exec executable="npm" failonerror="true" dir="vscode">
