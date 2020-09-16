@@ -48,4 +48,7 @@ public @interface MimeLocation {
     @SuppressWarnings("rawtypes")
     public Class<? extends InstanceProvider> instanceProviderClass() default InstanceProvider.class;
     
+    public @interface Ordered {
+        public boolean value() default true;
+    }
 }

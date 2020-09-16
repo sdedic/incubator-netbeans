@@ -55,19 +55,21 @@ public final class CompoundFolderChildren implements FileChangeListener {
     private List<FileObject> children;
     private FileObject mergedLayers; // just hold a strong ref so listeners remain active
     private final FileChangeListener weakFCL = FileUtil.weakFileChangeListener(this, null);
+    private final boolean ordered;
     
     private PropertyChangeSupport pcs = new PropertyChangeSupport(this);
 
-    public CompoundFolderChildren(String [] paths) {
-        this(paths, true);
+    public CompoundFolderChildren(String [] paths, boolean ordered) {
+        this(paths, ordered, true);
     }
     
-    public CompoundFolderChildren(String [] paths, boolean includeSubfolders) {
+    public CompoundFolderChildren(String [] paths, boolean ordered, boolean includeSubfolders) {
         prefixes = new ArrayList<String>();
         for (String path : paths) {
             prefixes.add(path.endsWith("/") ? path : path + "/"); // NOI18N
         }
         this.includeSubfolders = includeSubfolders;
+        this.ordered = ordered;
         rebuild();
     }
     
@@ -132,7 +134,7 @@ public final class CompoundFolderChildren implements FileChangeListener {
                 }
             }
             List<FileObject> sorted = new ArrayList<FileObject>(unsorted.size());
-            for (FileObject merged : FileUtil.getOrder(unsorted, true)) {
+            for (FileObject merged : FileUtil.getOrder(unsorted, ordered)) {
                 String name = merged.getNameExt();
                 FileObject original = null;
                 for (FileObject folder : folders) {

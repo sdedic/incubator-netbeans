@@ -128,27 +128,34 @@ public class CreateRegistrationProcessor extends LayerGeneratingProcessor {
             }
         }
 
+        boolean orderRequired = true;
         if (mimeType != null) {
             if (mimeType.length() != 0) mimeType = "/" + mimeType;
 
             String folder = "";
             TypeElement apiTE = (TypeElement) processingEnv.getTypeUtils().asElement(service);
             TypeElement location = processingEnv.getElementUtils().getTypeElement("org.netbeans.spi.editor.mimelookup.MimeLocation");
+            TypeElement order = processingEnv.getElementUtils().getTypeElement("org.netbeans.spi.editor.mimelookup.MimeLocation.Ordered");
 
+            boolean acceptFolder = true;
             OUTER: for (AnnotationMirror am : apiTE.getAnnotationMirrors()) {
-                if (!location.equals(am.getAnnotationType().asElement())) continue;
-
-                for (Entry<? extends ExecutableElement, ? extends AnnotationValue> e : am.getElementValues().entrySet()) {
-                    if (e.getKey().getSimpleName().contentEquals("subfolderName")) {
-                        folder = "/" + (String) e.getValue().getValue();
-                        break OUTER;
+                if (location.equals(am.getAnnotationType().asElement())) {
+                    for (Entry<? extends ExecutableElement, ? extends AnnotationValue> e : am.getElementValues().entrySet()) {
+                        if (acceptFolder && e.getKey().getSimpleName().contentEquals("subfolderName")) {
+                            folder = "/" + (String) e.getValue().getValue();
+                            acceptFolder = false;
+                        }
+                    }
+                } else if (order.equals(am.getAnnotationType().asElement())) {
+                    for (Entry<? extends ExecutableElement, ? extends AnnotationValue> e : am.getElementValues().entrySet()) {
+                        orderRequired = (Boolean)e.getValue().getValue();
                     }
                 }
             }
 
             instantiableClassOrMethod(toRegister, apiTE);
             File f = layer(toRegister).instanceFile("Editors" + mimeType + folder, null, null);
-            if (position == Integer.MAX_VALUE && !"".equals(folder)) {
+            if (position == Integer.MAX_VALUE && !"".equals(folder) && orderRequired) {
                 // always in Editors at least, slash will be there
                 int lsl = f.getPath().lastIndexOf("/"); // NOI18N
                 String hashDiscr = f.getPath().substring(lsl + 1);
@@ -156,6 +163,10 @@ public class CreateRegistrationProcessor extends LayerGeneratingProcessor {
                 int depth = mimeType.split("/").length; // NOI18N
                 // favour the most specific registrations (i.e. text/x-ant+xml/xml > text/x-ant+xml > /)
                 position = ((10 - depth) * MIME_SLOT_SIZE) + (((7 * mimeType.hashCode()) ^ hashDiscr.hashCode()) % MIME_SLOT_SIZE);
+            } else if (position != Integer.MAX_VALUE && !orderRequired) {
+                processingEnv.getMessager().printMessage(Kind.WARNING, 
+                        "Positions are not required for this service. If there are other registrations without a position, a warning may be printed during the application runtime.", 
+                        toRegister, mimeRegistration);
             }
             f.position(position).stringvalue("instanceOf", processingEnv.getElementUtils().getBinaryName(apiTE).toString()).write();    //NOI18N
         }

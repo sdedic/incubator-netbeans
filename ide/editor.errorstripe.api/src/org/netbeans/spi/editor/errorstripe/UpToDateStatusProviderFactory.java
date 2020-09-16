@@ -28,6 +28,7 @@ import org.netbeans.spi.editor.mimelookup.MimeLocation;
  * @author Jan Lahoda
  */
 @MimeLocation(subfolderName="UpToDateStatusProvider")
+@MimeLocation.Ordered(false)
 public interface UpToDateStatusProviderFactory {
 
     /**Create an instance of {@link UpToDateStatusProvider} for a given {@link Document}.

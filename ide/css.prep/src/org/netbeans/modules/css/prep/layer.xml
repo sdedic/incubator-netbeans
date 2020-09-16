@@ -25,7 +25,9 @@
         <folder name="text">
             <folder name="scss">
                 <folder name="CodeGenerators">
-                    <file name="org-netbeans-modules-css-refactoring-CssCodeGenerators$Factory.instance"/>
+                    <file name="org-netbeans-modules-css-refactoring-CssCodeGenerators$Factory.instance">
+                        <attr name="position" intvalue="1000"/>
+                    </file>
                 </folder>
                 <folder name="Popup">
                     <file name="org-netbeans-modules-refactoring-api-ui-WhereUsedAction.shadow">
@@ -64,7 +66,9 @@
             </folder>
             <folder name="less">
                 <folder name="CodeGenerators">
-                    <file name="org-netbeans-modules-css-refactoring-CssCodeGenerators$Factory.instance"/>
+                    <file name="org-netbeans-modules-css-refactoring-CssCodeGenerators$Factory.instance">
+                        <attr name="position" intvalue="1000"/>
+                    </file>
                 </folder>
                 <folder name="Popup">
                     <file name="org-netbeans-modules-refactoring-api-ui-WhereUsedAction.shadow">

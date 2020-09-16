@@ -36,7 +36,9 @@
                     </folder>
                 </folder>
                 <folder name="CompletionProviders">
-                    <file name="org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance"/>
+                    <file name="org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance">
+                        <attr name="position" intvalue="1300"/>
+                    </file>
                 </folder>
                 <folder name="BracesMatchers">
                     <file name="org-netbeans-modules-php-smarty-editor-TplBracesMatching.instance">
@@ -61,12 +63,23 @@
                     <attr name="instanceOf" stringvalue="org.netbeans.api.lexer.Language"/>
                 </file>
                 <folder name="CompletionProviders">
-                    <file name="org-netbeans-modules-html-editor-completion-HtmlCompletionProvider.instance"/>
-                    <file name="org-netbeans-modules-php-editor-completion-PHPCodeCompletion.instance"/>
-                    <file name="org-netbeans-modules-csl-editor-completion-GsfCompletionProvider.instance"/>
-                    <file name="org-netbeans-modules-html-editor-completion-HtmlPaletteCompletionProvider.instance"/>
-                    <file name="org-netbeans-modules-php-smarty-editor-completion-TplCompletionProvider.instance"/>
-                    <file name="org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance"/>
+                    <file name="org-netbeans-modules-html-editor-completion-HtmlCompletionProvider.instance">
+                        <attr name="position" intvalue="900"/>
+                    </file>
+
+                    <file name="org-netbeans-modules-php-editor-completion-PHPCodeCompletion.instance">
+                        <attr name="position" intvalue="1000"/>
+                    </file>
+
+                    <file name="org-netbeans-modules-csl-editor-completion-GsfCompletionProvider.instance">
+                        <attr name="position" intvalue="1100"/>
+                    </file>
+                    <file name="org-netbeans-modules-html-editor-completion-HtmlPaletteCompletionProvider.instance">
+                       <attr name="position" intvalue="1200"/>
+                    </file>
+                    <file name="org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance">
+                        <attr name="position" intvalue="1300"/>
+                    </file>
                 </folder>
                 <file name="EditorKit.instance">
                     <attr name="instanceClass" stringvalue="org.netbeans.modules.php.smarty.editor.TplKit"/>

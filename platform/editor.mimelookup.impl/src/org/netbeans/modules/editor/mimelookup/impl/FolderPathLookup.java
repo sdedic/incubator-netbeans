@@ -121,16 +121,16 @@ public final class FolderPathLookup extends AbstractLookup {
     }
     
     /** Creates a new instance of InstanceProviderLookup */
-    public FolderPathLookup(String [] paths) {
-        this(paths, new InstanceContent());
+    public FolderPathLookup(String [] paths, boolean ordered) {
+        this(paths, new InstanceContent(), ordered);
     }
     
-    private FolderPathLookup(String [] paths, InstanceContent content) {
+    private FolderPathLookup(String [] paths, InstanceContent content, boolean ordered) {
         super(content);
         
         this.content = content;
         
-        this.children = new CompoundFolderChildren(paths, false);
+        this.children = new CompoundFolderChildren(paths, ordered, false);
         this.children.addPropertyChangeListener(listener);
         
         rebuild();

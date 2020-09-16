@@ -61,7 +61,9 @@
         <folder name="text">
             <folder name="x-dialog-binding">
                 <folder name="CompletionProviders">
-                    <file name="org-netbeans-modules-csl-editor-completion-GsfCompletionProvider.instance"/>
+                    <file name="org-netbeans-modules-csl-editor-completion-GsfCompletionProvider.instance">
+                        <attr name="position" intvalue="900"/>
+                    </file>
                 </folder>
             </folder>
         </folder>

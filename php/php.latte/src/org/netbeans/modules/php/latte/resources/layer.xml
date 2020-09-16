@@ -38,10 +38,18 @@
                     <attr name="instanceOf" stringvalue="org.netbeans.spi.editor.highlighting.HighlightsLayerFactory"/>
                 </file>
                 <folder name="CompletionProviders">
-                    <file name="org-netbeans-modules-html-editor-completion-HtmlCompletionProvider.instance"/>
-                    <file name="org-netbeans-modules-csl-editor-completion-GsfCompletionProvider.instance"/>
-                    <file name="org-netbeans-modules-html-editor-completion-HtmlPaletteCompletionProvider.instance"/>
-                    <file name="org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance"/>
+                    <file name="org-netbeans-modules-html-editor-completion-HtmlCompletionProvider.instance">
+                        <attr name="position" intvalue="1000"/>
+                    </file>
+                    <file name="org-netbeans-modules-csl-editor-completion-GsfCompletionProvider.instance">
+                        <attr name="position" intvalue="1100"/>
+                    </file>
+                    <file name="org-netbeans-modules-html-editor-completion-HtmlPaletteCompletionProvider.instance">
+                       <attr name="position" intvalue="1200"/>
+                    </file>
+                    <file name="org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance">
+                        <attr name="position" intvalue="1300"/>
+                    </file>
                 </folder>
                 <folder name="FontsColors">
                     <folder name="NetBeans">
@@ -157,10 +165,18 @@
                     <attr name="instanceOf" stringvalue="org.netbeans.api.lexer.Language"/>
                 </file>
                 <folder name="CompletionProviders">
-                    <file name="org-netbeans-modules-html-editor-completion-HtmlCompletionProvider.instance"/>
-                    <file name="org-netbeans-modules-csl-editor-completion-GsfCompletionProvider.instance"/>
-                    <file name="org-netbeans-modules-html-editor-completion-HtmlPaletteCompletionProvider.instance"/>
-                    <file name="org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance"/>
+                    <file name="org-netbeans-modules-html-editor-completion-HtmlCompletionProvider.instance">
+                        <attr name="position" intvalue="1000"/>
+                    </file>
+                    <file name="org-netbeans-modules-csl-editor-completion-GsfCompletionProvider.instance">
+                        <attr name="position" intvalue="1100"/>
+                    </file>
+                    <file name="org-netbeans-modules-html-editor-completion-HtmlPaletteCompletionProvider.instance">
+                       <attr name="position" intvalue="1200"/>
+                    </file>
+                    <file name="org-netbeans-lib-editor-codetemplates-CodeTemplateCompletionProvider.instance">
+                        <attr name="position" intvalue="1300"/>
+                    </file>
                 </folder>
                 <folder name="CodeTemplateFilterFactories">
                     <file name="org-netbeans-modules-php-latte-codetemplates-LatteCodeTemplateFilter$Factory.instance"/>

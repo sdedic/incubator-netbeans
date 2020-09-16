@@ -166,7 +166,7 @@ class Ordering {
         }
         boolean shouldLog = logWarnings && !childrenByPosition.isEmpty() && childrenByPosition.size() < children.size();
         if (shouldLog) {
-            // exceptions:
+            // exceptions:  See Bugzilla#201893 
             if (parent.getPath().matches("Projects/.+/Lookup")) {
                 // do not report any order issues for Projects/Lookup, even between files, or between folders.
                 shouldLog = false;
