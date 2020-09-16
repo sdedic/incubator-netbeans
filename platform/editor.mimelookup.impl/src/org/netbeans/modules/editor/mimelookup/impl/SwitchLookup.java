@@ -78,7 +78,6 @@ public class SwitchLookup extends Lookup {
 
     private Lookup createLookup(Class<?> forClass) {
         MimeLocation loc = forClass.getAnnotation(MimeLocation.class);
-        MimeLocation.Ordered order = forClass.getAnnotation(MimeLocation.Ordered.class);
 
         if (loc == null) {
             loc = new MimeLocation() {
@@ -97,14 +96,13 @@ public class SwitchLookup extends Lookup {
                 }
             };
         }
-        boolean ordered = order == null || order.value();
         List<String> paths = computePaths(mimePath, ROOT_FOLDER, loc.subfolderName());
         Lookup lookup;
         
         if (loc.instanceProviderClass() != null && loc.instanceProviderClass() != InstanceProvider.class) {
             try {
                 // Get a lookup for the new instance provider
-                lookup = getLookupForProvider(paths, loc.instanceProviderClass().newInstance(), ordered);
+                lookup = getLookupForProvider(paths, loc.instanceProviderClass().newInstance());
             } catch (InstantiationException ex) {
                 Exceptions.printStackTrace(ex);
                 lookup = Lookup.EMPTY;
@@ -114,24 +112,24 @@ public class SwitchLookup extends Lookup {
             }
         } else {
             // Get a lookup for the new paths
-            lookup = getLookupForPaths(paths, ordered);
+            lookup = getLookupForPaths(paths);
         }
         
         return lookup;
     }
     
-    private Lookup getLookupForPaths(List<String> paths, boolean ordered) {
+    private Lookup getLookupForPaths(List<String> paths) {
         Lookup lookup = pathsLookups.get(paths);
         if (lookup == null) {
-            lookup = new FolderPathLookup(paths.toArray(new String[paths.size()]), ordered);
+            lookup = new FolderPathLookup(paths.toArray(new String[paths.size()]));
             pathsLookups.put(paths, lookup);
         }
         
         return lookup;
     }
 
-    private Lookup getLookupForProvider(List<String> paths, InstanceProvider instanceProvider, boolean ordered) {
-        return new InstanceProviderLookup(paths.toArray(new String[paths.size()]), instanceProvider, ordered);
+    private Lookup getLookupForProvider(List<String> paths, InstanceProvider instanceProvider) {
+        return new InstanceProviderLookup(paths.toArray(new String[paths.size()]), instanceProvider);
     }
     
     private static List<String> computePaths(MimePath mimePath, String prefixPath, String suffixPath) {

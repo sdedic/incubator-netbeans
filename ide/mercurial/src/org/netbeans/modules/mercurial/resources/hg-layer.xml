@@ -113,6 +113,7 @@
         </folder>
         <folder name="UpToDateStatusProvider">
             <file name="org-netbeans-modules-mercurial-ui-annotate-AnnotationMarkInstaller.instance">
+                <attr name="position" intvalue="14000"/>
                 <attr name="instanceClass" stringvalue="org.netbeans.modules.mercurial.ui.annotate.AnnotationMarkInstaller"/>
             </file>
         </folder>

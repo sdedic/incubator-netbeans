@@ -135,20 +135,14 @@ public class CreateRegistrationProcessor extends LayerGeneratingProcessor {
             String folder = "";
             TypeElement apiTE = (TypeElement) processingEnv.getTypeUtils().asElement(service);
             TypeElement location = processingEnv.getElementUtils().getTypeElement("org.netbeans.spi.editor.mimelookup.MimeLocation");
-            TypeElement order = processingEnv.getElementUtils().getTypeElement("org.netbeans.spi.editor.mimelookup.MimeLocation.Ordered");
 
-            boolean acceptFolder = true;
             OUTER: for (AnnotationMirror am : apiTE.getAnnotationMirrors()) {
-                if (location.equals(am.getAnnotationType().asElement())) {
+                if (!location.equals(am.getAnnotationType().asElement())) continue;
+
                     for (Entry<? extends ExecutableElement, ? extends AnnotationValue> e : am.getElementValues().entrySet()) {
-                        if (acceptFolder && e.getKey().getSimpleName().contentEquals("subfolderName")) {
+                    if (e.getKey().getSimpleName().contentEquals("subfolderName")) {
                             folder = "/" + (String) e.getValue().getValue();
-                            acceptFolder = false;
-                        }
-                    }
-                } else if (order.equals(am.getAnnotationType().asElement())) {
-                    for (Entry<? extends ExecutableElement, ? extends AnnotationValue> e : am.getElementValues().entrySet()) {
-                        orderRequired = (Boolean)e.getValue().getValue();
+                        break OUTER;
                     }
                 }
             }

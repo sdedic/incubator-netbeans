@@ -325,8 +325,10 @@ public class LanguageRegistrationProcessor extends LayerGeneratingProcessor {
     }
 
     private static void registerUpToDateStatus(LayerBuilder b, String mimeType) {
-        instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, GsfUpToDateStateProviderFactory.class, null, UpToDateStatusProviderFactory.class).write(); //NOI18N
-        instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, OccurrencesMarkProviderCreator.class, null, MarkProviderCreator.class).write(); //NOI18N
+        instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, GsfUpToDateStateProviderFactory.class, null, UpToDateStatusProviderFactory.class).
+                position(100000).write(); //NOI18N
+        instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, OccurrencesMarkProviderCreator.class, null, MarkProviderCreator.class).
+                position(101000).write(); //NOI18N
 /*
         instanceFile(b, "Editors/" + mimeType + "/UpToDateStatusProvider", null, GsfUpToDateStateProviderFactory.class, null, UpToDateStatusProviderFactory.class).
                 intvalue("position", 900).write(); //NOI18N

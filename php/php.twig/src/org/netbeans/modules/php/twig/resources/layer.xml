@@ -117,7 +117,9 @@ Contributor(s): Sebastian Hörl
                 </file>
 
                 <folder name="UpToDateStatusProvider">
-                    <file name="org-netbeans-modules-csl-hints-GsfUpToDateStateProviderFactory.instance"/>
+                    <file name="org-netbeans-modules-csl-hints-GsfUpToDateStateProviderFactory.instance">
+                        <attr name="position" intvalue="20000"/>
+                    </file>
                 </folder>
                 <folder name="BracesMatchers">
                     <file name="org-netbeans-modules-php-twig-editor-braces-TwigBracesMatcher$Factory.instance">

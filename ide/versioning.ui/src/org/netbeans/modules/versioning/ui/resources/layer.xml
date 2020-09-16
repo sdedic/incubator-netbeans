@@ -33,6 +33,7 @@
 
         <folder name="UpToDateStatusProvider">
             <file name="org-netbeans-modules-versioning-ui-diff-DiffMarkProviderCreator.instance">
+                <attr name="position" intvalue="17000"/>
                 <attr name="instanceClass" stringvalue="org.netbeans.modules.versioning.ui.diff.DiffMarkProviderCreator"/>
             </file>
         </folder>

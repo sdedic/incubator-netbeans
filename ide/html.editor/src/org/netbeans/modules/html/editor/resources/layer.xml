@@ -173,7 +173,9 @@
                 </file>
 
                 <folder name="UpToDateStatusProvider">
-                    <file name="org-netbeans-modules-csl-hints-GsfUpToDateStateProviderFactory.instance"/>
+                    <file name="org-netbeans-modules-csl-hints-GsfUpToDateStateProviderFactory.instance">
+                        <attr name="position" intvalue="20000"/>
+                    </file>
                 </folder>
 
                 <folder name="Popup">
@@ -346,7 +348,9 @@
                 </file>
 
                 <folder name="UpToDateStatusProvider">
-                    <file name="org-netbeans-modules-csl-hints-GsfUpToDateStateProviderFactory.instance"/>
+                    <file name="org-netbeans-modules-csl-hints-GsfUpToDateStateProviderFactory.instance">
+                        <attr name="position" intvalue="21000"/>
+                    </file>
                 </folder>
 
                 <folder name="Popup">

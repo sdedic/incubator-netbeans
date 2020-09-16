@@ -124,7 +124,9 @@
                 </folder>
                 
                 <folder name="UpToDateStatusProvider">
-                    <file name="org-netbeans-modules-java-hints-infrastructure-JavaUpToDateStateProviderFactory.instance"/>
+                    <file name="org-netbeans-modules-java-hints-infrastructure-JavaUpToDateStateProviderFactory.instance">
+                        <attr name="position" intvalue="21000"/>
+                    </file>
                 </folder>
                 <file name="org-netbeans-modules-java-hints-infrastructure-ErrorHintsFactory.instance"/>
                 <file name="org-netbeans-modules-java-hints-introduce-IntroduceHint$HLFImpl.instance"/>

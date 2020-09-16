@@ -40,6 +40,7 @@
         </folder>
         <folder name="UpToDateStatusProvider">
             <file name="org-netbeans-modules-git-ui-blame-AnnotationMarkInstaller.instance">
+                <attr name="position" intvalue="12000"/>
                 <attr name="instanceClass" stringvalue="org.netbeans.modules.git.ui.blame.AnnotationMarkInstaller"/>
             </file>
         </folder>

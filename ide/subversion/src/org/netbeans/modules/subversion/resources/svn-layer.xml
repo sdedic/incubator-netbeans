@@ -121,6 +121,7 @@
         </folder>
         <folder name="UpToDateStatusProvider">
             <file name="org-netbeans-modules-subversion-ui-blame-AnnotationMarkInstaller.instance">
+                <attr name="position" intvalue="15000"/>
                 <attr name="instanceClass" stringvalue="org.netbeans.modules.subversion.ui.blame.AnnotationMarkInstaller"/>
             </file>
         </folder>

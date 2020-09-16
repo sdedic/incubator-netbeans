@@ -89,6 +89,7 @@
         </folder>
         <folder name="UpToDateStatusProvider">
             <file name="org-netbeans-modules-diff-builtin-visualizer-editable-DiffMarkProviderCreator.instance">
+                <attr name="position" intvalue="10000"/>
                 <attr name="instanceClass" stringvalue="org.netbeans.modules.diff.builtin.visualizer.editable.DiffMarkProviderCreator"/>                                                               
             </file>
         </folder>

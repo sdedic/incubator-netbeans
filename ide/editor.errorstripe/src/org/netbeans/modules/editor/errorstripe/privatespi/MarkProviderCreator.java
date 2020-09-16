@@ -29,7 +29,6 @@ import org.netbeans.spi.editor.mimelookup.MimeLocation;
  * @author Jan Lahoda
  */
 @MimeLocation(subfolderName="UpToDateStatusProvider")
-@MimeLocation.Ordered(false)
 public interface MarkProviderCreator {
 
     /**

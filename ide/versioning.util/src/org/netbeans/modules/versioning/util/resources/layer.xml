@@ -42,6 +42,7 @@
         </folder>
         <folder name="UpToDateStatusProvider">
             <file name="org-netbeans-modules-versioning-annotate-AnnotationMarkInstaller.instance">
+                <attr name="position" intvalue="16000"/>
                 <attr name="instanceClass" stringvalue="org.netbeans.modules.versioning.annotate.AnnotationMarkInstaller"/>
             </file>
         </folder>

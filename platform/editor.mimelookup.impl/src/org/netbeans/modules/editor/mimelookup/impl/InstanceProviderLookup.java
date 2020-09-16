@@ -41,17 +41,17 @@ public final class InstanceProviderLookup extends AbstractLookup {
     private PCL listener = new PCL();
 
     /** Creates a new instance of InstanceProviderLookup */
-    public InstanceProviderLookup(String [] paths, InstanceProvider instanceProvider, boolean ordered) {
-        this(paths, instanceProvider, new InstanceContent(), ordered);
+    public InstanceProviderLookup(String [] paths, InstanceProvider instanceProvider) {
+        this(paths, instanceProvider, new InstanceContent());
     }
     
-    private InstanceProviderLookup(String [] paths, InstanceProvider instanceProvider, InstanceContent content, boolean ordered) {
+    private InstanceProviderLookup(String [] paths, InstanceProvider instanceProvider, InstanceContent content) {
         super(content);
         
         this.content = content;
         this.instanceProvider = instanceProvider;
         
-        this.children = new CompoundFolderChildren(paths, ordered, true);
+        this.children = new CompoundFolderChildren(paths, true);
         this.children.addPropertyChangeListener(listener);
     }
 
