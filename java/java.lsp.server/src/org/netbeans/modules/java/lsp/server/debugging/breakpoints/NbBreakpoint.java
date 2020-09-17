@@ -18,13 +18,9 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.breakpoints;
 
-import com.sun.jdi.request.EventRequest;
-import io.reactivex.disposables.Disposable;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -50,7 +46,6 @@ public final class NbBreakpoint implements IBreakpoint {
     private String condition;
     private String logMessage;
     private final Map<Object, Object> properties = new HashMap<>();
-    private final List<Disposable> subscriptions = new ArrayList<>();
     private Breakpoint breakpoint; // Either JPDA's LineBreakpoint, or TruffleLineBreakpoint
 
     public NbBreakpoint(String sourceURL, int line, int hitCount, String condition, String logMessage) {
@@ -179,16 +174,6 @@ public final class NbBreakpoint implements IBreakpoint {
     }
 
     @Override
-    public List<EventRequest> requests() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public List<Disposable> subscriptions() {
-        return subscriptions;
-    }
-
-    @Override
     public int hashCode() {
         int hash = 7;
         hash = 59 * hash + Objects.hashCode(this.sourceURL);
@@ -223,10 +208,6 @@ public final class NbBreakpoint implements IBreakpoint {
             DebuggerManager d = DebuggerManager.getDebuggerManager();
             d.removeBreakpoint(breakpoint);
         }
-        subscriptions.forEach(subscription -> {
-            subscription.dispose();
-        });
-        subscriptions.clear();
     }
     
 }

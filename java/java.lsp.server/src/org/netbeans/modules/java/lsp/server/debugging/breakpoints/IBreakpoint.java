@@ -11,16 +11,9 @@
 
 package org.netbeans.modules.java.lsp.server.debugging.breakpoints;
 
-import com.sun.jdi.request.EventRequest;
-import io.reactivex.disposables.Disposable;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface IBreakpoint extends AutoCloseable {
-
-    List<EventRequest> requests();
-
-    List<Disposable> subscriptions();
 
     String className();
 

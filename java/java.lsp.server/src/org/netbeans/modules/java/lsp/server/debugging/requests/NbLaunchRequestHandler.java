@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -130,15 +131,8 @@ final class NbLaunchRequestHandler implements DebuggerRequestHandler {
             return resultFuture;
         }
 
-        CompletableFuture<NbProcessConsole> debuggeeConsoleFuture = ((NbLaunchDelegate) activeLaunchHandler).nbLaunch(file, context, !launchArguments.noDebug);
-        debuggeeConsoleFuture.thenAccept(debuggeeConsole -> {
-            debuggeeConsole.lineMessages()
-                    .map((message) -> convertToOutputEvent(message.output, message.category, context))
-                    .doFinally(() -> waitForDebuggeeConsole.complete(true))
-                    .subscribe((event) -> context.getProtocolServer().sendEvent(event));
-            debuggeeConsole.start();
-            resultFuture.complete(response);
-        });
+        activeLaunchHandler.nbLaunch(file, context, !launchArguments.noDebug, new OutputListener(context)).
+                thenRun(() -> resultFuture.complete(response));
         return resultFuture;
     }
 
@@ -181,4 +175,23 @@ final class NbLaunchRequestHandler implements DebuggerRequestHandler {
         });
     }
 
+    private final class OutputListener implements Consumer<NbProcessConsole.ConsoleMessage> {
+
+        private final IDebugAdapterContext context;
+
+        OutputListener(IDebugAdapterContext context) {
+            this.context = context;
+        }
+
+        @Override
+        public void accept(NbProcessConsole.ConsoleMessage message) {
+            if (message == null) {
+                // EOF
+                waitForDebuggeeConsole.complete(true);
+            } else {
+                OutputEvent outputEvent = convertToOutputEvent(message.output, message.category, context);
+                context.getProtocolServer().sendEvent(outputEvent);
+            }
+        }
+    }
 }

@@ -18,22 +18,20 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import io.reactivex.Observable;
-import io.reactivex.schedulers.Schedulers;
-import io.reactivex.subjects.PublishSubject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.Charset;
-import java.util.stream.Stream;
+import java.util.function.Consumer;
 import org.netbeans.modules.java.lsp.server.debugging.protocol.Events.OutputEvent.Category;
 import org.openide.util.Pair;
 
 public final class NbProcessConsole {
-    private InputStreamObservable stdoutStream;
-    private InputStreamObservable stderrStream;
-    private Observable<ConsoleMessage> observable = null;
+
+    private final Consumer<ConsoleMessage> messageConsumer;
+    private final MessagesProvider outputProvider;
+    private final MessagesProvider errorProvider;
 
     /**
      * Constructor.
@@ -44,113 +42,60 @@ public final class NbProcessConsole {
      * @param encoding
      *              the process encoding format
      */
-    NbProcessConsole(Pair<InputStream, InputStream> outErrStreams, String name, Charset encoding) {
-        this.stdoutStream = new InputStreamObservable(name + " Stdout Handler", outErrStreams.first(), encoding);
-        this.stderrStream = new InputStreamObservable(name + " Stderr Handler", outErrStreams.second(), encoding);
-        Observable<ConsoleMessage> stdout = this.stdoutStream.messages().map((message) -> new ConsoleMessage(message, Category.stdout));
-        Observable<ConsoleMessage> stderr = this.stderrStream.messages().map((message) -> new ConsoleMessage(message, Category.stderr));
-        this.observable = Observable.mergeArrayDelayError(stdout, stderr).observeOn(Schedulers.newThread());
-    }
-
-    /**
-     * Start monitoring the stdout/stderr streams of the target process.
-     */
-    public void start() {
-        stdoutStream.start();
-        stderrStream.start();
+    NbProcessConsole(Pair<InputStream, InputStream> outErrStreams, String name, Charset encoding, Consumer<ConsoleMessage> messageConsumer) {
+        this.messageConsumer = messageConsumer;
+        outputProvider = new MessagesProvider(name + " OUT", outErrStreams.first(), encoding, Category.stdout);
+        errorProvider = new MessagesProvider(name + " ERR", outErrStreams.second(), encoding, Category.stderr);
+        outputProvider.start();
+        errorProvider.start();
     }
 
     /**
      * Stop monitoring the process console.
      */
     public void stop() {
-        stdoutStream.stop();
-        stderrStream.stop();
+        outputProvider.interrupt();
+        errorProvider.interrupt();
     }
 
-    public Observable<ConsoleMessage> messages() {
-        return observable;
-    }
+    private final class MessagesProvider extends Thread {
 
-    /**
-     * Split the stdio message to lines, and return them as a new Observable.
-     */
-    public Observable<ConsoleMessage> lineMessages() {
-        return this.messages().map((message) -> {
-            String[] lines = message.output.split("(?<=\n)");
-            return Stream.of(lines).map((line) -> new ConsoleMessage(line, message.category)).toArray(ConsoleMessage[]::new);
-        }).concatMap((lines) -> Observable.fromArray(lines));
-    }
+        private static final int BUFFER_LENGTH = 2048;
 
-    public static class InputStreamObservable {
-        private PublishSubject<String> rxSubject = PublishSubject.<String>create();
-        private String name;
-        private InputStream inputStream;
-        private Charset encoding;
-        private Thread loopingThread;
+        private final Reader reader;
+        private final Category category;
+        private char[] buffer = new char[BUFFER_LENGTH];
 
-        /**
-         * Constructor.
-         */
-        public InputStreamObservable(String name, InputStream inputStream, Charset encoding) {
-            this.name = name;
-            this.inputStream = inputStream;
-            this.encoding = encoding;
+        MessagesProvider(String name, InputStream inputStream, Charset encoding, Category category) {
+            super(name);
+            setDaemon(true);
+            this.reader = new InputStreamReader(inputStream, encoding);
+            this.category = category;
         }
 
-        /**
-         * Starts the stream.
-         */
-        public void start() {
-            loopingThread = new Thread(name) {
-                public void run() {
-                    monitor(inputStream, rxSubject);
-                }
-            };
-            loopingThread.setDaemon(true);
-            loopingThread.start();
-        }
-
-        /**
-         * Stops the stream.
-         */
-        public void stop() {
-            if (loopingThread != null) {
-                loopingThread.interrupt();
-                loopingThread = null;
-            }
-        }
-
-        private void monitor(InputStream input, PublishSubject<String> subject) {
-            Reader reader = new InputStreamReader(input, encoding);
-            final int BUFFERSIZE = 4096;
-            char[] buffer = new char[BUFFERSIZE];
-            while (true) {
-                try {
+        @Override
+        public void run() {
+            int length;
+            try {
+                while ((length = reader.read(buffer, 0, BUFFER_LENGTH)) != -1) {
+                    String text = new String(buffer, 0, length);
+                    String[] lines = text.split("(?<=\n)");
+                    for (String line : lines) {
+                        messageConsumer.accept(new ConsoleMessage(line, category));
+                    }
                     if (Thread.interrupted()) {
-                        subject.onComplete();
-                        return;
+                        break;
                     }
-                    int read = reader.read(buffer, 0, BUFFERSIZE);
-                    if (read == -1) {
-                        subject.onComplete();
-                        return;
-                    }
-
-                    subject.onNext(new String(buffer, 0, read));
-                } catch (IOException e) {
-                    subject.onError(e);
-                    return;
                 }
+            } catch (IOException ex) {
+                // EOF
+            } finally {
+                messageConsumer.accept(null); // EOF
             }
-        }
-
-        public Observable<String> messages() {
-            return rxSubject;
         }
     }
 
-    public static class ConsoleMessage {
+    public static final class ConsoleMessage {
         public String output;
         public Category category;
 
@@ -159,4 +104,5 @@ public final class NbProcessConsole {
             this.category = category;
         }
     }
+
 }

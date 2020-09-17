@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -65,7 +66,8 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
 
     private static final Logger LOG = Logger.getLogger(NbLaunchDelegate.class.getName());
 
-    public final CompletableFuture<NbProcessConsole> nbLaunch(FileObject toRun, IDebugAdapterContext context, boolean debug) {
+    @Override
+    public final CompletableFuture<Void> nbLaunch(FileObject toRun, IDebugAdapterContext context, boolean debug, Consumer<NbProcessConsole.ConsoleMessage> consoleMessages) {
             Pair<ActionProvider, String> providerAndCommand = findTarget(toRun, debug);
             if (providerAndCommand == null) {
                 throw new VMDisconnectedException("Cannot find debug action!"); //TODO: message, locations
@@ -98,7 +100,7 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
                     }*/
                 }
             };
-            CompletableFuture<NbProcessConsole> launchFuture = new CompletableFuture<>();
+            CompletableFuture<Void> launchFuture = new CompletableFuture<>();
             if (debug) {
                 DebuggerManager.getDebuggerManager().addDebuggerListener(new DebuggerManagerAdapter() {
                     @Override
@@ -116,8 +118,7 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
                                         debugger.removePropertyChangeListener(JPDADebugger.PROP_STATE, this);
                                         IDebugSession debugSession = new NbDebugSession(debugger);
                                         context.setDebugSession(debugSession);
-                                        NbProcessConsole console = new NbProcessConsole(Pair.of(out, err), "Debuggee", context.getDebuggeeEncoding());
-                                        launchFuture.complete(console);
+                                        launchFuture.complete(null);
                                         context.getProvider(IConfigurationSemaphore.class).waitForConfigutaionDone();
                                     }
                                 }
@@ -126,9 +127,10 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
                     }
                 });
             } else {
-                launchFuture.complete(new NbProcessConsole(Pair.of(out, err), "Run", context.getDebuggeeEncoding()));
+                launchFuture.complete(null);
             }
 
+            new NbProcessConsole(Pair.of(out, err), debug ? "Debuggee" : "Run", context.getDebuggeeEncoding(), consoleMessages);
             Lookups.executeWith(new ProxyLookup(Lookups.fixed(ioProvider), Lookup.getDefault()), () -> {
                 providerAndCommand.first().invokeAction(providerAndCommand.second(), Lookups.fixed(toRun, ioProvider, progress));
             });

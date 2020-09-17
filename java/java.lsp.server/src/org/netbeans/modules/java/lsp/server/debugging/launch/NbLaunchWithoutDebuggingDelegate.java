@@ -48,12 +48,6 @@ public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
         this.terminateHandler = terminateHandler;
     }
 
-    @Override
-    public Process launch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context)
-            throws IOException, IllegalConnectorArgumentsException, VMStartException {
-        throw new UnsupportedOperationException();
-    }
-
     protected static String[] constructEnvironmentVariables(Requests.LaunchArguments launchArguments) {
         String[] envVars = null;
         if (launchArguments.env != null && !launchArguments.env.isEmpty()) {

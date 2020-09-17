@@ -43,12 +43,6 @@ public class NbLaunchWithDebuggingDelegate extends NbLaunchDelegate {
     }
 
     @Override
-    public Process launch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context)
-            throws IOException, IllegalConnectorArgumentsException, VMStartException {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public void postLaunch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context) {
         //context.getProvider(IThreadsProvider.class).initialize(context, Collections.emptyMap());
         // send an InitializedEvent to indicate that the debugger is ready to accept
