@@ -19,7 +19,7 @@ import com.google.gson.JsonObject;
 public class Messages {
 
     public static class ProtocolMessage {
-        public int seq;
+        public long seq;
         public String type;
 
         public ProtocolMessage() {
@@ -60,7 +60,7 @@ public class Messages {
     public static class Response extends ProtocolMessage {
         public boolean success;
         public String message;
-        public int request_seq;
+        public long request_seq;
         public String command;
         public Object body;
 
@@ -102,13 +102,13 @@ public class Messages {
         /**
          * Constructor.
          */
-        public Response(int requestSeq, String command) {
+        public Response(long requestSeq, String command) {
             super("response");
             this.request_seq = requestSeq;
             this.command = command;
         }
 
-        public Response(int requestSeq, String command, boolean success) {
+        public Response(long requestSeq, String command, boolean success) {
             this(requestSeq, command);
             this.success = success;
         }
@@ -116,7 +116,7 @@ public class Messages {
         /**
          * Constructor.
          */
-        public Response(int requestSeq, String command, boolean success, String message) {
+        public Response(long requestSeq, String command, boolean success, String message) {
             this(requestSeq, command);
             this.success = success;
             this.message = message;

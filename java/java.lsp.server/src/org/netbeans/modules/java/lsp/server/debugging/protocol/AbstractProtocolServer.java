@@ -11,15 +11,12 @@
 
 package org.netbeans.modules.java.lsp.server.debugging.protocol;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.Reader;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -27,34 +24,33 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
-import io.reactivex.disposables.Disposable;
-import io.reactivex.schedulers.Schedulers;
-import io.reactivex.subjects.PublishSubject;
+import org.openide.util.Pair;
 
 public abstract class AbstractProtocolServer implements IProtocolServer {
     private static final Logger logger = Logger.getLogger("java-debug");
-    private static final int BUFFER_SIZE = 4096;
+    private static final int BUFFER_SIZE = 8192;
     private static final String TWO_CRLF = "\r\n\r\n";
     private static final Pattern CONTENT_LENGTH_MATCHER = Pattern.compile("Content-Length: (\\d+)");
     private static final Charset PROTOCOL_ENCODING = StandardCharsets.UTF_8; // vscode protocol uses UTF-8 as encoding format.
 
     protected boolean terminateSession = false;
 
-    private Reader reader;
-    private Writer writer;
+    private final InputStream input;
+    private final Writer writer;
 
-    private ByteBuffer rawData;
+    private final ByteBuffer rawData;
     private int contentLength = -1;
-    private AtomicInteger sequenceNumber = new AtomicInteger(1);
+    private final AtomicLong sequenceNumber = new AtomicLong(1);
 
-    private PublishSubject<Messages.Response> responseSubject = PublishSubject.<Messages.Response>create();
-    private PublishSubject<Messages.Request> requestSubject = PublishSubject.<Messages.Request>create();
+    private final RequestResponses requestResponses = new RequestResponses();
 
     /**
      * Constructs a protocol server instance based on the given input stream and
@@ -66,40 +62,30 @@ public abstract class AbstractProtocolServer implements IProtocolServer {
      *            the output stream
      */
     public AbstractProtocolServer(InputStream input, OutputStream output) {
-        this.reader = new BufferedReader(new InputStreamReader(input, PROTOCOL_ENCODING));
+        this.input = input;
         this.writer = new PrintWriter(new BufferedWriter(new OutputStreamWriter(output, PROTOCOL_ENCODING)));
         this.contentLength = -1;
         this.rawData = new ByteBuffer();
-
-        requestSubject.observeOn(Schedulers.newThread()).subscribe(request -> {
-            try {
-                this.dispatchRequest(request);
-            } catch (Exception e) {
-                logger.log(Level.SEVERE, String.format("Dispatch debug protocol error: %s", e.toString()), e);
-            }
-        });
     }
 
     /**
      * A while-loop to parse input data and send output data constantly.
      */
     public void run() {
-        char[] buffer = new char[BUFFER_SIZE];
+        byte[] buffer = new byte[BUFFER_SIZE];
         try {
             while (!this.terminateSession) {
-                int read = this.reader.read(buffer, 0, BUFFER_SIZE);
+                int read = this.input.read(buffer, 0, BUFFER_SIZE);
                 if (read == -1) {
                     break;
                 }
 
-                this.rawData.append(new String(buffer, 0, read).getBytes(PROTOCOL_ENCODING));
+                this.rawData.append(buffer, read);
                 this.processData();
             }
         } catch (IOException e) {
             logger.log(Level.SEVERE, String.format("Read data from io exception: %s", e.toString()), e);
         }
-
-        requestSubject.onComplete();
     }
 
     /**
@@ -163,37 +149,8 @@ public abstract class AbstractProtocolServer implements IProtocolServer {
 
     @Override
     public CompletableFuture<Messages.Response> sendRequest(Messages.Request request, long timeout) {
-        CompletableFuture<Messages.Response> future = new CompletableFuture<>();
-        Timer timer = new Timer();
-        Disposable[] disposable = new Disposable[1];
-        disposable[0] = responseSubject.filter(response -> response.request_seq == request.seq).take(1)
-                .observeOn(Schedulers.newThread()).subscribe((response) -> {
-                    try {
-                        timer.cancel();
-                        future.complete(response);
-                        if (disposable[0] != null) {
-                            disposable[0].dispose();
-                        }
-                    } catch (Exception e) {
-                        logger.log(Level.SEVERE, String.format("Handle response error: %s", e.toString()), e);
-                    }
-                });
+        CompletableFuture<Messages.Response> future = requestResponses.add(request.seq, timeout);
         sendMessage(request);
-        if (timeout > 0) {
-            try {
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        if (disposable[0] != null) {
-                            disposable[0].dispose();
-                        }
-                        future.completeExceptionally(new TimeoutException("timeout"));
-                    }
-                }, timeout);
-            } catch (IllegalStateException ex) {
-                // if timer or task has been cancelled, do nothing.
-            }
-        }
         return future;
     }
 
@@ -215,10 +172,14 @@ public abstract class AbstractProtocolServer implements IProtocolServer {
 
                         if (message.type.equals("request")) {
                             Messages.Request request = JsonUtils.fromJson(messageData, Messages.Request.class);
-                            requestSubject.onNext(request);
+                            try {
+                                this.dispatchRequest(request);
+                            } catch (Exception e) {
+                                logger.log(Level.SEVERE, String.format("Dispatch debug protocol error: %s", e.toString()), e);
+                            }
                         } else if (message.type.equals("response")) {
                             Messages.Response response = JsonUtils.fromJson(messageData, Messages.Response.class);
-                            responseSubject.onNext(response);
+                            requestResponses.response(response);
                         }
                     } catch (Exception ex) {
                         logger.log(Level.SEVERE, String.format("Error parsing message: %s", ex.toString()), ex);
@@ -247,7 +208,46 @@ public abstract class AbstractProtocolServer implements IProtocolServer {
 
     protected abstract void dispatchRequest(Messages.Request request);
 
-    class ByteBuffer {
+    private class RequestResponses {
+
+        private final Map<Long, Pair<CompletableFuture<Messages.Response>, Timer>> pendingResponses = new ConcurrentHashMap<>();
+
+        public CompletableFuture<Messages.Response> add(long seq, long timeout) {
+            Timer timer;
+            if (timeout != 0) {
+                timer = new Timer(Long.toString(seq));
+                timer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        Pair<CompletableFuture<Messages.Response>, Timer> completable = pendingResponses.remove(seq);
+                        if (completable != null) {
+                            completable.first().completeExceptionally(new TimeoutException("timeout"));
+                        }
+                    }
+                }, timeout);
+            } else {
+                timer = null;
+            }
+            CompletableFuture<Messages.Response> completable = new CompletableFuture<>();
+            pendingResponses.put(seq, Pair.of(completable, timer));
+            return completable;
+        }
+
+        public void response(Messages.Response response) {
+            Pair<CompletableFuture<Messages.Response>, Timer> completable = pendingResponses.remove(response.request_seq);
+            if (completable != null) {
+                Timer timer = completable.second();
+                if (timer != null) {
+                    timer.cancel();
+                }
+                completable.first().complete(response);
+            } else {
+                // Timed out already
+            }
+        }
+    }
+
+    private class ByteBuffer {
         private byte[] buffer;
 
         public ByteBuffer() {

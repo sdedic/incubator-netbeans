@@ -40,7 +40,7 @@ public final class UsageDataSession {
     private long stopAt = -1;
     private Map<String, Integer> commandCountMap = new HashMap<>();
     private Map<String, Integer> breakpointCountMap = new HashMap<>();
-    private Map<Integer, RequestEvent> requestEventMap = new HashMap<>();
+    private Map<Long, RequestEvent> requestEventMap = new HashMap<>();
     private Map<String, Integer> userErrorCount = new HashMap<>();
     private Map<String, Integer> commandPerfCountMap = new HashMap<>();
     private List<String> eventList = new ArrayList<>();
