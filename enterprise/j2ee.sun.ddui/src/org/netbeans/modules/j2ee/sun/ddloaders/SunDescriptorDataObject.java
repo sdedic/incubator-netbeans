@@ -67,6 +67,7 @@ import org.netbeans.modules.j2ee.sun.ddloaders.multiview.webservice.WebServiceMu
 import org.netbeans.modules.schema2beans.Schema2BeansException;
 import org.netbeans.modules.schema2beans.Schema2BeansRuntimeException;
 import org.netbeans.modules.xml.multiview.XmlMultiViewElement;
+import org.openide.loaders.MultiFileLoader;
 import org.openide.util.Lookup;
 import org.openide.util.Mutex;
 import org.openide.windows.TopComponent;
@@ -107,7 +108,7 @@ public class SunDescriptorDataObject extends DDMultiViewDataObject
     private DDType descriptorType;
     private final int xmlIndex;
     
-    public SunDescriptorDataObject(FileObject pf, SunDescriptorDataLoader loader) throws DataObjectExistsException {
+    public SunDescriptorDataObject(FileObject pf, MultiFileLoader loader) throws DataObjectExistsException {
         super(pf, loader);
         
         descriptorType = DDType.getDDType(pf.getNameExt());
