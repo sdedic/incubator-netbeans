@@ -15,5 +15,5 @@
 # specific language governing permissions and limitations
 # under the License.
 
-OpenIDE-Module-Name=Java LSP Server
-OpenIDE-Module-Display-Category=Java
+# cluster incompatible release version
+1
