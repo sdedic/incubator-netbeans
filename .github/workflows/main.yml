@@ -245,11 +245,11 @@ jobs:
         run: |
           ant -f platform/masterfs.macosx test
           ant -f platform/core.network test
+
   commit-validation:
     name: Commit-validation (on Linux)
     runs-on: ubuntu-18.04
     env:
-      DISPLAY: ":99.0"
       OPTS: -Dcluster.config=release -Dtest-unit-sys-prop.ignore.random.failures=true
     steps:
       - name: Checkout
