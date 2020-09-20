@@ -50,6 +50,7 @@ import org.netbeans.modules.xml.multiview.XmlMultiViewElement;
 import org.openide.awt.ActionID;
 import org.openide.awt.ActionReference;
 import org.openide.awt.ActionReferences;
+import org.openide.loaders.MultiFileLoader;
 import org.openide.util.Lookup;
 import static org.openide.windows.TopComponent.PERSISTENCE_ONLY_OPENED;
 import org.xml.sax.SAXException;
@@ -113,7 +114,7 @@ import org.xml.sax.SAXParseException;
     ),
     @ActionReference(
             path = DD_ACTION_PATH,
-            id = @ActionID(category = "Edit", id = "org.openide.actions.RenameAction"),
+            id = @ActionID(category = "System", id = "org.openide.actions.RenameAction"),
             position = 950,
             separatorAfter = 1000
     ),
@@ -166,7 +167,7 @@ public class PayaraDescriptorDataObject extends SunDescriptorDataObject {
     private final PayaraDDType descriptorType;
     private final int xmlIndex;
 
-    public PayaraDescriptorDataObject(FileObject pf, PayaraDescriptorDataLoader loader) throws DataObjectExistsException {
+    public PayaraDescriptorDataObject(FileObject pf, MultiFileLoader loader) throws DataObjectExistsException {
         super(pf, loader);
         descriptorType = PayaraDDType.getDDType(pf.getNameExt());
         if (descriptorType != null && descriptorType.equals(PayaraDDType.DD_PAYARA_WEB_APP)) {
