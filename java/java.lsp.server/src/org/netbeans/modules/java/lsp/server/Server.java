@@ -119,15 +119,15 @@ public final class Server {
                     projects.add(prj);
                 }
             }
-            //XXX: ensure project opened:
             try {
-                Class.forName("org.netbeans.modules.project.ui.OpenProjectList", false, Lookup.getDefault().lookup(ClassLoader.class)).getDeclaredMethod("waitProjectsFullyOpen").invoke(null);
-            } catch (Exception ex) {
-                throw new IllegalStateException(ex);
-            }
-            OpenProjects.getDefault().open(projects.toArray(new Project[0]), false);
-            try {
-                OpenProjects.getDefault().openProjects().get();
+                Project[] previouslyOpened = OpenProjects.getDefault().openProjects().get();
+                if (previouslyOpened.length > 0) {
+                    Level level = Level.FINEST;
+                    assert (level = Level.CONFIG) != null;
+                    for (Project p : previouslyOpened) {
+                        LOG.log(level, "Previously opened project at {0}", p.getProjectDirectory());
+                    }
+                }
             } catch (InterruptedException | ExecutionException ex) {
                 throw new IllegalStateException(ex);
             }
