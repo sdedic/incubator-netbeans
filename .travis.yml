@@ -773,7 +773,8 @@ matrix:
             - ant $OPTS build
           script:
             - nbbuild/travis/scripting.sh
-	- name: commit-validation
+
+        - name: commit-validation
           jdk: openjdk8
           env:
             - OPTS="-quiet -Dcluster.config=php -Djavac.compilerargs=-nowarn -Dbuild.compiler.deprecation=false -Dtest-unit-sys-prop.ignore.random.failures=true"
@@ -782,4 +783,3 @@ matrix:
             - ant $OPTS build
           script:
             - hide-logs.sh ant $OPTS commit-validation
-
