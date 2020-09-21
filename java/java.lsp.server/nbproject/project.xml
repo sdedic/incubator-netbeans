@@ -93,16 +93,6 @@
                     </run-dependency>
                 </dependency>
                 <dependency>
-                    <!-- XXX: remove dependency on this module -->
-                    <code-name-base>org.netbeans.modules.debugger.jpda</code-name-base>
-                    <build-prerequisite/>
-                    <compile-dependency/>
-                    <run-dependency>
-                        <release-version>2</release-version>
-                        <implementation-version/>
-                    </run-dependency>
-                </dependency>
-                <dependency>
                     <code-name-base>org.netbeans.modules.debugger.jpda.truffle</code-name-base>
                     <build-prerequisite/>
                     <compile-dependency/>
