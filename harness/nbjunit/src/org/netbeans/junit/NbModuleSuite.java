@@ -861,6 +861,10 @@ public class NbModuleSuite {
             if (config.enableClasspathModules) {
                 turnClassPathModules(ud, NbTestSuite.class.getClassLoader());
             }
+            
+            if (!config.honorAutoEager) {
+                System.setProperty("org.netbeans.ModuleManager.dontWarnDependencies", Boolean.TRUE.toString()); // NOOI18N
+            }
 
             StringBuilder sb = new StringBuilder();
             String sep = "";

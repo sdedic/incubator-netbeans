@@ -125,6 +125,8 @@ public final class ModuleManager extends Modules {
     private final Events ev;
     private final ModuleDataCache mdc = new ModuleDataCache();
     private final NetigsoHandle netigso;
+    
+    private final boolean dontWarnDependencies = Boolean.getBoolean("org.netbeans.ModuleManager.dontWarnDependencies"); // NOOI18N
 
     /** Create a manager, initially with no managed modules.
      * The handler for installing modules is given.
@@ -1697,7 +1699,7 @@ public final class ModuleManager extends Modules {
     
     private void maybeAddToEnableList(Set<Module> willEnable, Set<Module> mightEnable, Module m, boolean okToFail) {
         if (! missingDependencies(m).isEmpty()) {
-            if (!okToFail) {
+            if (!okToFail && !dontWarnDependencies) {
                 Util.err.warning("Module " + m + " had unexpected problems: " + missingDependencies(m) + " (willEnable: " + willEnable + " mightEnable: " + mightEnable + ")");
             }
             // Cannot satisfy its dependencies, exclude it.
