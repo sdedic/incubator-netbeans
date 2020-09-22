@@ -58,7 +58,6 @@ import org.netbeans.modules.java.lsp.server.text.TextDocumentServiceImpl;
 import org.netbeans.modules.java.lsp.server.workspace.WorkspaceServiceImpl;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Exceptions;
-import org.openide.util.Lookup;
 
 /**
  *
@@ -128,6 +127,12 @@ public final class Server {
                         LOG.log(level, "Previously opened project at {0}", p.getProjectDirectory());
                     }
                 }
+            } catch (InterruptedException | ExecutionException ex) {
+                throw new IllegalStateException(ex);
+            }
+            OpenProjects.getDefault().open(projects.toArray(new Project[0]), false);
+            try {
+                OpenProjects.getDefault().openProjects().get();
             } catch (InterruptedException | ExecutionException ex) {
                 throw new IllegalStateException(ex);
             }
