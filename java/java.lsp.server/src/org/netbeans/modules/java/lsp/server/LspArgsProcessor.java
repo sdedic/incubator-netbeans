@@ -29,7 +29,7 @@ import org.openide.util.NbBundle.Messages;
 
 public final class LspArgsProcessor implements ArgsProcessor {
 
-    @Arg(longName="start-java-language-server", defaultValue = "-1")
+    @Arg(longName="start-java-language-server", defaultValue = "")
     @Description(shortDescription="#DESC_StartJavaLanguageServer")
     @Messages("DESC_StartJavaLanguageServer=Starts the Java Language Server")
     public String lsPort;

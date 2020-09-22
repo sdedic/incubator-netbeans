@@ -50,7 +50,7 @@ final class ConnectionSpec implements Closeable {
     }
 
     public static ConnectionSpec parse(String spec) throws CommandException {
-        if (spec == null || spec.equals("stdio")) { // NOI18N
+        if (spec == null || spec.isEmpty() || spec.equals("stdio")) { // NOI18N
             return new ConnectionSpec(null, -1);
         }
         final String listenPrefix = "listen:"; // NOI18N
