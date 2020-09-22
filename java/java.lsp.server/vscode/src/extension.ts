@@ -72,7 +72,6 @@ export function activate(context: ExtensionContext) {
     ideArgs.push("--list");
 
     let log = vscode.window.createOutputChannel("Java Language Server");
-    log.show(true);
     log.appendLine("Launching Java Language Server");
     vscode.window.showInformationMessage("Launching Java Language Server");
 
@@ -104,9 +103,15 @@ export function activate(context: ExtensionContext) {
             if (code != 0) {
                 vscode.window.showWarningMessage("Java Language Server exited with " + code);
             }
-            log.appendLine("");
             if (collectedText != null) {
-                reject("Exit code " + code);
+                let match = collectedText.match(/org.netbeans.modules.java.lsp.server[^\n]*/)
+                if (match?.length == 1) {
+                    log.appendLine(match[0]);
+                } else {
+                    log.appendLine("Cannot find org.netbeans.modules.java.lsp.server in the log!");
+                }
+                log.show(false);
+                reject("Java Language Server not enabled!");
             } else {
                 log.appendLine("Exit code " + code);
             }
