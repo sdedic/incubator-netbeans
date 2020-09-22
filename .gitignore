@@ -54,6 +54,7 @@
 /platform/o.n.bootstrap/launcher/windows/nbproject/Makefile-*.mk
 /platform/o.n.bootstrap/launcher/windows/nbproject/Package-*.bash
 /platform/o.n.bootstrap/launcher/windows/nbproject/private/
+/java/java.lsp.server/vscapp/integration/nbproject/private/
 
 # Database logs
 derby.log
@@ -101,3 +102,4 @@ derby.log
 /extide/gradle/netbeans-gradle-tooling/gradle/wrapper/gradle-wrapper.jar
 /extide/gradle/release/modules/gradle/daemon-loader/.gradle/
 /nbbuild/misc/prepare-bundles/target/
+/java/java.lsp.server/vscapp/integration/build/

@@ -19,7 +19,7 @@
     under the License.
 
 -->
-<project name="vscapp" basedir=".">
-    <description>VSCode Integration Application</description>
+<project name="org.netbeans.modules.vscapp.integration" default="netbeans" basedir=".">
+    <description>Builds, tests, and runs the project org.netbeans.modules.vscapp.integration.</description>
     <import file="nbproject/build-impl.xml"/>
 </project>
