@@ -35,7 +35,9 @@ import com.sun.jdi.VirtualMachine;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -50,6 +52,12 @@ import org.netbeans.api.debugger.Breakpoint;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
 import org.netbeans.api.debugger.jpda.JPDAThread;
+import org.netbeans.api.java.queries.BinaryForSourceQuery;
+import org.netbeans.api.project.Project;
+import org.netbeans.api.project.ProjectManager;
+import org.netbeans.api.project.ProjectUtils;
+import org.netbeans.api.project.SourceGroup;
+import org.netbeans.api.project.Sources;
 import org.netbeans.modules.debugger.jpda.JPDADebuggerImpl;
 import org.netbeans.modules.debugger.jpda.jdi.ClassNotPreparedExceptionWrapper;
 import org.netbeans.modules.debugger.jpda.jdi.ClassTypeWrapper;
@@ -63,7 +71,10 @@ import org.netbeans.modules.debugger.jpda.truffle.PersistentValues;
 import org.netbeans.modules.debugger.jpda.truffle.access.TruffleAccess;
 import org.netbeans.modules.debugger.jpda.truffle.source.Source;
 import org.netbeans.modules.javascript2.debug.breakpoints.JSLineBreakpoint;
+import org.netbeans.spi.java.queries.BinaryForSourceQueryImplementation;
 import org.openide.filesystems.FileObject;
+import org.openide.filesystems.FileUtil;
+import org.openide.filesystems.URLMapper;
 import org.openide.util.Exceptions;
 import org.openide.util.Mutex;
 
@@ -124,7 +135,7 @@ public class TruffleBreakpointsHandler {
             }
             URI uri = Source.getTruffleInternalURI(fileObject);
             if (uri == null) {
-                uri = fileObject.toURI();
+                uri = getBinaryURI(fileObject);
             }
             ObjectReference bpImpl;
             if (bp.isEnabled()) {
@@ -147,7 +158,44 @@ public class TruffleBreakpointsHandler {
             }
         }
     }
-    
+
+    private URI getBinaryURI(FileObject fileObject) {
+        Project project;
+        try {
+            project = ProjectManager.getDefault().findProject(fileObject);
+        } catch (IOException | IllegalArgumentException e) {
+            project = null;
+        }
+        if (project != null) {
+            BinaryForSourceQueryImplementation binaryForSource = project.getLookup().lookup(BinaryForSourceQueryImplementation.class);
+            if (binaryForSource != null) {
+                Sources sources = ProjectUtils.getSources(project);
+                SourceGroup[] sourceGroups = sources.getSourceGroups(Sources.TYPE_GENERIC);
+                for (SourceGroup sourceGroup : sourceGroups) {
+                    FileObject sourceRoot = sourceGroup.getRootFolder();
+                    String relativePath = FileUtil.getRelativePath(sourceRoot, fileObject);
+                    if (relativePath != null) {
+                        BinaryForSourceQuery.Result binaryRoots = binaryForSource.findBinaryRoots(sourceRoot.toURL());
+                        if (binaryRoots != null) {
+                            URL[] roots = binaryRoots.getRoots();
+                            for (URL root : roots) {
+                                FileObject rootFo = URLMapper.findFileObject(root);
+                                if (rootFo != null) {
+                                    FileObject binaryFo = rootFo.getFileObject(relativePath);
+                                    if (binaryFo != null) {
+                                        return binaryFo.toURI();
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return fileObject.toURI();
+    }
+
     private static int getIgnoreCount(JSLineBreakpoint bp) {
         int ignoreCount = 0;
         if (Breakpoint.HIT_COUNT_FILTERING_STYLE.GREATER.equals(bp.getHitCountFilteringStyle())) {
@@ -204,7 +252,7 @@ public class TruffleBreakpointsHandler {
         if (tiuri != null) {
             uri = tiuri;
         } else {
-            uri = fileObject.toURI();
+            uri = getBinaryURI(fileObject);
         }
         final int line = bp.getLineNumber();
         final int ignoreCount = getIgnoreCount(bp);
