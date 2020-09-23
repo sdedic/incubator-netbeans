@@ -18,6 +18,7 @@
  */
 package org.netbeans.modules.java.lsp.server;
 
+import org.netbeans.modules.java.lsp.server.protocol.Server;
 import java.io.IOException;
 import org.netbeans.api.sendopts.CommandException;
 import org.netbeans.modules.java.lsp.server.debugging.Debugger;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server;
+package org.netbeans.modules.java.lsp.server.protocol;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,8 +54,6 @@ import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.api.project.Sources;
 import org.netbeans.api.project.ui.OpenProjects;
-import org.netbeans.modules.java.lsp.server.text.TextDocumentServiceImpl;
-import org.netbeans.modules.java.lsp.server.workspace.WorkspaceServiceImpl;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Exceptions;
 
@@ -67,7 +65,7 @@ public final class Server {
     private Server() {
     }
     
-    static void launchServer(InputStream in, OutputStream out) {
+    public static void launchServer(InputStream in, OutputStream out) {
         LanguageServerImpl server = new LanguageServerImpl();
         Launcher<LanguageClient> serverLauncher = LSPLauncher.createServerLauncher(server, in, out);
         ((LanguageClientAware) server).connect(serverLauncher.getRemoteProxy());

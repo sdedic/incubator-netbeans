@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server;
+package org.netbeans.modules.java.lsp.server.protocol;
 
+import org.netbeans.modules.java.lsp.server.protocol.Server;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;

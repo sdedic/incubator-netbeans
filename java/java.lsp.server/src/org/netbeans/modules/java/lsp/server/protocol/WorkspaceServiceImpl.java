@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.workspace;
+package org.netbeans.modules.java.lsp.server.protocol;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -39,7 +39,7 @@ import org.netbeans.api.debugger.ActionsManager;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ui.OpenProjects;
-import org.netbeans.modules.java.lsp.server.Server;
+import org.netbeans.modules.java.lsp.server.ui.UIContext;
 import org.netbeans.modules.java.lsp.server.utils.IOProviderImpl;
 import org.netbeans.spi.project.ActionProvider;
 import org.openide.util.Lookup;
@@ -56,6 +56,7 @@ public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAwa
 
     private final IOProvider ioProvider;
     private LanguageClient client;
+    private UIContext ctx;
 
     public WorkspaceServiceImpl() {
         final Pair<InputStream, OutputStream> out = IOProviderImpl.createCopyingStreams();
@@ -76,7 +77,7 @@ public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAwa
                 for (Project prj : OpenProjects.getDefault().getOpenProjects()) {
                     ActionProvider ap = prj.getLookup().lookup(ActionProvider.class);
                     if (ap != null && ap.isActionEnabled(ActionProvider.COMMAND_BUILD, Lookups.fixed())) {
-                        Lookups.executeWith(new ProxyLookup(Lookups.fixed(ioProvider), Lookup.getDefault()), () -> {
+                        Lookups.executeWith(new ProxyLookup(Lookups.fixed(ctx, ioProvider), Lookup.getDefault()), () -> {
                             ap.invokeAction(ActionProvider.COMMAND_REBUILD, Lookups.fixed());
                         });
                     }
@@ -105,6 +106,17 @@ public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAwa
     @Override
     public void connect(LanguageClient client) {
         this.client = client;
+        this.ctx = new UIContext() {
+            @Override
+            protected boolean isValid() {
+                return true;
+            }
+
+            @Override
+            protected void showMessage(MessageParams msg) {
+                client.showMessage(msg);
+            }
+        };
     }
 
     private class StreamPrinter extends Thread {
