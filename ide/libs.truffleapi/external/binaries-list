@@ -14,17 +14,4 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-OpenIDE-Module-Name=Apple Application Menu for JDK9+
-OpenIDE-Module-Display-Category=Infrastructure
-OpenIDE-Module-Short-Description=Enables proper support for the Apple Application menu on JDK9+
-
-OpenIDE-Module-Long-Description=Enables Apple menu items to work properly, \
-    and moves some standard menu items there - Tools | Options becomes \
-    Preferences, Help | About becomes about, File | Exit becomes Quit.
-
-
-Toolbars/QuickSearch=&Quick Search
-
-CTL_ShowInFinder=Show In Finder
-TXT_NoLocalFile=Cannot find selected file.
+741A86577A73D5B3DE19B688F87B869E14E6349B org.graalvm.truffle:truffle-api:20.2.0

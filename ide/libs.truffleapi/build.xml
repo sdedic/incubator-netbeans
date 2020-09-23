@@ -19,7 +19,7 @@
     under the License.
 
 -->
-
-<project name="platform/applemenu.jdk9" basedir="." default="build">
-  <import file="../../nbbuild/templates/projectized.xml"/>
+<project basedir="." default="build" name="ide/libs.truffleapi">
+    <description>Builds, tests, and runs the project org.netbeans.libs.truffleapi</description>
+    <import file="../../nbbuild/templates/projectized.xml"/>
 </project>
