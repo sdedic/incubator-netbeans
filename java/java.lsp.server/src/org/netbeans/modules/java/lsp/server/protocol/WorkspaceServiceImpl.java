@@ -18,11 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.protocol;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
@@ -39,14 +34,12 @@ import org.netbeans.api.debugger.ActionsManager;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ui.OpenProjects;
+import org.netbeans.modules.java.lsp.server.ui.IOContext;
 import org.netbeans.modules.java.lsp.server.ui.UIContext;
-import org.netbeans.modules.java.lsp.server.utils.IOProviderImpl;
 import org.netbeans.spi.project.ActionProvider;
 import org.openide.util.Lookup;
-import org.openide.util.Pair;
 import org.openide.util.lookup.Lookups;
 import org.openide.util.lookup.ProxyLookup;
-import org.openide.windows.IOProvider;
 
 /**
  *
@@ -54,16 +47,12 @@ import org.openide.windows.IOProvider;
  */
 public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAware {
 
-    private final IOProvider ioProvider;
     private LanguageClient client;
     private UIContext ctx;
+    private final WorkspaceContext ioContext;
 
     public WorkspaceServiceImpl() {
-        final Pair<InputStream, OutputStream> out = IOProviderImpl.createCopyingStreams();
-        final Pair<InputStream, OutputStream> err = IOProviderImpl.createCopyingStreams();
-        this.ioProvider = new IOProviderImpl(out.second(), err.second());
-        StreamPrinter sp = new StreamPrinter(out.first());
-        sp.start();
+        this.ioContext = new WorkspaceContext();
     }
 
     @Override
@@ -77,7 +66,7 @@ public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAwa
                 for (Project prj : OpenProjects.getDefault().getOpenProjects()) {
                     ActionProvider ap = prj.getLookup().lookup(ActionProvider.class);
                     if (ap != null && ap.isActionEnabled(ActionProvider.COMMAND_BUILD, Lookups.fixed())) {
-                        Lookups.executeWith(new ProxyLookup(Lookups.fixed(ctx, ioProvider), Lookup.getDefault()), () -> {
+                        Lookups.executeWith(new ProxyLookup(Lookups.fixed(ctx, ioContext), Lookup.getDefault()), () -> {
                             ap.invokeAction(ActionProvider.COMMAND_REBUILD, Lookups.fixed());
                         });
                     }
@@ -119,26 +108,24 @@ public class WorkspaceServiceImpl implements WorkspaceService, LanguageClientAwa
         };
     }
 
-    private class StreamPrinter extends Thread {
-
-        InputStream is;
-
-        public StreamPrinter(InputStream stream) {
-            is = stream;
+    private class WorkspaceContext extends IOContext {
+        @Override
+        protected void stdOut(String line) {
+            if (client != null) {
+                client.logMessage(new MessageParams(MessageType.Info, line));
+            }
         }
 
-        public void run() {
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
-                String line = br.readLine();
-                while (line != null) {
-                    if (client != null) {
-                        client.logMessage(new MessageParams(MessageType.Info, line));
-                    }
-                    line = br.readLine();
-                }
-            } catch (IOException ioe) {
-                throw new RuntimeException(ioe);
+        @Override
+        protected void stdErr(String line) {
+            if (client != null) {
+                client.logMessage(new MessageParams(MessageType.Error, line));
             }
+        }
+
+        @Override
+        protected boolean isValid() {
+            return client != null;
         }
     }
 }

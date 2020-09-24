@@ -39,7 +39,6 @@ import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
 import org.netbeans.modules.java.lsp.server.debugging.LaunchMode;
 import org.netbeans.modules.java.lsp.server.debugging.NbSourceProvider;
 import org.netbeans.modules.java.lsp.server.debugging.launch.ILaunchDelegate;
-import org.netbeans.modules.java.lsp.server.debugging.launch.NbLaunchDelegate;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbLaunchWithDebuggingDelegate;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbLaunchWithoutDebuggingDelegate;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbProcessConsole;
@@ -55,7 +54,6 @@ import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
 import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
-import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
 /**
  *

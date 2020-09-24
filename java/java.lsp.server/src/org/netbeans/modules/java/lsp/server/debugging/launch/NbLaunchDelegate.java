@@ -21,9 +21,6 @@ package org.netbeans.modules.java.lsp.server.debugging.launch;
 import com.sun.jdi.VMDisconnectedException;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,7 +28,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.netbeans.api.annotations.common.CheckForNull;
@@ -48,7 +44,7 @@ import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
 import org.netbeans.modules.java.lsp.server.debugging.IDebugSession;
 import org.netbeans.modules.java.lsp.server.debugging.ISourceLookUpProvider;
 import org.netbeans.modules.java.lsp.server.debugging.NbSourceProvider;
-import org.netbeans.modules.java.lsp.server.utils.IOProviderImpl;
+import org.netbeans.modules.java.lsp.server.ui.IOContext;
 import org.netbeans.spi.project.ActionProgress;
 import org.netbeans.spi.project.ActionProvider;
 import org.openide.filesystems.FileObject;
@@ -56,7 +52,6 @@ import org.openide.util.Lookup;
 import org.openide.util.Pair;
 import org.openide.util.lookup.Lookups;
 import org.openide.util.lookup.ProxyLookup;
-import org.openide.windows.IOProvider;
 
 /**
  *
@@ -72,32 +67,13 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
             if (providerAndCommand == null) {
                 throw new VMDisconnectedException("Cannot find debug action!"); //TODO: message, locations
             }
-            Pair<InputStream, OutputStream> outPair = IOProviderImpl.createCopyingStreams();
-            InputStream out = outPair.first();
-            Pair<InputStream, OutputStream> errPair = IOProviderImpl.createCopyingStreams();
-            InputStream err = errPair.first();
-            IOProvider ioProvider = new IOProviderImpl(outPair.second(), errPair.second());
+            NbProcessConsole ioContext = new NbProcessConsole(consoleMessages);
             ActionProgress progress = new ActionProgress() {
                 @Override
                 protected void started() {}
                 @Override
                 public void finished(boolean success) {
-                    try {
-                        outPair.second().close();
-                    } catch (IOException ex) {
-                        LOG.log(Level.FINE, null, ex);
-                    }
-                    try {
-                        errPair.second().close();
-                    } catch (IOException ex) {
-                        LOG.log(Level.FINE, null, ex);
-                    }
-                    /*
-                    synchronized (LaunchingVirtualMachine.this) {
-                        exitCode = success ? 0 : 1;
-                        finished = true;
-                        LaunchingVirtualMachine.this.notifyAll();
-                    }*/
+                    ioContext.stop();
                 }
             };
             CompletableFuture<Void> launchFuture = new CompletableFuture<>();
@@ -130,9 +106,13 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
                 launchFuture.complete(null);
             }
 
-            new NbProcessConsole(Pair.of(out, err), debug ? "Debuggee" : "Run", context.getDebuggeeEncoding(), consoleMessages);
-            Lookups.executeWith(new ProxyLookup(Lookups.fixed(ioProvider), Lookup.getDefault()), () -> {
-                providerAndCommand.first().invokeAction(providerAndCommand.second(), Lookups.fixed(toRun, ioProvider, progress));
+            Lookup launchCtx = new ProxyLookup(
+                Lookups.fixed(
+                    toRun, ioContext, progress
+                ), Lookup.getDefault()
+            );
+            Lookups.executeWith(launchCtx, () -> {
+                providerAndCommand.first().invokeAction(providerAndCommand.second(), Lookups.fixed(toRun, ioContext, progress));
             });
             return launchFuture;
     }

@@ -18,20 +18,14 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.Charset;
 import java.util.function.Consumer;
 import org.netbeans.modules.java.lsp.server.debugging.protocol.Events.OutputEvent.Category;
-import org.openide.util.Pair;
+import org.netbeans.modules.java.lsp.server.ui.IOContext;
 
-public final class NbProcessConsole {
+public final class NbProcessConsole extends IOContext {
 
     private final Consumer<ConsoleMessage> messageConsumer;
-    private final MessagesProvider outputProvider;
-    private final MessagesProvider errorProvider;
+    private boolean stopped;
 
     /**
      * Constructor.
@@ -42,57 +36,32 @@ public final class NbProcessConsole {
      * @param encoding
      *              the process encoding format
      */
-    NbProcessConsole(Pair<InputStream, InputStream> outErrStreams, String name, Charset encoding, Consumer<ConsoleMessage> messageConsumer) {
+    NbProcessConsole(Consumer<ConsoleMessage> messageConsumer) {
         this.messageConsumer = messageConsumer;
-        outputProvider = new MessagesProvider(name + " OUT", outErrStreams.first(), encoding, Category.stdout);
-        errorProvider = new MessagesProvider(name + " ERR", outErrStreams.second(), encoding, Category.stderr);
-        outputProvider.start();
-        errorProvider.start();
     }
 
     /**
      * Stop monitoring the process console.
      */
     public void stop() {
-        outputProvider.interrupt();
-        errorProvider.interrupt();
+        stopped = true;
     }
 
-    private final class MessagesProvider extends Thread {
+    @Override
+    protected void stdOut(String line) {
+        ConsoleMessage msg = new ConsoleMessage(line, Category.stdout);
+        messageConsumer.accept(msg);
+    }
 
-        private static final int BUFFER_LENGTH = 2048;
+    @Override
+    protected void stdErr(String line) {
+        ConsoleMessage msg = new ConsoleMessage(line, Category.stderr);
+        messageConsumer.accept(msg);
+    }
 
-        private final Reader reader;
-        private final Category category;
-        private char[] buffer = new char[BUFFER_LENGTH];
-
-        MessagesProvider(String name, InputStream inputStream, Charset encoding, Category category) {
-            super(name);
-            setDaemon(true);
-            this.reader = new InputStreamReader(inputStream, encoding);
-            this.category = category;
-        }
-
-        @Override
-        public void run() {
-            int length;
-            try {
-                while ((length = reader.read(buffer, 0, BUFFER_LENGTH)) != -1) {
-                    String text = new String(buffer, 0, length);
-                    String[] lines = text.split("(?<=\n)");
-                    for (String line : lines) {
-                        messageConsumer.accept(new ConsoleMessage(line, category));
-                    }
-                    if (Thread.interrupted()) {
-                        break;
-                    }
-                }
-            } catch (IOException ex) {
-                // EOF
-            } finally {
-                messageConsumer.accept(null); // EOF
-            }
-        }
+    @Override
+    protected boolean isValid() {
+        return !stopped;
     }
 
     public static final class ConsoleMessage {
