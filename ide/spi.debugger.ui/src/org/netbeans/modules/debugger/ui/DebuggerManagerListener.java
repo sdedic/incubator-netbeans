@@ -557,8 +557,9 @@ public class DebuggerManagerListener extends DebuggerManagerAdapter {
                 });*/
             }
         }
-        //closeToolbar(engine, doCloseToolbar);
-        closeToolbar(engine);
+        if (!GraphicsEnvironment.isHeadless()) {
+            closeToolbar(engine);
+        }
     }
 
     private void closeToolbar(DebuggerEngine engine) {
