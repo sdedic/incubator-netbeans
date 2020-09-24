@@ -40,6 +40,7 @@ import org.openide.filesystems.URLMapper;
 public final class SourceBinaryTranslator {
 
     private static final String[] SOURCE_IDS = new String[] {JavaProjectConstants.SOURCES_TYPE_RESOURCES, JavaProjectConstants.SOURCES_TYPE_JAVA, JavaProjectConstants.SOURCES_TYPE_MODULES};
+
     /**
      * Returns a file from binary location, that corresponds to the provided one.
      * If none is found, the provided file's URI is returned.
@@ -63,13 +64,12 @@ public final class SourceBinaryTranslator {
                                     FileObject rootFo = URLMapper.findFileObject(root);
                                     if (rootFo != null) {
                                         FileObject binaryFo = rootFo.getFileObject(relativePath);
-                                        if (binaryFo != null) {
+                                        if (binaryFo != null && binaryFo.getSize() == fileObject.getSize()) {
                                             return binaryFo.toURI();
                                         }
                                     }
                                 }
                             }
-                            break;
                         }
                     }
                 }
@@ -109,7 +109,7 @@ public final class SourceBinaryTranslator {
                                         String relativePath = FileUtil.getRelativePath(rootFo, fileObject);
                                         if (relativePath != null) {
                                             FileObject sourceFo = sourceRoot.getFileObject(relativePath);
-                                            if (sourceFo != null) {
+                                            if (sourceFo != null && sourceFo.getSize() == fileObject.getSize()) {
                                                 return sourceFo.toURI();
                                             }
                                         }
