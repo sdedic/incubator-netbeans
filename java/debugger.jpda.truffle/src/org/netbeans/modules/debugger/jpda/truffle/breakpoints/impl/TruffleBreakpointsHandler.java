@@ -70,6 +70,7 @@ import org.netbeans.modules.debugger.jpda.models.JPDAThreadImpl;
 import org.netbeans.modules.debugger.jpda.truffle.PersistentValues;
 import org.netbeans.modules.debugger.jpda.truffle.access.TruffleAccess;
 import org.netbeans.modules.debugger.jpda.truffle.source.Source;
+import org.netbeans.modules.debugger.jpda.truffle.source.SourceBinaryTranslator;
 import org.netbeans.modules.javascript2.debug.breakpoints.JSLineBreakpoint;
 import org.netbeans.spi.java.queries.BinaryForSourceQueryImplementation;
 import org.openide.filesystems.FileObject;
@@ -135,7 +136,7 @@ public class TruffleBreakpointsHandler {
             }
             URI uri = Source.getTruffleInternalURI(fileObject);
             if (uri == null) {
-                uri = getBinaryURI(fileObject);
+                uri = SourceBinaryTranslator.source2Binary(fileObject);
             }
             ObjectReference bpImpl;
             if (bp.isEnabled()) {
@@ -157,43 +158,6 @@ public class TruffleBreakpointsHandler {
                 impls.add(bpEntry.getValue());
             }
         }
-    }
-
-    private URI getBinaryURI(FileObject fileObject) {
-        Project project;
-        try {
-            project = ProjectManager.getDefault().findProject(fileObject);
-        } catch (IOException | IllegalArgumentException e) {
-            project = null;
-        }
-        if (project != null) {
-            BinaryForSourceQueryImplementation binaryForSource = project.getLookup().lookup(BinaryForSourceQueryImplementation.class);
-            if (binaryForSource != null) {
-                Sources sources = ProjectUtils.getSources(project);
-                SourceGroup[] sourceGroups = sources.getSourceGroups(Sources.TYPE_GENERIC);
-                for (SourceGroup sourceGroup : sourceGroups) {
-                    FileObject sourceRoot = sourceGroup.getRootFolder();
-                    String relativePath = FileUtil.getRelativePath(sourceRoot, fileObject);
-                    if (relativePath != null) {
-                        BinaryForSourceQuery.Result binaryRoots = binaryForSource.findBinaryRoots(sourceRoot.toURL());
-                        if (binaryRoots != null) {
-                            URL[] roots = binaryRoots.getRoots();
-                            for (URL root : roots) {
-                                FileObject rootFo = URLMapper.findFileObject(root);
-                                if (rootFo != null) {
-                                    FileObject binaryFo = rootFo.getFileObject(relativePath);
-                                    if (binaryFo != null) {
-                                        return binaryFo.toURI();
-                                    }
-                                }
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-        return fileObject.toURI();
     }
 
     private static int getIgnoreCount(JSLineBreakpoint bp) {
@@ -252,7 +216,7 @@ public class TruffleBreakpointsHandler {
         if (tiuri != null) {
             uri = tiuri;
         } else {
-            uri = getBinaryURI(fileObject);
+            uri = SourceBinaryTranslator.source2Binary(fileObject);
         }
         final int line = bp.getLineNumber();
         final int ignoreCount = getIgnoreCount(bp);
