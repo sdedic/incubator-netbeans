@@ -29,14 +29,14 @@ import org.netbeans.modules.java.lsp.server.debugging.utils.UsageDataSession;
 
 public class NbProtocolServer extends AbstractProtocolServer {
 
-    private static final Logger LOGGER = Logger.getLogger(NbProtocolServer.class.getName());
+    private static final Logger LOG = Logger.getLogger(NbProtocolServer.class.getName());
 
-    private IDebugAdapter debugAdapter;
-    private UsageDataSession usageDataSession = new UsageDataSession();
+    private final IDebugAdapter debugAdapter;
+    private final UsageDataSession usageDataSession = new UsageDataSession();
 
-    private Object lock = new Object();
+    private final Object lock = new Object();
     private boolean isDispatchingRequest = false;
-    private ConcurrentLinkedQueue<DebugEvent> eventQueue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<DebugEvent> eventQueue = new ConcurrentLinkedQueue<>();
 
     /**
      * Constructs a protocol server instance based on the given input stream and output stream.
@@ -71,21 +71,21 @@ public class NbProtocolServer extends AbstractProtocolServer {
 
     @Override
     public CompletableFuture<Messages.Response> sendRequest(Messages.Request request) {
-        System.out.println("SEND REQUEST: " + request.command + " " + request.arguments);
+        LOG.log(Level.FINE, "SEND REQUEST: {0} {1}", new Object[]{request.command, request.arguments});
         usageDataSession.recordRequest(request);
         return super.sendRequest(request);
     }
 
     @Override
     public CompletableFuture<Messages.Response> sendRequest(Messages.Request request, long timeout) {
-        System.out.println("SEND REQUEST: " + request.command + " " + request.arguments);
+        LOG.log(Level.FINE, "SEND REQUEST: {0} {1}", new Object[]{request.command, request.arguments});
         usageDataSession.recordRequest(request);
         return super.sendRequest(request, timeout);
     }
 
     @Override
     public void sendEvent(DebugEvent event) {
-        System.out.println("SEND Event: " + event.type + " " + event);
+        LOG.log(Level.FINE, "SEND Event: {0} {1}", new Object[]{event.type, event});
         // See the two bugs https://github.com/Microsoft/java-debug/issues/134 and https://github.com/Microsoft/vscode/issues/58327,
         // it requires the java-debug to send the StoppedEvent after ContinueResponse/StepResponse is received by DA.
         if (event instanceof StoppedEvent) {
@@ -121,7 +121,7 @@ public class NbProtocolServer extends AbstractProtocolServer {
             debugAdapter.dispatchRequest(request).thenCompose((response) -> {
                 CompletableFuture<Void> future = new CompletableFuture<>();
                 if (response != null) {
-                    System.out.println("Response: " + response.command + " " + response.message + " body = " + response.body);
+                    LOG.log(Level.FINE, "Response: {0} {1} body = {2}", new Object[]{response.command, response.message, response.body});
                     sendResponse(response);
                     future.complete(null);
                 } else {
@@ -129,11 +129,15 @@ public class NbProtocolServer extends AbstractProtocolServer {
                             ErrorCode.UNKNOWN_FAILURE.getId()));
                 }
                 return future;
-            }).exceptionally((ex) -> {
+            }).exceptionally((error) -> {
                 Messages.Response response = new Messages.Response(request.seq, request.command);
-                if (ex instanceof CompletionException && ex.getCause() != null) {
-                    ex = ex.getCause();
+                Throwable ex;
+                if (error instanceof CompletionException && error.getCause() != null) {
+                    ex = error.getCause();
+                } else {
+                    ex = error;
                 }
+                assert ex != null;
 
                 if (ex instanceof VMDisconnectedException) {
                     // mark it success to avoid reporting error on VSCode.
@@ -146,7 +150,7 @@ public class NbProtocolServer extends AbstractProtocolServer {
                     if (isUserError) {
                         usageDataSession.recordUserError(errorCode);
                     } else {
-                        LOGGER.log(Level.SEVERE, String.format("[error response][%s]: %s", request.command, exceptionMessage), ex);
+                        LOG.log(Level.SEVERE, String.format("[error response][%s]: %s", request.command, exceptionMessage), ex);
                     }
 
                     sendResponse(AdapterUtils.setErrorResponse(response,
