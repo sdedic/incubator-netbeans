@@ -48,7 +48,7 @@
     <target name="-set-use-jdk-javac">
         <property name="test.use.jdk.javac" value="true" />
     </target>
-    <target name="clean" depends="projectized.clean">
+    <target name="clean-vscode-ext" depends="clean" description="Cleans all VSCode related artifacts">
         <delete dir="${lsp.build.dir}" />
         <delete dir="vscode/node_modules" />
         <ant dir="vscapp" target="clean" inheritall="false" inheritrefs="false"/>
