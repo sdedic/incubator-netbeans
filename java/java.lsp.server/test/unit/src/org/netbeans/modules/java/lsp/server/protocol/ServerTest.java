@@ -177,7 +177,6 @@ public class ServerTest extends NbTestCase {
 
             @Override
             public void showMessage(MessageParams arg0) {
-                throw new UnsupportedOperationException("Not supported yet.");
             }
 
             @Override
@@ -370,7 +369,6 @@ public class ServerTest extends NbTestCase {
 
             @Override
             public void showMessage(MessageParams arg0) {
-                throw new UnsupportedOperationException("Not supported yet.");
             }
 
             @Override
@@ -489,7 +487,6 @@ public class ServerTest extends NbTestCase {
 
             @Override
             public void showMessage(MessageParams arg0) {
-                throw new UnsupportedOperationException("Not supported yet.");
             }
 
             @Override
