@@ -35,7 +35,7 @@ import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
  *
  * @author Martin Entlicher
  */
-@DebuggingView.DVSupport.Registration(path="netbeans-JPDASession", position = 10)
+@DebuggingView.DVSupport.Registration(path="netbeans-JPDASession")
 public class DebuggingViewTruffleSupport extends DebuggingViewSupportImpl {
 
     public DebuggingViewTruffleSupport(ContextProvider lookupProvider) {
