@@ -18,7 +18,6 @@
  */
 package org.netbeans.modules.java.lsp.server.protocol;
 
-import org.netbeans.modules.java.lsp.server.protocol.Server;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -77,6 +76,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.junit.Assume;
 import org.netbeans.api.java.classpath.ClassPath;
 import org.netbeans.api.java.classpath.GlobalPathRegistry;
 import org.netbeans.api.java.source.JavaSource;
@@ -207,7 +207,9 @@ public class ServerTest extends NbTestCase {
         assertDiags(diags, "Error:0:31-0:34");//hints
         completion = server.getTextDocumentService().completion(new CompletionParams(new TextDocumentIdentifier(src.toURI().toString()), new Position(0, hashCodeStart + 2))).get();
         actualItems = completion.getRight().getItems().stream().map(ci -> ci.getKind() + ":" + ci.getLabel()).collect(Collectors.toList());
-        assertEquals(Arrays.asList("Method:equals(Object anObject) : boolean", "Method:equalsIgnoreCase(String anotherString) : boolean"), actualItems);
+        if (jdk9Plus()) {
+            assertEquals(Arrays.asList("Method:equals(Object anObject) : boolean", "Method:equalsIgnoreCase(String anotherString) : boolean"), actualItems);
+        }
         int testStart = code.indexOf("test") + "equ".length() - "hashCode".length();
         completion = server.getTextDocumentService().completion(new CompletionParams(new TextDocumentIdentifier(src.toURI().toString()), new Position(0, testStart + 3))).get();
         List<CompletionItem> actualCompletionItem = completion.getRight().getItems();
@@ -843,7 +845,9 @@ public class ServerTest extends NbTestCase {
 
         Diagnostic unresolvable = assertDiags(diags, "Error:2:8-2:12").get(0);
         List<Either<Command, CodeAction>> codeActions = server.getTextDocumentService().codeAction(new CodeActionParams(new TextDocumentIdentifier(src.toURI().toString()), unresolvable.getRange(), new CodeActionContext(Arrays.asList(unresolvable)))).get();
-        assertEquals(2, codeActions.size());
+        if (jdk9Plus()) {
+            assertEquals(2, codeActions.size());
+        }
     }
 
     private void assertHighlights(List<? extends DocumentHighlight> highlights, String... expected) {
@@ -856,6 +860,14 @@ public class ServerTest extends NbTestCase {
         }
         assertEquals(new HashSet<>(Arrays.asList(expected)),
                      stringHighlights);
+    }
+
+    private static boolean jdk9Plus() {
+        String version = System.getProperty("java.version");
+        if (version == null || version.startsWith("1.")) {
+            return false;
+        }
+        return true;
     }
 
     //make sure files can access other files in the same directory:
