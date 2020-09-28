@@ -18,11 +18,16 @@
  */
 package org.netbeans.modules.debugger.jpda.truffle;
 
+import com.sun.jdi.ClassNotLoadedException;
+import com.sun.jdi.IncompatibleThreadStateException;
+import com.sun.jdi.InvalidTypeException;
+import com.sun.jdi.InvocationException;
 import com.sun.jdi.ObjectReference;
 import com.sun.jdi.StringReference;
 import com.sun.jdi.VirtualMachine;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import org.netbeans.modules.debugger.jpda.jdi.InternalExceptionWrapper;
 import org.netbeans.modules.debugger.jpda.jdi.ObjectCollectedExceptionWrapper;
 import org.netbeans.modules.debugger.jpda.jdi.ObjectReferenceWrapper;
@@ -69,6 +74,34 @@ public final class PersistentValues {
         }
     }
 
+    public <T extends ObjectReference> T valueOf(ValueSupplier<T> valueSupplier) throws InternalExceptionWrapper, VMDisconnectedExceptionWrapper, UnsupportedOperationExceptionWrapper {
+        T value = null;
+        while (value == null) {
+            value = valueSupplier.get();
+            try {
+                ObjectReferenceWrapper.disableCollection(value);
+            } catch (ObjectCollectedExceptionWrapper ce) {
+                value = null;
+            }
+        }
+        references.add(value);
+        return value;
+    }
+
+    public <T extends ObjectReference> T invokeOf(InvokeSupplier<T> valueSupplier) throws InternalExceptionWrapper, VMDisconnectedExceptionWrapper, UnsupportedOperationExceptionWrapper, ClassNotLoadedException, IncompatibleThreadStateException, InvalidTypeException, InvocationException, ObjectCollectedExceptionWrapper {
+        T value = null;
+        while (value == null) {
+            value = valueSupplier.get();
+            try {
+                ObjectReferenceWrapper.disableCollection(value);
+            } catch (ObjectCollectedExceptionWrapper ce) {
+                value = null;
+            }
+        }
+        references.add(value);
+        return value;
+    }
+
     public void collect() {
         for (ObjectReference reference : references) {
             try {
@@ -80,5 +113,17 @@ public final class PersistentValues {
             }
         }
         references.clear();
+    }
+
+    @FunctionalInterface
+    public interface ValueSupplier<T> {
+
+        public T get() throws InternalExceptionWrapper, VMDisconnectedExceptionWrapper, UnsupportedOperationExceptionWrapper;
+    }
+
+    @FunctionalInterface
+    public interface InvokeSupplier<T> {
+
+        public T get() throws InternalExceptionWrapper, VMDisconnectedExceptionWrapper, UnsupportedOperationExceptionWrapper, ClassNotLoadedException, IncompatibleThreadStateException, InvalidTypeException, InvocationException, ObjectCollectedExceptionWrapper;
     }
 }
