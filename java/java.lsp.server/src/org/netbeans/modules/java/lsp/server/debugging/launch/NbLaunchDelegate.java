@@ -83,6 +83,7 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
                     public void sessionAdded(Session session) {
                         JPDADebugger debugger = session.lookupFirst(null, JPDADebugger.class);
                         if (debugger != null) {
+                            DebuggerManager.getDebuggerManager().removeDebuggerListener(this);
                             Map properties = session.lookupFirst(null, Map.class);
                             NbSourceProvider sourceProvider = (NbSourceProvider) context.getProvider(ISourceLookUpProvider.class);
                             sourceProvider.setSourcePath(properties != null ? (ClassPath) properties.getOrDefault("sourcepath", ClassPath.EMPTY) : ClassPath.EMPTY);
