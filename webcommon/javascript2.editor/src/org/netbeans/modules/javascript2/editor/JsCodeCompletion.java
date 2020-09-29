@@ -380,7 +380,7 @@ class JsCodeCompletion implements CodeCompletionHandler2 {
     public String getPrefix(ParserResult info, int caretOffset, boolean upToOffset) {
         String prefix = "";
 
-        BaseDocument doc = (BaseDocument) info.getSnapshot().getSource().getDocument(false);
+        Document doc = info.getSnapshot().getSource().getDocument(false);
         if (doc == null) {
             return null;
         }

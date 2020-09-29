@@ -19,6 +19,7 @@
 package org.netbeans.modules.javascript2.editor;
 
 import javax.swing.text.BadLocationException;
+import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 import org.netbeans.api.editor.mimelookup.MimePath;
 import org.netbeans.api.editor.mimelookup.MimeRegistration;
@@ -77,6 +78,7 @@ public class JsDeletedTextInterceptor implements DeletedTextInterceptor {
 
     @Override
     public void remove(Context context) throws BadLocationException {
+        // Can be replaced by LineDocument, except perhaps the getChars(), which is optimized.
         BaseDocument doc = (BaseDocument) context.getDocument();
 
         int dotPos = context.getOffset() - 1;
