@@ -192,7 +192,7 @@ public abstract class CslTestBase extends NbTestCase {
     }
 
     private Map<String, ClassPath> classPathsForTest;
-    private static Object[] extraLookupContent = null;
+    private Object[] extraLookupContent = null;
 
     @Override
     protected void setUp() throws Exception {
@@ -231,13 +231,22 @@ public abstract class CslTestBase extends NbTestCase {
 
         Repository repository = new Repository(system);
         // This has to be before touching ClassPath cla
+        
+        Object[] subExtra = createExtraMockLookupContent();
+        if (subExtra == null) {
+            subExtra = new Object[0];
+        }
 
-        extraLookupContent = new Object[additionalLookupContent.length + 1];
-
-        System.arraycopy(additionalLookupContent, 0, extraLookupContent, 1, additionalLookupContent.length);
-
+        extraLookupContent = new Object[additionalLookupContent.length + subExtra.length + 1 + 2];
+        int at = 1;
+        System.arraycopy(subExtra, 0, extraLookupContent, 1, subExtra.length);
+        at += subExtra.length;
+        System.arraycopy(additionalLookupContent, 0, extraLookupContent, subExtra.length + 1, additionalLookupContent.length);
+        at += additionalLookupContent.length;
         extraLookupContent[0] = repository;
-        MockLookup.setInstances(extraLookupContent, new TestClassPathProvider(), new TestPathRecognizer());
+        extraLookupContent[at++] = new TestClassPathProvider();
+        extraLookupContent[at++] = new TestPathRecognizer();
+        MockLookup.setInstances(extraLookupContent);
 
         classPathsForTest = createClassPathsForTest();
         if (classPathsForTest != null) {
@@ -257,6 +266,15 @@ public abstract class CslTestBase extends NbTestCase {
             w.waitForScanToFinish();
             logger.removeHandler(w);
         }
+    }
+    
+    /**
+     * Injects specific services into MockLookup, in preference to the standard ones.
+     * @return instances to inject into the Lookup; {@code null} if none.
+     * @since 2.65
+     */
+    protected Object[] createExtraMockLookupContent() {
+        return new Object[0];
     }
 
     @Override
