@@ -96,7 +96,7 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
                                         IDebugSession debugSession = new NbDebugSession(debugger);
                                         context.setDebugSession(debugSession);
                                         launchFuture.complete(null);
-                                        context.getProvider(IConfigurationSemaphore.class).waitForConfigutaionDone();
+                                        context.getProvider(IConfigurationSemaphore.class).waitForConfigurationDone();
                                     }
                                 }
                             });

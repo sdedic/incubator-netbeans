@@ -1,14 +1,21 @@
-/*******************************************************************************
-* Copyright (c) 2017 Microsoft Corporation and others.
-* All rights reserved. This program and the accompanying materials
-* are made available under the terms of the Eclipse Public License v1.0
-* which accompanies this distribution, and is available at
-* http://www.eclipse.org/legal/epl-v10.html
-*
-* Contributors:
-*     Microsoft Corporation - initial API and implementation
-*******************************************************************************/
-
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.netbeans.modules.java.lsp.server.debugging.breakpoints;
 
 import java.util.ArrayList;
@@ -20,15 +27,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class BreakpointManager {
+import org.netbeans.api.debugger.Breakpoint;
+import org.netbeans.api.debugger.DebuggerManager;
+
+public final class BreakpointManager {
 
     private static final Logger LOGGER = Logger.getLogger(BreakpointManager.class.getName());
 
-    /**
-     * A collection of breakpoints registered with this manager.
-     */
     private List<IBreakpoint> breakpoints;
-    private HashMap<String, HashMap<String, IBreakpoint>> sourceToBreakpoints;
+    private HashMap<String, HashMap<Integer, IBreakpoint>> sourceToBreakpoints;
     private AtomicInteger nextBreakpointId = new AtomicInteger(1);
 
     /**
@@ -40,33 +47,15 @@ public class BreakpointManager {
     }
 
     /**
-     * Adds breakpoints to breakpoint manager.
-     * Deletes all breakpoints that are no longer listed.
-     * @param source
-     *              source path of breakpoints
-     * @param breakpoints
-     *              full list of breakpoints that locates in this source file
-     * @return the full breakpoint list that locates in the source file
-     */
-    public IBreakpoint[] setBreakpoints(String source, IBreakpoint[] breakpoints) {
-        return setBreakpoints(source, breakpoints, false);
-    }
-
-    /**
-     * Adds breakpoints to breakpoint manager.
-     * Deletes all breakpoints that are no longer listed.
-     * In the case of modified source, delete everything.
-     * @param source
-     *              source path of breakpoints
-     * @param breakpoints
-     *              full list of breakpoints that locates in this source file
-     * @param sourceModified
-     *              the source file are modified or not.
-     * @return the full breakpoint list that locates in the source file
+     * Set breakpoints to the given source.
+     * <p>
+     * Deletes all old breakpoints from the source.
+     * 
+     * @return a new list of breakpoints in that source
      */
     public IBreakpoint[] setBreakpoints(String source, IBreakpoint[] breakpoints, boolean sourceModified) {
         List<IBreakpoint> result = new ArrayList<>();
-        HashMap<String, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
+        HashMap<Integer, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
         // When source file is modified, delete all previously added breakpoints.
         if (sourceModified && breakpointMap != null) {
             for (IBreakpoint bp : breakpointMap.values()) {
@@ -90,7 +79,7 @@ public class BreakpointManager {
         List<IBreakpoint> toAdd = new ArrayList<>();
         List<Integer> visitedLineNumbers = new ArrayList<>();
         for (IBreakpoint breakpoint : breakpoints) {
-            IBreakpoint existed = breakpointMap.get(String.valueOf(breakpoint.getLineNumber()));
+            IBreakpoint existed = breakpointMap.get(breakpoint.getLineNumber());
             if (existed != null) {
                 result.add(existed);
                 visitedLineNumbers.add(existed.getLineNumber());
@@ -116,13 +105,13 @@ public class BreakpointManager {
     }
 
     private void addBreakpointsInternally(String source, IBreakpoint[] breakpoints) {
-        Map<String, IBreakpoint> breakpointMap = this.sourceToBreakpoints.computeIfAbsent(source, k -> new HashMap<>());
+        Map<Integer, IBreakpoint> breakpointMap = this.sourceToBreakpoints.computeIfAbsent(source, k -> new HashMap<>());
 
         if (breakpoints != null && breakpoints.length > 0) {
             for (IBreakpoint breakpoint : breakpoints) {
                 breakpoint.putProperty("id", this.nextBreakpointId.getAndIncrement());
                 this.breakpoints.add(breakpoint);
-                breakpointMap.put(String.valueOf(breakpoint.getLineNumber()), breakpoint);
+                breakpointMap.put(breakpoint.getLineNumber(), breakpoint);
             }
         }
     }
@@ -131,7 +120,7 @@ public class BreakpointManager {
      * Removes the specified breakpoints from breakpoint manager.
      */
     private void removeBreakpointsInternally(String source, IBreakpoint[] breakpoints) {
-        Map<String, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
+        Map<Integer, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
         if (breakpointMap == null || breakpointMap.isEmpty() || breakpoints.length == 0) {
             return;
         }
@@ -142,7 +131,7 @@ public class BreakpointManager {
                     // Destroy the breakpoint on the debugee VM.
                     breakpoint.close();
                     this.breakpoints.remove(breakpoint);
-                    breakpointMap.remove(String.valueOf(breakpoint.getLineNumber()));
+                    breakpointMap.remove(breakpoint.getLineNumber());
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, String.format("Remove breakpoint exception: %s", e.toString()), e);
                 }
@@ -158,7 +147,7 @@ public class BreakpointManager {
      * Gets the registered breakpoints at the source file.
      */
     public IBreakpoint[] getBreakpoints(String source) {
-        HashMap<String, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
+        HashMap<Integer, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
         if (breakpointMap == null) {
             return new IBreakpoint[0];
         }
@@ -166,9 +155,15 @@ public class BreakpointManager {
     }
 
     /**
-     * Cleanup all breakpoints and reset the breakpoint id counter.
+     * Breakpoints are always being set from the client. We must clean them so that
+     * they are not duplicated on the next start.
      */
-    public void reset() {
+    public void disposeBreakpoints() {
+        DebuggerManager debuggerManager = DebuggerManager.getDebuggerManager();
+        for (IBreakpoint breakpoint : breakpoints) {
+            debuggerManager.removeBreakpoint(breakpoint.getNBBreakpoint());
+        }
+        debuggerManager.removeAllWatches();
         this.sourceToBreakpoints.clear();
         this.breakpoints.clear();
         this.nextBreakpointId.set(1);

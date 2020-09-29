@@ -145,4 +145,9 @@ final class NbSetBreakpointsRequestHandler implements DebuggerRequestHandler {
         return breakpoints;
     }
 
+    @Override
+    public void dispose(IDebugAdapterContext debugContext) {
+        manager.disposeBreakpoints();
+    }
+
 }

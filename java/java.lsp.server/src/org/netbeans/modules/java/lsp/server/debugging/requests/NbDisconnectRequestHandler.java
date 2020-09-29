@@ -28,12 +28,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
 import org.netbeans.modules.java.lsp.server.debugging.IDebugSession;
+import org.netbeans.modules.java.lsp.server.debugging.IShutdownProvider;
 import org.netbeans.modules.java.lsp.server.debugging.LaunchMode;
 import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages.Response;
 import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
 import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
 import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.DisconnectArguments;
-import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
 /**
  *
@@ -66,6 +66,7 @@ final class NbDisconnectRequestHandler implements DebuggerRequestHandler {
                 debugSession.detach();
             }
         }
+        context.getProvider(IShutdownProvider.class).shutDown();
     }
 
     /**

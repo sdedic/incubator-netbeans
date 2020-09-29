@@ -24,4 +24,7 @@ public interface DebuggerRequestHandler {
 
     CompletableFuture<Response> handle(Command command, Arguments arguments, Response response, IDebugAdapterContext context);
 
+    default void dispose(IDebugAdapterContext debugContext) {
+    }
+
 }

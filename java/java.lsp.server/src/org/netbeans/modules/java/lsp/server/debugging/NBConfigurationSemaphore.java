@@ -28,7 +28,7 @@ public class NBConfigurationSemaphore implements IConfigurationSemaphore {
 
     private final Semaphore s = new Semaphore(0);
 
-    public void waitForConfigutaionDone() {
+    public void waitForConfigurationDone() {
         try {
             s.acquire();
         } catch (InterruptedException e) {

@@ -36,6 +36,7 @@ public class NbDebugAdapter implements IDebugAdapter {
      * Constructor.
      */
     public NbDebugAdapter(IProtocolServer server, IProviderContext providerContext) {
+        providerContext.registerProvider(IShutdownProvider.class, new ShutdownHandler());
         this.debugContext = new DebugAdapterContext(server, providerContext);
         this.handlers = new HandlersCollection();
     }
@@ -64,4 +65,12 @@ public class NbDebugAdapter implements IDebugAdapter {
         }
     }
 
+    private class ShutdownHandler implements IShutdownProvider {
+
+        @Override
+        public void shutDown() {
+            handlers.shutDown(debugContext);
+        }
+        
+    }
 }

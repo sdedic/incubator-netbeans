@@ -66,7 +66,6 @@ public final class NbDebugSession implements IDebugSession {
     @Override
     public void terminate() {
         debugger.finish();
-        cleanBreakpoints();
     }
 
     @Override
@@ -89,15 +88,4 @@ public final class NbDebugSession implements IDebugSession {
         throw new UnsupportedOperationException("Not supported.");
     }
 
-    /**
-     * Breakpoints are always being set from the client. We must clean them so that
-     * they are not duplicated on the next start.
-     */
-    private static void cleanBreakpoints() {
-        DebuggerManager debuggerManager = DebuggerManager.getDebuggerManager();
-        for (Breakpoint breakpoint : debuggerManager.getBreakpoints()) {
-            debuggerManager.removeBreakpoint(breakpoint);
-        }
-        debuggerManager.removeAllWatches();
-    }
 }

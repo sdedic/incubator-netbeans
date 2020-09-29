@@ -19,7 +19,10 @@
 package org.netbeans.modules.java.lsp.server.debugging.requests;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
 
 import org.netbeans.modules.java.lsp.server.debugging.LaunchMode;
 import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
@@ -79,6 +82,15 @@ public final class HandlersCollection {
                 return noDebugHandlers.get(command);
             default:
                 throw new IllegalStateException("Unhandled mode: " + mode);
+        }
+    }
+
+    public void shutDown(IDebugAdapterContext debugContext) {
+        Set<DebuggerRequestHandler> allHandlers = new HashSet<>();
+        allHandlers.addAll(noDebugHandlers.values());
+        allHandlers.addAll(debugHandlers.values());
+        for (DebuggerRequestHandler handler : allHandlers) {
+            handler.dispose(debugContext);
         }
     }
 }

@@ -56,6 +56,11 @@ public final class NbBreakpoint implements IBreakpoint {
         this.logMessage = logMessage;
     }
 
+    @Override
+    public Breakpoint getNBBreakpoint() {
+        return breakpoint;
+    }
+
     /**
      * Interpreted as a source URL.
      */

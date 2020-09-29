@@ -12,8 +12,11 @@
 package org.netbeans.modules.java.lsp.server.debugging.breakpoints;
 
 import java.util.concurrent.CompletableFuture;
+import org.netbeans.api.debugger.Breakpoint;
 
 public interface IBreakpoint extends AutoCloseable {
+
+    Breakpoint getNBBreakpoint();
 
     String className();
 

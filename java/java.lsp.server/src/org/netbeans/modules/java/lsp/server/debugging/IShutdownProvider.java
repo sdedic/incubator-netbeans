@@ -22,10 +22,7 @@ package org.netbeans.modules.java.lsp.server.debugging;
  *
  * @author martin
  */
-public interface IConfigurationSemaphore extends IProvider {
+public interface IShutdownProvider extends IProvider {
 
-    void waitForConfigurationDone();
-
-    void notifyCongigurationDone();
-
+    void shutDown();
 }
