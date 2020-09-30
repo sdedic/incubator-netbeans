@@ -30,6 +30,7 @@ import * as net from 'net';
 import * as path from 'path';
 import { spawn, ChildProcess, SpawnOptions } from 'child_process';
 import * as vscode from 'vscode';
+import * as launcher from './launcher';
 
 let client: LanguageClient;
 let nbProcess : ChildProcess | null = null;
@@ -38,23 +39,6 @@ let debugPort: number = -1;
 export function activate(context: ExtensionContext) {
     //verify acceptable JDK is available/set:
     let specifiedJDK = workspace.getConfiguration('netbeans').get('jdkhome');
-
-    let serverPath = path.resolve(context.extensionPath, "nb-java-lsp-server", "bin", "nb-java-lsp-server");
-
-    let ideArgs: string[] = [];
-    if (specifiedJDK) {
-        ideArgs = ['--jdkhome', specifiedJDK as string];
-    }
-    let serverArgs: string[] = new Array<string>(...ideArgs);
-
-    let serverOptions = {
-        command: serverPath,
-        args: serverArgs,
-        options: {
-            stdio : ["ignore", "pipe", "ignore"],
-            cwd: workspace.rootPath
-        } as SpawnOptions
-    }
 
     vscode.extensions.all.forEach((e, index) => {
         if (e.extensionPath.indexOf("redhat.java") >= 0) {
@@ -66,10 +50,6 @@ export function activate(context: ExtensionContext) {
             });
         }
     });
-
-    // give the process some reasonable command
-    ideArgs.push("--modules");
-    ideArgs.push("--list");
 
     let log = vscode.window.createOutputChannel("Java Language Server");
     log.appendLine("Launching Java Language Server");
@@ -88,10 +68,7 @@ export function activate(context: ExtensionContext) {
                 collectedText = null;
             }
         }
-
-        let p = spawn(serverPath, ideArgs, {
-            stdio : ["ignore", "pipe", "pipe"]
-        });
+        let p = launcher.launch(context, specifiedJDK, "--modules", "--list");
         p.stdout.on('data', function(d: any) {
             logAndWaitForEnabled(d.toString());
         });
@@ -131,11 +108,12 @@ export function activate(context: ExtensionContext) {
             server.on('error', (err) => {
                 reject(err);
             });
-            server.listen(() => {
+            server.listen(async () => {
                 const address: any = server.address();
-                serverOptions.args.push(`--start-java-language-server=connect:${address.port}`);
-                serverOptions.args.push(`--start-java-debug-adapter-server=listen:0`);
-                const srv = spawn(serverOptions.command, serverOptions.args, serverOptions.options);
+                const srv = launcher.launch(context, specifiedJDK,
+                    `--start-java-language-server=connect:${address.port}`,
+                    `--start-java-debug-adapter-server=listen:0`
+                );
                 if (!srv) {
                     reject();
                 } else {

@@ -31,12 +31,7 @@
     <target name="build-lsp-server" depends="-set-use-jdk-javac,build,test-init,proxy-setup" description="Prepares NetBeans bits for vscode extensions">
         <ant dir="vscapp" target="build-zip" inheritall="false" inheritrefs="false" />
         <unzip src="vscapp/dist/nb-java-lsp-server.zip" dest="${lsp.build.dir}/../" />
-        <mkdir dir="${lsp.build.dir}/bin" />
-        <copy todir="${lsp.build.dir}/bin" file="script/bin/nb-java-lsp-server" overwrite="true" />
-        <mkdir dir="${lsp.build.dir}/etc" />
-        <copy todir="${lsp.build.dir}/etc" file="script/etc/nb-java-lsp-server.conf" overwrite="true" />
-        <copy todir="${lsp.build.dir}/etc" file="script/etc/nb-java-lsp-server.clusters" overwrite="true" />
-        <chmod file="${lsp.build.dir}/bin/nb-java-lsp-server" perm="u+x" />
+        <chmod file="${lsp.build.dir}/platform/lib/nbexec" perm="u+x"/>
         <chmod file="${lsp.build.dir}/java/maven/bin/mvn" perm="u+x" />
         <delete file="${lsp.build.dir}/lib/nb-javac-9-api.jar" />
         <delete file="${lsp.build.dir}/lib/nb-javac-9-impl.jar" />
