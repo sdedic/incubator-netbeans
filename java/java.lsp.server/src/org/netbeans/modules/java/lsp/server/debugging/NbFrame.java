@@ -23,9 +23,9 @@ import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
 public final class NbFrame {
 
     private final DVFrame dvFrame;
-    private final long threadId;
+    private final int threadId;
 
-    public NbFrame(long threadId, DVFrame dvFrame) {
+    public NbFrame(int threadId, DVFrame dvFrame) {
         this.threadId = threadId;
         this.dvFrame = dvFrame;
     }
@@ -34,7 +34,7 @@ public final class NbFrame {
         return dvFrame;
     }
 
-    public long getThreadId() {
+    public int getThreadId() {
         return threadId;
     }
 }

@@ -24,7 +24,7 @@ import java.util.concurrent.Semaphore;
  *
  * @author martin
  */
-public class NBConfigurationSemaphore implements IConfigurationSemaphore {
+public class NBConfigurationSemaphore {
 
     private final Semaphore s = new Semaphore(0);
 

@@ -16,53 +16,42 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging.requests;
+package org.netbeans.modules.java.lsp.server.debugging.breakpoints;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Logger;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
-import org.netbeans.modules.java.lsp.server.debugging.breakpoints.BreakpointManager;
-import org.netbeans.modules.java.lsp.server.debugging.breakpoints.IBreakpoint;
-import org.netbeans.modules.java.lsp.server.debugging.breakpoints.NbBreakpoint;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Events;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages.Response;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.SetBreakpointArguments;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Responses;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Types;
+import org.eclipse.lsp4j.debug.Breakpoint;
+import org.eclipse.lsp4j.debug.BreakpointEventArguments;
+import org.eclipse.lsp4j.debug.SetBreakpointsArguments;
+import org.eclipse.lsp4j.debug.SetBreakpointsResponse;
+import org.eclipse.lsp4j.debug.SetExceptionBreakpointsArguments;
+import org.eclipse.lsp4j.debug.SourceBreakpoint;
+import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
 import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
 import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
-import org.netbeans.modules.java.lsp.server.debugging.requests.DebuggerRequestHandler;
 
 /**
  *
  * @author martin
  */
-final class NbSetBreakpointsRequestHandler implements DebuggerRequestHandler {
+public final class NbBreakpointsRequestHandler {
 
-    private final BreakpointManager manager = new BreakpointManager();
+    public static final String CAUGHT_EXCEPTION_FILTER_NAME = "caught";
+    public static final String UNCAUGHT_EXCEPTION_FILTER_NAME = "uncaught";
 
-    @Override
-    public List<Command> getTargetCommands() {
-        return Collections.singletonList(Command.SETBREAKPOINTS);
-    }
-
-    @Override
-    public CompletableFuture<Response> handle(Command command, Arguments arguments, Response response, IDebugAdapterContext context) {
+    public CompletableFuture<SetBreakpointsResponse> setBreakpoints(SetBreakpointsArguments arguments, DebugAdapterContext context) {
+        CompletableFuture<SetBreakpointsResponse> resultFuture = new CompletableFuture<>();
         if (context.getDebugSession() == null) {
-            return AdapterUtils.createAsyncErrorResponse(response, ErrorCode.EMPTY_DEBUG_SESSION, "Empty debug session.");
+            resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException("Empty debug session.", ErrorCode.EMPTY_DEBUG_SESSION));
+            return resultFuture;
         }
-
-        SetBreakpointArguments bpArguments = (SetBreakpointArguments) arguments;
-        String clientPath = bpArguments.source.path;
+        String clientPath = arguments.getSource().getPath();
         if (AdapterUtils.isWindows()) {
             // VSCode may send drive letters with inconsistent casing which will mess up the key
             // in the BreakpointManager. See https://github.com/Microsoft/vscode/issues/6268
@@ -82,22 +71,24 @@ final class NbSetBreakpointsRequestHandler implements DebuggerRequestHandler {
             sourcePath = AdapterUtils.convertPath(clientPath, AdapterUtils.isUri(clientPath), context.isDebuggerPathsAreUri());
         }
         if (StringUtils.isBlank(sourcePath)) {
-            throw AdapterUtils.createCompletionException(
-                String.format("Failed to setBreakpoint. Reason: '%s' is an invalid path.", bpArguments.source.path),
-                ErrorCode.SET_BREAKPOINT_FAILURE);
+            resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException(
+                String.format("Failed to setBreakpoint. Reason: '%s' is an invalid path.", arguments.getSource().getPath()),
+                ErrorCode.SET_BREAKPOINT_FAILURE));
+            return resultFuture;
         }
-
-        List<Types.Breakpoint> res = new ArrayList<>();
-        IBreakpoint[] toAdds = this.convertClientBreakpointsToDebugger(sourcePath, bpArguments.breakpoints, context);
+        List<Breakpoint> res = new ArrayList<>();
+        NbBreakpoint[] toAdds = this.convertClientBreakpointsToDebugger(sourcePath, arguments.getBreakpoints(), context);
         // See the VSCode bug https://github.com/Microsoft/vscode/issues/36471.
         // The source uri sometimes is encoded by VSCode, the debugger will decode it to keep the uri consistent.
-        IBreakpoint[] added = manager.setBreakpoints(AdapterUtils.decodeURIComponent(sourcePath), toAdds, bpArguments.sourceModified);
-        for (int i = 0; i < bpArguments.breakpoints.length; i++) {
+        NbBreakpoint[] added = context.getBreakpointManager().setBreakpoints(AdapterUtils.decodeURIComponent(sourcePath), toAdds, arguments.getSourceModified());
+        for (int i = 0; i < arguments.getBreakpoints().length; i++) {
             // For newly added breakpoint, should install it to debuggee first.
             if (toAdds[i] == added[i] && added[i].className() != null) {
                 added[i].install().thenAccept(bp -> {
-                    Events.BreakpointEvent bpEvent = new Events.BreakpointEvent("new", this.convertDebuggerBreakpointToClient(bp, context));
-                    context.getProtocolServer().sendEvent(bpEvent);
+                    BreakpointEventArguments bpEvent = new BreakpointEventArguments();
+                    bpEvent.setReason("new");
+                    bpEvent.setBreakpoint(this.convertDebuggerBreakpointToClient(bp, context));
+                    context.getClient().breakpoint(bpEvent);
                 });
             } else if (added[i].className() != null) {
                 if (toAdds[i].getHitCount() != added[i].getHitCount()) {
@@ -116,38 +107,52 @@ final class NbSetBreakpointsRequestHandler implements DebuggerRequestHandler {
             }
             res.add(this.convertDebuggerBreakpointToClient(added[i], context));
         }
-        response.body = new Responses.SetBreakpointsResponseBody(res);
-        return CompletableFuture.completedFuture(response);
+        SetBreakpointsResponse response = new SetBreakpointsResponse();
+        response.setBreakpoints(res.toArray(new Breakpoint[res.size()]));
+        resultFuture.complete(response);
+        return resultFuture;
     }
 
-    private Types.Breakpoint convertDebuggerBreakpointToClient(IBreakpoint breakpoint, IDebugAdapterContext context) {
+    public CompletableFuture<Void> setExceptionBreakpoints(SetExceptionBreakpointsArguments arguments, DebugAdapterContext context) {
+        CompletableFuture<Void> resultFuture = new CompletableFuture<>();
+        if (context.getDebugSession() == null) {
+            resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException("Empty debug session.", ErrorCode.EMPTY_DEBUG_SESSION));
+            return resultFuture;
+        }
+        String[] filters = arguments.getFilters();
+        boolean notifyCaught = ArrayUtils.contains(filters, CAUGHT_EXCEPTION_FILTER_NAME);
+        boolean notifyUncaught = ArrayUtils.contains(filters, UNCAUGHT_EXCEPTION_FILTER_NAME);
+        //TODO: context.getDebugSession().setExceptionBreakpoints(notifyCaught, notifyUncaught);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private Breakpoint convertDebuggerBreakpointToClient(NbBreakpoint breakpoint, DebugAdapterContext context) {
         int id = (int) breakpoint.getProperty("id");
         boolean verified = breakpoint.getProperty("verified") != null && (boolean) breakpoint.getProperty("verified");
         int lineNumber = AdapterUtils.convertLineNumber(breakpoint.getLineNumber(), context.isDebuggerLinesStartAt1(), context.isClientLinesStartAt1());
-        return new Types.Breakpoint(id, verified, lineNumber, "");
+        Breakpoint bp = new Breakpoint();
+        bp.setId(id);
+        bp.setVerified(verified);
+        bp.setLine(lineNumber);
+        bp.setMessage("");
+        return bp;
     }
 
-    private IBreakpoint[] convertClientBreakpointsToDebugger(String sourceFile, Types.SourceBreakpoint[] sourceBreakpoints, IDebugAdapterContext context) {
+    private NbBreakpoint[] convertClientBreakpointsToDebugger(String sourceFile, SourceBreakpoint[] sourceBreakpoints, DebugAdapterContext context) {
             //throws DebugException {
         int[] lines = Arrays.asList(sourceBreakpoints).stream().map(sourceBreakpoint -> {
-            return AdapterUtils.convertLineNumber(sourceBreakpoint.line, context.isClientLinesStartAt1(), context.isDebuggerLinesStartAt1());
+            return AdapterUtils.convertLineNumber(sourceBreakpoint.getLine(), context.isClientLinesStartAt1(), context.isDebuggerLinesStartAt1());
         }).mapToInt(line -> line).toArray();
-        IBreakpoint[] breakpoints = new IBreakpoint[lines.length];
+        NbBreakpoint[] breakpoints = new NbBreakpoint[lines.length];
         for (int i = 0; i < lines.length; i++) {
             int hitCount = 0;
             try {
-                hitCount = Integer.parseInt(sourceBreakpoints[i].hitCondition);
+                hitCount = Integer.parseInt(sourceBreakpoints[i].getHitCondition());
             } catch (NumberFormatException e) {
                 hitCount = 0; // If hitCount is an illegal number, ignore hitCount condition.
             }
-            breakpoints[i] = new NbBreakpoint(sourceFile, lines[i], hitCount, sourceBreakpoints[i].condition, sourceBreakpoints[i].logMessage);
+            breakpoints[i] = new NbBreakpoint(sourceFile, lines[i], hitCount, sourceBreakpoints[i].getCondition(), sourceBreakpoints[i].getLogMessage());
         }
         return breakpoints;
     }
-
-    @Override
-    public void dispose(IDebugAdapterContext debugContext) {
-        manager.disposeBreakpoints();
-    }
-
 }

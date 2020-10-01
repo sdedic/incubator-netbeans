@@ -19,11 +19,12 @@
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
 import java.util.function.Consumer;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Events.OutputEvent.Category;
 import org.netbeans.modules.java.lsp.server.ui.IOContext;
 
 public final class NbProcessConsole extends IOContext {
 
+    private static final String STDOUT = "stdout";
+    private static final String STDERR = "stderr";
     private final Consumer<ConsoleMessage> messageConsumer;
     private boolean stopped;
 
@@ -49,13 +50,13 @@ public final class NbProcessConsole extends IOContext {
 
     @Override
     protected void stdOut(String line) {
-        ConsoleMessage msg = new ConsoleMessage(line, Category.stdout);
+        ConsoleMessage msg = new ConsoleMessage(line, STDOUT);
         messageConsumer.accept(msg);
     }
 
     @Override
     protected void stdErr(String line) {
-        ConsoleMessage msg = new ConsoleMessage(line, Category.stderr);
+        ConsoleMessage msg = new ConsoleMessage(line, STDERR);
         messageConsumer.accept(msg);
     }
 
@@ -66,9 +67,9 @@ public final class NbProcessConsole extends IOContext {
 
     public static final class ConsoleMessage {
         public String output;
-        public Category category;
+        public String category;
 
-        public ConsoleMessage(String message, Category category) {
+        public ConsoleMessage(String message, String category) {
             this.output = message;
             this.category = category;
         }

@@ -18,19 +18,13 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import com.sun.jdi.connect.IllegalConnectorArgumentsException;
-import com.sun.jdi.connect.VMStartException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
-import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests;
+import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
 
 /**
  *
@@ -42,18 +36,19 @@ public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
 
     protected static final String TERMINAL_TITLE = "Java Process Console";
     protected static final long RUNINTERMINAL_TIMEOUT = 10 * 1000;
-    private Consumer<IDebugAdapterContext> terminateHandler;
+    private Consumer<DebugAdapterContext> terminateHandler;
 
-    public NbLaunchWithoutDebuggingDelegate(Consumer<IDebugAdapterContext> terminateHandler) {
+    public NbLaunchWithoutDebuggingDelegate(Consumer<DebugAdapterContext> terminateHandler) {
         this.terminateHandler = terminateHandler;
     }
 
-    protected static String[] constructEnvironmentVariables(Requests.LaunchArguments launchArguments) {
+    protected static String[] constructEnvironmentVariables(Map<String, Object> launchArguments) {
         String[] envVars = null;
-        if (launchArguments.env != null && !launchArguments.env.isEmpty()) {
+        Map<String, String> env = (Map<String, String>) launchArguments.get("env");
+        if (env != null && !env.isEmpty()) {
             Map<String, String> environment = new HashMap<>(System.getenv());
             List<String> duplicated = new ArrayList<>();
-            for (Map.Entry<String, String> entry : launchArguments.env.entrySet()) {
+            for (Map.Entry<String, String> entry : env.entrySet()) {
                 if (environment.containsKey(entry.getKey())) {
                     duplicated.add(entry.getKey());
                 }
@@ -75,7 +70,7 @@ public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
     }
 
     @Override
-    public void postLaunch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context) {
+    public void postLaunch(Map<String, Object> launchArguments, DebugAdapterContext context) {
         // For NO_DEBUG launch mode, the debugger does not respond to requests like
         // SetBreakpointsRequest,
         // but the front end keeps sending them according to the Debug Adapter Protocol.
@@ -86,14 +81,7 @@ public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
     }
 
     @Override
-    // XXX TODO:
-    public CompletableFuture<Messages.Response> launchInTerminal(Requests.LaunchArguments launchArguments, Messages.Response response,
-            IDebugAdapterContext context) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void preLaunch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context) {
+    public void preLaunch(Map<String, Object> launchArguments, DebugAdapterContext context) {
         // TODO Auto-generated method stub
     }
     

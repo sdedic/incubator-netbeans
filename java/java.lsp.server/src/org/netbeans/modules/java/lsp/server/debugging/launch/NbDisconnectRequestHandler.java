@@ -16,57 +16,42 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging.requests;
+package org.netbeans.modules.java.lsp.server.debugging.launch;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
-import org.netbeans.modules.java.lsp.server.debugging.IDebugSession;
-import org.netbeans.modules.java.lsp.server.debugging.IShutdownProvider;
-import org.netbeans.modules.java.lsp.server.debugging.LaunchMode;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages.Response;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Arguments;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.Command;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.DisconnectArguments;
+import org.apache.commons.lang3.BooleanUtils;
+import org.eclipse.lsp4j.debug.DisconnectArguments;
+import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
 
 /**
  *
  * @author martin
  */
-final class NbDisconnectRequestHandler implements DebuggerRequestHandler {
+public final class NbDisconnectRequestHandler {
 
     private static final Logger LOGGER = Logger.getLogger(NbDisconnectRequestHandler.class.getName());
 
-    @Override
-    public List<Command> getTargetCommands() {
-        return Arrays.asList(Command.DISCONNECT);
-    }
-
-    @Override
-    public CompletableFuture<Response> handle(Command command, Arguments arguments, Response response,
-            IDebugAdapterContext context) {
-        destroyDebugSession(command, arguments, response, context);
+    public CompletableFuture<Void> disconnect(DisconnectArguments arguments, DebugAdapterContext context) {
+        destroyDebugSession(arguments, context);
+        context.getBreakpointManager().disposeBreakpoints();
         destroyResource(context);
-        return CompletableFuture.completedFuture(response);
+        return CompletableFuture.completedFuture(null);
     }
 
-    public void destroyDebugSession(Command command, Arguments arguments, Response response, IDebugAdapterContext context) {
-        DisconnectArguments disconnectArguments = (DisconnectArguments) arguments;
-        IDebugSession debugSession = context.getDebugSession();
+    private void destroyDebugSession(DisconnectArguments arguments, DebugAdapterContext context) {
+        NbDebugSession debugSession = context.getDebugSession();
         if (debugSession != null) {
-            if (disconnectArguments.terminateDebuggee && !context.isAttached()) {
+            if (BooleanUtils.isTrue(arguments.getTerminateDebuggee()) && !context.isAttached()) {
                 debugSession.terminate();
             } else {
                 debugSession.detach();
             }
         }
-        context.getProvider(IShutdownProvider.class).shutDown();
     }
 
     /**
@@ -74,13 +59,13 @@ final class NbDisconnectRequestHandler implements DebuggerRequestHandler {
      *
      * @param context the debug context
      */
-    private void destroyResource(IDebugAdapterContext context) {
+    private void destroyResource(DebugAdapterContext context) {
         if (shouldDestroyLaunchFiles(context)) {
             destroyLaunchFiles(context);
         }
     }
 
-    private boolean shouldDestroyLaunchFiles(IDebugAdapterContext context) {
+    private boolean shouldDestroyLaunchFiles(DebugAdapterContext context) {
         // Delete the temporary launch files must happen after the debuggee process is fully exited,
         // otherwise it throws error saying the file is being used by other process.
         // In Debug mode, the debugger is able to receive VM terminate event. It's sensible to do cleanup.
@@ -88,10 +73,10 @@ final class NbDisconnectRequestHandler implements DebuggerRequestHandler {
         // when the debuggee process exited. Should do cleanup. But if the debuggee is launched in the
         // integrated/external terminal, the debugger lost the contact with the debuggee after it's launched.
         // Have no idea when the debuggee is exited. So ignore the cleanup.
-        return context.getLaunchMode() == LaunchMode.DEBUG || context.getDebuggeeProcess() != null;
+        return context.isDebugMode() || context.getDebuggeeProcess() != null;
     }
 
-    private void destroyLaunchFiles(IDebugAdapterContext context) {
+    private void destroyLaunchFiles(DebugAdapterContext context) {
         // Sometimes when the debug session is terminated, the debuggee process is not exited immediately.
         // Add retry to delete the temporary launch files.
         int retry = 5;

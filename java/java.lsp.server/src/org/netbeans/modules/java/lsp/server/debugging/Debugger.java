@@ -20,24 +20,32 @@ package org.netbeans.modules.java.lsp.server.debugging;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.logging.Logger;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import org.eclipse.lsp4j.debug.launch.DSPLauncher;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
+import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.openide.util.Exceptions;
 
 /**
  *
  * @author lahvac
  */
-public class Debugger {
+public final class Debugger {
 
-    private static final Logger LOG = Logger.getLogger(Debugger.class.getName());
+    private Debugger() {
+    }
 
     public static void startDebugger(InputStream in, OutputStream out) {
-        LOG.info("debugging requestaccepted....");
-        NbSourceProvider sourceProvider = new NbSourceProvider();
-        ProviderContext context = new ProviderContext();
-        context.registerProvider(ISourceLookUpProvider.class, sourceProvider);
-        context.registerProvider(IConfigurationSemaphore.class, new NBConfigurationSemaphore());
-        context.registerProvider(IThreadsProvider.class, new NbThreads());
-        NbProtocolServer server = new NbProtocolServer(in, out, context);
-        server.run();
+        final DebugAdapterContext context = new DebugAdapterContext();
+        NbProtocolServer server = new NbProtocolServer(context);
+        Launcher<IDebugProtocolClient> serverLauncher = DSPLauncher.createServerLauncher(server, in, out);
+        context.setClient(serverLauncher.getRemoteProxy());
+        Future<Void> runningServer = serverLauncher.startListening();
+        try {
+            runningServer.get();
+        } catch (InterruptedException | ExecutionException ex) {
+            Exceptions.printStackTrace(ex);
+        }
     }
 }

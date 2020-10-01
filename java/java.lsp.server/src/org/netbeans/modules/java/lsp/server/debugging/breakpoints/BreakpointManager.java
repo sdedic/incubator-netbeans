@@ -27,16 +27,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.netbeans.api.debugger.Breakpoint;
 import org.netbeans.api.debugger.DebuggerManager;
 
 public final class BreakpointManager {
 
     private static final Logger LOGGER = Logger.getLogger(BreakpointManager.class.getName());
 
-    private List<IBreakpoint> breakpoints;
-    private HashMap<String, HashMap<Integer, IBreakpoint>> sourceToBreakpoints;
-    private AtomicInteger nextBreakpointId = new AtomicInteger(1);
+    private final List<NbBreakpoint> breakpoints;
+    private final HashMap<String, HashMap<Integer, NbBreakpoint>> sourceToBreakpoints;
+    private final AtomicInteger nextBreakpointId = new AtomicInteger(1);
 
     /**
      * Constructor.
@@ -53,12 +52,12 @@ public final class BreakpointManager {
      * 
      * @return a new list of breakpoints in that source
      */
-    public IBreakpoint[] setBreakpoints(String source, IBreakpoint[] breakpoints, boolean sourceModified) {
-        List<IBreakpoint> result = new ArrayList<>();
-        HashMap<Integer, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
+    public NbBreakpoint[] setBreakpoints(String source, NbBreakpoint[] breakpoints, boolean sourceModified) {
+        List<NbBreakpoint> result = new ArrayList<>();
+        HashMap<Integer, NbBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
         // When source file is modified, delete all previously added breakpoints.
         if (sourceModified && breakpointMap != null) {
-            for (IBreakpoint bp : breakpointMap.values()) {
+            for (NbBreakpoint bp : breakpointMap.values()) {
                 try {
                     // Destroy the breakpoint on the debugee VM.
                     bp.close();
@@ -76,10 +75,10 @@ public final class BreakpointManager {
         }
 
         // Compute the breakpoints that are newly added.
-        List<IBreakpoint> toAdd = new ArrayList<>();
+        List<NbBreakpoint> toAdd = new ArrayList<>();
         List<Integer> visitedLineNumbers = new ArrayList<>();
-        for (IBreakpoint breakpoint : breakpoints) {
-            IBreakpoint existed = breakpointMap.get(breakpoint.getLineNumber());
+        for (NbBreakpoint breakpoint : breakpoints) {
+            NbBreakpoint existed = breakpointMap.get(breakpoint.getLineNumber());
             if (existed != null) {
                 result.add(existed);
                 visitedLineNumbers.add(existed.getLineNumber());
@@ -91,24 +90,24 @@ public final class BreakpointManager {
         }
 
         // Compute the breakpoints that are no longer listed.
-        List<IBreakpoint> toRemove = new ArrayList<>();
-        for (IBreakpoint breakpoint : breakpointMap.values()) {
+        List<NbBreakpoint> toRemove = new ArrayList<>();
+        for (NbBreakpoint breakpoint : breakpointMap.values()) {
             if (!visitedLineNumbers.contains(breakpoint.getLineNumber())) {
                 toRemove.add(breakpoint);
             }
         }
 
-        removeBreakpointsInternally(source, toRemove.toArray(new IBreakpoint[0]));
-        addBreakpointsInternally(source, toAdd.toArray(new IBreakpoint[0]));
+        removeBreakpointsInternally(source, toRemove.toArray(new NbBreakpoint[0]));
+        addBreakpointsInternally(source, toAdd.toArray(new NbBreakpoint[0]));
 
-        return result.toArray(new IBreakpoint[0]);
+        return result.toArray(new NbBreakpoint[0]);
     }
 
-    private void addBreakpointsInternally(String source, IBreakpoint[] breakpoints) {
-        Map<Integer, IBreakpoint> breakpointMap = this.sourceToBreakpoints.computeIfAbsent(source, k -> new HashMap<>());
+    private void addBreakpointsInternally(String source, NbBreakpoint[] breakpoints) {
+        Map<Integer, NbBreakpoint> breakpointMap = this.sourceToBreakpoints.computeIfAbsent(source, k -> new HashMap<>());
 
         if (breakpoints != null && breakpoints.length > 0) {
-            for (IBreakpoint breakpoint : breakpoints) {
+            for (NbBreakpoint breakpoint : breakpoints) {
                 breakpoint.putProperty("id", this.nextBreakpointId.getAndIncrement());
                 this.breakpoints.add(breakpoint);
                 breakpointMap.put(breakpoint.getLineNumber(), breakpoint);
@@ -119,13 +118,13 @@ public final class BreakpointManager {
     /**
      * Removes the specified breakpoints from breakpoint manager.
      */
-    private void removeBreakpointsInternally(String source, IBreakpoint[] breakpoints) {
-        Map<Integer, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
+    private void removeBreakpointsInternally(String source, NbBreakpoint[] breakpoints) {
+        Map<Integer, NbBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
         if (breakpointMap == null || breakpointMap.isEmpty() || breakpoints.length == 0) {
             return;
         }
 
-        for (IBreakpoint breakpoint : breakpoints) {
+        for (NbBreakpoint breakpoint : breakpoints) {
             if (this.breakpoints.contains(breakpoint)) {
                 try {
                     // Destroy the breakpoint on the debugee VM.
@@ -139,19 +138,19 @@ public final class BreakpointManager {
         }
     }
 
-    public IBreakpoint[] getBreakpoints() {
-        return this.breakpoints.toArray(new IBreakpoint[0]);
+    public NbBreakpoint[] getBreakpoints() {
+        return this.breakpoints.toArray(new NbBreakpoint[0]);
     }
 
     /**
      * Gets the registered breakpoints at the source file.
      */
-    public IBreakpoint[] getBreakpoints(String source) {
-        HashMap<Integer, IBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
+    public NbBreakpoint[] getBreakpoints(String source) {
+        HashMap<Integer, NbBreakpoint> breakpointMap = this.sourceToBreakpoints.get(source);
         if (breakpointMap == null) {
-            return new IBreakpoint[0];
+            return new NbBreakpoint[0];
         }
-        return breakpointMap.values().toArray(new IBreakpoint[0]);
+        return breakpointMap.values().toArray(new NbBreakpoint[0]);
     }
 
     /**
@@ -160,7 +159,7 @@ public final class BreakpointManager {
      */
     public void disposeBreakpoints() {
         DebuggerManager debuggerManager = DebuggerManager.getDebuggerManager();
-        for (IBreakpoint breakpoint : breakpoints) {
+        for (NbBreakpoint breakpoint : breakpoints) {
             debuggerManager.removeBreakpoint(breakpoint.getNBBreakpoint());
         }
         debuggerManager.removeAllWatches();

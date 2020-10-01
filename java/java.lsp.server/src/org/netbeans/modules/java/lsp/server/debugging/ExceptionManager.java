@@ -15,26 +15,41 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ExceptionManager implements IExceptionManager {
-    private Map<Long, ExceptionInfo> exceptions = Collections.synchronizedMap(new HashMap<>());
+public class ExceptionManager {
+    private final Map<Long, ExceptionInfo> exceptions = Collections.synchronizedMap(new HashMap<>());
 
-    @Override
     public ExceptionInfo getException(long threadId) {
         return exceptions.get(threadId);
     }
 
-    @Override
     public ExceptionInfo removeException(long threadId) {
         return exceptions.remove(threadId);
     }
 
-    @Override
     public ExceptionInfo setException(long threadId, ExceptionInfo exception) {
         return exceptions.put(threadId, exception);
     }
 
-    @Override
     public void removeAllExceptions() {
         exceptions.clear();
+    }
+
+    public static final class ExceptionInfo {
+
+        private final Throwable exception;
+        private final boolean caught;
+
+        public ExceptionInfo(Throwable exception, boolean caught) {
+            this.exception = exception;
+            this.caught = caught;
+        }
+
+        public Throwable getException() {
+            return exception;
+        }
+
+        public boolean isCaught() {
+            return caught;
+        }
     }
 }

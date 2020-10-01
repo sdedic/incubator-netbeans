@@ -46,11 +46,13 @@ import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
+import org.eclipse.lsp4j.DefinitionParams;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
+import org.eclipse.lsp4j.DocumentHighlightParams;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.InitializeParams;
@@ -67,7 +69,6 @@ import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentContentChangeEvent;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextDocumentItem;
-import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
 import org.eclipse.lsp4j.WorkspaceFolder;
@@ -241,8 +242,8 @@ public class ServerTest extends NbTestCase {
         CodeAction action = codeActions.get(0).getRight();
         assertEquals("Cast ...o to String", action.getTitle());
         assertEquals(1, action.getEdit().getDocumentChanges().size());
-        assertEquals(1, action.getEdit().getDocumentChanges().get(0).getEdits().size());
-        TextEdit edit = action.getEdit().getDocumentChanges().get(0).getEdits().get(0);
+        assertEquals(1, action.getEdit().getDocumentChanges().get(0).getLeft().getEdits().size());
+        TextEdit edit = action.getEdit().getDocumentChanges().get(0).getLeft().getEdits().get(0);
         assertEquals(1, edit.getRange().getStart().getLine());
         assertEquals(7, edit.getRange().getStart().getCharacter());
         assertEquals(1, edit.getRange().getEnd().getLine());
@@ -304,8 +305,8 @@ public class ServerTest extends NbTestCase {
         CodeAction action = codeActions.get(0).getRight();
         assertEquals("Remove .toString()", action.getTitle());
         assertEquals(1, action.getEdit().getDocumentChanges().size());
-        assertEquals(1, action.getEdit().getDocumentChanges().get(0).getEdits().size());
-        TextEdit edit = action.getEdit().getDocumentChanges().get(0).getEdits().get(0);
+        assertEquals(1, action.getEdit().getDocumentChanges().get(0).getLeft().getEdits().size());
+        TextEdit edit = action.getEdit().getDocumentChanges().get(0).getLeft().getEdits().get(0);
         assertEquals(1, edit.getRange().getStart().getLine());
         assertEquals(8, edit.getRange().getStart().getCharacter());
         assertEquals(1, edit.getRange().getEnd().getLine());
@@ -506,7 +507,7 @@ public class ServerTest extends NbTestCase {
         InitializeResult result = server.initialize(new InitializeParams()).get();
         server.getTextDocumentService().didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(src.toURI().toString(), "java", 0, code)));
         Position pos = new Position(3, 30);
-        List<? extends Location> definition = server.getTextDocumentService().definition(new TextDocumentPositionParams(new TextDocumentIdentifier(src.toURI().toString()), pos)).get();
+        List<? extends Location> definition = server.getTextDocumentService().definition(new DefinitionParams(new TextDocumentIdentifier(src.toURI().toString()), pos)).get().getLeft();
         assertEquals(1, definition.size());
         assertEquals(src.toURI().toString(), definition.get(0).getUri());
         assertEquals(1, definition.get(0).getRange().getStart().getLine());
@@ -514,7 +515,7 @@ public class ServerTest extends NbTestCase {
         assertEquals(1, definition.get(0).getRange().getEnd().getLine());
         assertEquals(22, definition.get(0).getRange().getEnd().getCharacter());
         pos = new Position(4, 30);
-        definition = server.getTextDocumentService().definition(new TextDocumentPositionParams(new TextDocumentIdentifier(src.toURI().toString()), pos)).get();
+        definition = server.getTextDocumentService().definition(new DefinitionParams(new TextDocumentIdentifier(src.toURI().toString()), pos)).get().getLeft();
         assertEquals(1, definition.size());
         assertEquals(src.toURI().toString(), definition.get(0).getUri());
         assertEquals(2, definition.get(0).getRange().getStart().getLine());
@@ -522,7 +523,7 @@ public class ServerTest extends NbTestCase {
         assertEquals(2, definition.get(0).getRange().getEnd().getLine());
         assertEquals(30, definition.get(0).getRange().getEnd().getCharacter());
         pos = new Position(5, 22);
-        definition = server.getTextDocumentService().definition(new TextDocumentPositionParams(new TextDocumentIdentifier(src.toURI().toString()), pos)).get();
+        definition = server.getTextDocumentService().definition(new DefinitionParams(new TextDocumentIdentifier(src.toURI().toString()), pos)).get().getLeft();
         assertEquals(1, definition.size());
         assertEquals(otherSrc.toURI().toString(), definition.get(0).getUri());
         assertEquals(2, definition.get(0).getRange().getStart().getLine());
@@ -646,9 +647,9 @@ public class ServerTest extends NbTestCase {
         InitializeResult result = server.initialize(new InitializeParams()).get();
         assertTrue(result.getCapabilities().getDocumentHighlightProvider());
         server.getTextDocumentService().didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(src.toURI().toString(), "java", 0, code)));
-        assertHighlights(server.getTextDocumentService().documentHighlight(new TextDocumentPositionParams(new TextDocumentIdentifier(src.toURI().toString()), new Position(1, 13))).get(),
+        assertHighlights(server.getTextDocumentService().documentHighlight(new DocumentHighlightParams(new TextDocumentIdentifier(src.toURI().toString()), new Position(1, 13))).get(),
                          "<none>:2:21-2:31", "<none>:3:26-3:35", "<none>:4:13-4:22");
-        assertHighlights(server.getTextDocumentService().documentHighlight(new TextDocumentPositionParams(new TextDocumentIdentifier(src.toURI().toString()), new Position(1, 27))).get(),
+        assertHighlights(server.getTextDocumentService().documentHighlight(new DocumentHighlightParams(new TextDocumentIdentifier(src.toURI().toString()), new Position(1, 27))).get(),
                          "<none>:1:26-1:29", "<none>:2:12-2:15", "<none>:3:17-3:20");
     }
 

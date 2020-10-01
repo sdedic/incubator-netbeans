@@ -36,7 +36,7 @@ import org.netbeans.modules.debugger.jpda.truffle.breakpoints.TruffleLineBreakpo
  *
  * @author martin
  */
-public final class NbBreakpoint implements IBreakpoint {
+public final class NbBreakpoint {
 
     private static final Logger LOGGER = Logger.getLogger(NbBreakpoint.class.getName());
 
@@ -56,7 +56,6 @@ public final class NbBreakpoint implements IBreakpoint {
         this.logMessage = logMessage;
     }
 
-    @Override
     public Breakpoint getNBBreakpoint() {
         return breakpoint;
     }
@@ -64,22 +63,18 @@ public final class NbBreakpoint implements IBreakpoint {
     /**
      * Interpreted as a source URL.
      */
-    @Override
     public String className() {
         return sourceURL;
     }
 
-    @Override
     public int getLineNumber() {
         return line;
     }
 
-    @Override
     public int getHitCount() {
         return hitCount;
     }
 
-    @Override
     public void setHitCount(int hitCount) {
         if (this.hitCount != hitCount) {
             this.hitCount = hitCount;
@@ -89,8 +84,7 @@ public final class NbBreakpoint implements IBreakpoint {
         }
     }
 
-    @Override
-    public CompletableFuture<IBreakpoint> install() {
+    public CompletableFuture<NbBreakpoint> install() {
         Breakpoint breakpoint;
         if (sourceURL.toLowerCase().endsWith(".java")) {
             LineBreakpoint b = LineBreakpoint.create(sourceURL, line);
@@ -134,22 +128,18 @@ public final class NbBreakpoint implements IBreakpoint {
         }
     }
 
-    @Override
     public void putProperty(Object key, Object value) {
         properties.put(key, value);
     }
 
-    @Override
     public Object getProperty(Object key) {
         return properties.get(key);
     }
 
-    @Override
     public String getCondition() {
         return condition;
     }
 
-    @Override
     public void setCondition(String condition) {
         if (!Objects.equals(this.condition, condition)) {
             this.condition = condition;
@@ -161,12 +151,10 @@ public final class NbBreakpoint implements IBreakpoint {
         }
     }
 
-    @Override
     public String getLogMessage() {
         return logMessage;
     }
 
-    @Override
     public void setLogMessage(String logMessage) {
         if (!Objects.equals(this.logMessage, logMessage)) {
             this.logMessage = logMessage;
@@ -207,7 +195,6 @@ public final class NbBreakpoint implements IBreakpoint {
         return true;
     }
 
-    @Override
     public void close() throws Exception {
         if (breakpoint != null) {
             DebuggerManager d = DebuggerManager.getDebuggerManager();
