@@ -720,10 +720,10 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
         JavaSource js = JavaSource.forDocument(doc);
         List<Either<Command, CodeAction>> result = new ArrayList<>();
         for (Diagnostic diag : params.getContext().getDiagnostics()) {
-            ErrorDescription err = id2Errors.get(diag.getCode());
+            ErrorDescription err = id2Errors.get(diag.getCode().getLeft());
 
             if (err == null) {
-                client.logMessage(new MessageParams(MessageType.Log, "Cannot resolve error, code: " + diag.getCode()));
+                client.logMessage(new MessageParams(MessageType.Log, "Cannot resolve error, code: " + diag.getCode().getLeft()));
                 continue;
             }
 
