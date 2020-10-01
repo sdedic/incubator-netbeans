@@ -78,10 +78,10 @@ public final class BreakpointManager {
         List<NbBreakpoint> toAdd = new ArrayList<>();
         List<Integer> visitedLineNumbers = new ArrayList<>();
         for (NbBreakpoint breakpoint : breakpoints) {
-            NbBreakpoint existed = breakpointMap.get(breakpoint.getLineNumber());
-            if (existed != null) {
-                result.add(existed);
-                visitedLineNumbers.add(existed.getLineNumber());
+            NbBreakpoint existingBP = breakpointMap.get(breakpoint.getLineNumber());
+            if (existingBP != null) {
+                result.add(existingBP);
+                visitedLineNumbers.add(existingBP.getLineNumber());
                 continue;
             } else {
                 result.add(breakpoint);

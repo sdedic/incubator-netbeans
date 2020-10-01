@@ -16,33 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging.launch;
+package org.netbeans.modules.java.lsp.server.debugging.utils;
 
-import java.util.Map;
-import java.util.function.Consumer;
-import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
+import java.util.concurrent.CompletableFuture;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 
 /**
  *
  * @author martin
  */
-public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
+public final class ErrorUtilities {
 
-    protected static final long RUNINTERMINAL_TIMEOUT = 10 * 1000;
-    private Consumer<DebugAdapterContext> onFinishCallback;
-
-    public NbLaunchWithoutDebuggingDelegate(Consumer<DebugAdapterContext> onFinishCallback) {
-        this.onFinishCallback = onFinishCallback;
+    private ErrorUtilities() {
     }
 
-    @Override
-    public void postLaunch(Map<String, Object> launchArguments, DebugAdapterContext context) {
-        // Do not send InitializedEvent, so that we do not get DAP requests.
-        return;
+    public static void completeExceptionally(CompletableFuture<?> future, String message, ResponseErrorCode errorCode) {
+        future.completeExceptionally(createResponseErrorException(message, errorCode));
     }
 
-    @Override
-    public void preLaunch(Map<String, Object> launchArguments, DebugAdapterContext context) {
+    public static ResponseErrorException createResponseErrorException(String message, ResponseErrorCode errorCode) {
+        return new ResponseErrorException(new ResponseError(errorCode, message, null));
     }
-    
 }

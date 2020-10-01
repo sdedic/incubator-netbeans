@@ -27,13 +27,13 @@ import org.eclipse.lsp4j.debug.SetVariableResponse;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.eclipse.lsp4j.debug.VariablesResponse;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 
 import org.netbeans.api.debugger.jpda.JPDADebugger;
 import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
 import org.netbeans.modules.java.lsp.server.debugging.NbScope;
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
-import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
-import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorUtilities;
 import org.netbeans.spi.viewmodel.Models;
 import org.netbeans.spi.viewmodel.UnknownTypeException;
 
@@ -56,14 +56,11 @@ public final class NbVariablesRequestHandler {
 
     public CompletableFuture<VariablesResponse> variables(VariablesArguments arguments, DebugAdapterContext context) {
         CompletableFuture<VariablesResponse> future = new CompletableFuture<>();
-        // IVariableFormatter variableFormatter = context.getVariableFormatter();
-        // boolean showStaticVariables = DebugSettings.getCurrent().showStaticVariables;
 
         VariablesResponse response = new VariablesResponse();
         Object container = context.getRecyclableIdPool().getObjectById(arguments.getVariablesReference());
-        // vscode will always send variables request to a staled scope, return the empty list is ok since the next
-        // variable request will contain the right variablesReference.
         if (container == null) {
+            // Nothing on an old container
             response.setVariables(new Variable[0]);
         } else {
             JPDADebugger debugger = ((NbDebugSession) context.getDebugSession()).getDebugger();
@@ -94,7 +91,7 @@ public final class NbVariablesRequestHandler {
                     list.add(variable);
                 }
             } catch (UnknownTypeException e) {
-                future.completeExceptionally(AdapterUtils.createResponseErrorException(e.getMessage(), ErrorCode.GET_VARIABLE_FAILURE));
+                ErrorUtilities.completeExceptionally(future, e.getMessage(), ResponseErrorCode.InternalError);
                 return future;
             }
             response.setVariables(list.toArray(new Variable[list.size()]));
@@ -106,28 +103,28 @@ public final class NbVariablesRequestHandler {
     public CompletableFuture<SetVariableResponse> setVariable(SetVariableArguments args, DebugAdapterContext context) {
         CompletableFuture<SetVariableResponse> future = new CompletableFuture<>();
         if (StringUtils.isBlank(args.getValue())) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException(
+            ErrorUtilities.completeExceptionally(future,
                 "SetVariablesRequest: property 'value' is missing, null, or empty",
-                ErrorCode.ARGUMENT_MISSING));
+                ResponseErrorCode.InvalidParams);
             return future;
         } else if (args.getVariablesReference() == -1) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException(
+            ErrorUtilities.completeExceptionally(future,
                 "SetVariablesRequest: property 'variablesReference' is missing, null, or empty",
-                ErrorCode.ARGUMENT_MISSING));
+                ResponseErrorCode.InvalidParams);
             return future;
         } else if (StringUtils.isBlank(args.getName())) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException(
+            ErrorUtilities.completeExceptionally(future,
                 "SetVariablesRequest: property 'name' is missing, null, or empty",
-                ErrorCode.ARGUMENT_MISSING));
+                ResponseErrorCode.InvalidParams);
             return future;
         }
 
         Object container = context.getRecyclableIdPool().getObjectById(args.getVariablesReference());
         // container is null means the stack frame is continued by user manually.
         if (container == null) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException(
+            ErrorUtilities.completeExceptionally(future,
                 "Failed to set variable. Reason: Cannot set value because the thread is resumed.",
-                ErrorCode.SET_VARIABLE_FAILURE));
+                ResponseErrorCode.InternalError);
             return future;
         }
 
@@ -161,12 +158,12 @@ public final class NbVariablesRequestHandler {
                 response.setIndexedVariables(0);
                 future.complete(response);
             } else {
-                future.completeExceptionally(AdapterUtils.createResponseErrorException(
+                ErrorUtilities.completeExceptionally(future,
                     String.format("SetVariableRequest: Variable %s cannot be found.", varName),
-                    ErrorCode.SET_VARIABLE_FAILURE));
+                    ResponseErrorCode.InternalError);
             }
         } catch (UnknownTypeException e) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException(e.getMessage(), ErrorCode.SET_VARIABLE_FAILURE));
+            ErrorUtilities.completeExceptionally(future, e.getMessage(), ResponseErrorCode.InternalError);
         }
         return future;
     }

@@ -62,6 +62,7 @@ import org.eclipse.lsp4j.debug.ThreadsResponse;
 import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.eclipse.lsp4j.debug.VariablesResponse;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.netbeans.api.debugger.ActionsManager;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.jpda.InvalidExpressionException;
@@ -74,8 +75,7 @@ import org.netbeans.modules.java.lsp.server.debugging.launch.NbDisconnectRequest
 import org.netbeans.modules.java.lsp.server.debugging.launch.NbLaunchRequestHandler;
 import org.netbeans.modules.java.lsp.server.debugging.breakpoints.NbBreakpointsRequestHandler;
 import org.netbeans.modules.java.lsp.server.debugging.variables.NbVariablesRequestHandler;
-import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
-import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorUtilities;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
@@ -147,7 +147,7 @@ public final class NbProtocolServer implements IDebugProtocolServer {
             context.getConfigurationSemaphore().notifyCongigurationDone();;
             future.complete(null);
         } else {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException("Failed to launch debug session, the debugger will exit.", ErrorCode.EMPTY_DEBUG_SESSION));
+            ErrorUtilities.completeExceptionally(future, "Failed to launch debug session, the debugger will exit.", ResponseErrorCode.serverErrorStart);
         }
         return future;
     }
@@ -195,7 +195,7 @@ public final class NbProtocolServer implements IDebugProtocolServer {
     public CompletableFuture<Void> next(NextArguments args) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         if (context.getDebugSession() == null) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException("Debug Session doesn't exist.", ErrorCode.EMPTY_DEBUG_SESSION));
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
         } else {
             ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
             am.doAction("stepOver");
@@ -208,7 +208,7 @@ public final class NbProtocolServer implements IDebugProtocolServer {
     public CompletableFuture<Void> stepIn(StepInArguments args) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         if (context.getDebugSession() == null) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException("Debug Session doesn't exist.", ErrorCode.EMPTY_DEBUG_SESSION));
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
         } else {
             ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
             am.doAction("stepInto");
@@ -221,7 +221,7 @@ public final class NbProtocolServer implements IDebugProtocolServer {
     public CompletableFuture<Void> stepOut(StepOutArguments args) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         if (context.getDebugSession() == null) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException("Debug Session doesn't exist.", ErrorCode.EMPTY_DEBUG_SESSION));
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
         } else {
             ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
             am.doAction("stepOut");
@@ -262,7 +262,7 @@ public final class NbProtocolServer implements IDebugProtocolServer {
     public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
         CompletableFuture<StackTraceResponse> future = new CompletableFuture<>();
         if (context.getDebugSession() == null) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException("Debug Session doesn't exist.", ErrorCode.EMPTY_DEBUG_SESSION));
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
         } else {
             List<StackFrame> result = new ArrayList<>();
             int cnt = 0;
@@ -341,7 +341,7 @@ public final class NbProtocolServer implements IDebugProtocolServer {
         CompletableFuture<SourceResponse> future = new CompletableFuture<>();
         int sourceReference = args.getSourceReference();
         if (sourceReference <= 0) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException("SourceRequest: property 'sourceReference' is missing, null, or empty", ErrorCode.ARGUMENT_MISSING));
+            ErrorUtilities.completeExceptionally(future, "SourceRequest: property 'sourceReference' is missing, null, or empty", ResponseErrorCode.InvalidParams);
         } else {
             String uri = context.getSourceUri(sourceReference);
             NbSourceProvider sourceProvider = context.getSourceProvider();
@@ -357,7 +357,7 @@ public final class NbProtocolServer implements IDebugProtocolServer {
     public CompletableFuture<ThreadsResponse> threads() {
         CompletableFuture<ThreadsResponse> future = new CompletableFuture<>();
         if (context.getDebugSession() == null) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException("Debug Session doesn't exist.", ErrorCode.EMPTY_DEBUG_SESSION));
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
         } else {
             List<org.eclipse.lsp4j.debug.Thread> result = new ArrayList<>();
             context.getThreadsProvider().visitThreads((id, dvThread) -> {
@@ -378,15 +378,15 @@ public final class NbProtocolServer implements IDebugProtocolServer {
         return CompletableFuture.supplyAsync(() -> {
             String expression = args.getExpression();
             if (StringUtils.isBlank(expression)) {
-                throw AdapterUtils.createResponseErrorException(
+                throw ErrorUtilities.createResponseErrorException(
                     "Failed to evaluate. Reason: Empty expression cannot be evaluated.",
-                    ErrorCode.EVALUATION_COMPILE_ERROR);
+                    ResponseErrorCode.InvalidParams);
             }
             NbFrame stackFrame = (NbFrame) context.getRecyclableIdPool().getObjectById(args.getFrameId());
             if (stackFrame == null) {
-                throw AdapterUtils.createResponseErrorException(
+                throw ErrorUtilities.createResponseErrorException(
                     "Failed to evaluate. Reason: Unknown frame " + args.getFrameId(),
-                    ErrorCode.EVALUATION_COMPILE_ERROR);
+                    ResponseErrorCode.InvalidParams);
             }
             stackFrame.getDVFrame().makeCurrent(); // The evaluation is always performed with respect to the current frame
             DVThread dvThread = stackFrame.getDVFrame().getThread();
@@ -396,9 +396,9 @@ public final class NbProtocolServer implements IDebugProtocolServer {
             try {
                 variable = debugger.evaluate(expression);
             } catch (InvalidExpressionException ex) {
-                throw AdapterUtils.createResponseErrorException(
+                throw ErrorUtilities.createResponseErrorException(
                     "Failed to evaluate. Reason: " + ex.getLocalizedMessage(),
-                    ErrorCode.EVALUATION_COMPILE_ERROR);
+                    ResponseErrorCode.ParseError);
             }
             EvaluateResponse response = new EvaluateResponse();
             TruffleVariable truffleVariable = TruffleVariable.get(variable);
@@ -438,7 +438,7 @@ public final class NbProtocolServer implements IDebugProtocolServer {
         CompletableFuture<ExceptionInfoResponse> future = new CompletableFuture<>();
         ExceptionManager.ExceptionInfo exceptionInfo = context.getExceptionManager().getException(args.getThreadId());
         if (exceptionInfo == null) {
-            future.completeExceptionally(AdapterUtils.createResponseErrorException("No exception exists in thread " + args.getThreadId(), ErrorCode.EXCEPTION_INFO_FAILURE));
+            ErrorUtilities.completeExceptionally(future, "No exception exists in thread " + args.getThreadId(), ResponseErrorCode.InvalidParams);
         } else {
             String typeName = exceptionInfo.getException().getLocalizedMessage(); // TODO
             String exceptionToString = exceptionInfo.getException().toString();

@@ -20,12 +20,17 @@ package org.netbeans.modules.java.lsp.server.debugging;
 
 import java.io.File;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.commons.lang3.StringUtils;
+
 import org.eclipse.lsp4j.debug.Source;
 import org.netbeans.api.java.classpath.ClassPath;
-import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
 import org.openide.filesystems.FileObject;
 
 /**
@@ -35,74 +40,85 @@ import org.openide.filesystems.FileObject;
 public final class NbSourceProvider {
 
     private static final Logger LOG = Logger.getLogger(NbSourceProvider.class.getName());
-    
-    ClassPath sources = ClassPath.EMPTY;
 
-    public NbSourceProvider() {
+    private final Map<String, String> fqnToURI = Collections.synchronizedMap(new CacheMap());
+    private final Map<String, Source> uriToSource = Collections.synchronizedMap(new CacheMap());
+    private final DebugAdapterContext context;
+    private ClassPath sources = ClassPath.EMPTY;
+
+    NbSourceProvider(DebugAdapterContext context) {
+        this.context = context;
     }
 
     public void setSourcePath(ClassPath sources) {
         this.sources = sources;
     }
 
-    public String getSourceFileURI(String fqn, String fileName) {
-        FileObject source = sources.findResource(fileName);
-        if (source != null) {
-            return source.toURI().toString();
-        }
-        if (new File(fileName).exists()) {
-            return fileName;
-        }
-        return null;
+    private String getSourceFileURI(String fqn, String relativePathName) {
+        return fqnToURI.computeIfAbsent(fqn, name -> {
+            FileObject source = sources.findResource(relativePathName);
+            if (source != null) {
+                return source.toURI().toString();
+            }
+            if (new File(relativePathName).exists()) {
+                return relativePathName;
+            }
+            return "";
+        });
     }
 
     public String getSourceContents(String arg0) {
-        LOG.log(Level.INFO, "arg0={0}", arg0);
+        LOG.log(Level.INFO, "SourceContent {0}", arg0);
         throw new UnsupportedOperationException("Not supported yet.");
     }
     
+    public Source getSource(String sourceName, String debuggerURI) {
+        return uriToSource.computeIfAbsent(debuggerURI, uri -> {
+            Source source = new Source();
+            source.setName(sourceName);
+            source.setSourceReference(0);
+            if (uri.startsWith("file:")) {
+                String clientPath = context.getClientPath(uri);
+                source.setPath(clientPath);
+            } else {
+                source.setPath(uri);
+            }
+            return source;
+        });
+    }
+
     /**
      * Find the source mapping for the specified source file name.
      */
     public static Source convertDebuggerSourceToClient(String fullyQualifiedName, String sourceName, String relativeSourcePath,
             DebugAdapterContext context) throws URISyntaxException {
-        // use a lru cache for better performance
-        String uri = context.getSourceLookupCache().computeIfAbsent(fullyQualifiedName, key -> {
-            String fromProvider = context.getSourceProvider().getSourceFileURI(key, relativeSourcePath);
-            // avoid return null which will cause the compute function executed again
-            return StringUtils.isBlank(fromProvider) ? "" : fromProvider;
-        });
+        NbSourceProvider sourceProvider = context.getSourceProvider();
+        String uri = sourceProvider.getSourceFileURI(fullyQualifiedName, relativeSourcePath);
 
-        if (!StringUtils.isBlank(uri)) {
-            // The Source.path could be a file system path or uri string.
-            Source source = new Source();
-            source.setName(sourceName);
-            source.setSourceReference(0);
-            if (uri.startsWith("file:")) {
-                String clientPath = AdapterUtils.convertPath(uri, context.isDebuggerPathsAreUri(), context.isClientPathsAreUri());
-                source.setPath(clientPath);
-            } else {
-                // If the debugger returns uri in the Source.path for the StackTrace response, VSCode client will try to find a TextDocumentContentProvider
-                // to render the contents.
-                // Language Support for Java by Red Hat extension has already registered a jdt TextDocumentContentProvider to parse the jdt-based uri.
-                // The jdt uri looks like 'jdt://contents/rt.jar/java.io/PrintStream.class?=1.helloworld/%5C/usr%5C/lib%5C/jvm%5C/java-8-oracle%5C/jre%5C/
-                // lib%5C/rt.jar%3Cjava.io(PrintStream.class'.
-                source.setPath(uri);
+        if (uri == null || uri.isEmpty()) {
+            for (String path : context.getSourcePaths()) {
+                Path fullpath = Paths.get(path, relativeSourcePath);
+                if (Files.isRegularFile(fullpath)) {
+                    uri = fullpath.toString();
+                    break;
+                }
             }
-            return source;
+        }
+        if (uri != null && !uri.isEmpty()) {
+            return sourceProvider.getSource(sourceName, uri);
         } else {
-            // If the source lookup engine cannot find the source file, then lookup it in the source directories specified by user.
-            String absoluteSourcepath = AdapterUtils.sourceLookup(context.getSourcePaths(), relativeSourcePath);
-            if (absoluteSourcepath != null) {
-                Source source = new Source();
-                source.setName(sourceName);
-                source.setPath(absoluteSourcepath);
-                source.setSourceReference(0);
-                return source;
-            } else {
-                return null;
-            }
+            return null;
         }
     }
 
+    private static final class CacheMap<K,V> extends LinkedHashMap<K, V> {
+
+        private static final int SIZE_LIMIT = 1000;
+
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+            return size() > SIZE_LIMIT;
+        }
+        
+    }
 }

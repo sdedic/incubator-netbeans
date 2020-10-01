@@ -18,8 +18,10 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.breakpoints;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -32,9 +34,9 @@ import org.eclipse.lsp4j.debug.SetBreakpointsArguments;
 import org.eclipse.lsp4j.debug.SetBreakpointsResponse;
 import org.eclipse.lsp4j.debug.SetExceptionBreakpointsArguments;
 import org.eclipse.lsp4j.debug.SourceBreakpoint;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
-import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
-import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorUtilities;
 
 /**
  *
@@ -45,42 +47,36 @@ public final class NbBreakpointsRequestHandler {
     public static final String CAUGHT_EXCEPTION_FILTER_NAME = "caught";
     public static final String UNCAUGHT_EXCEPTION_FILTER_NAME = "uncaught";
 
+    private static final boolean IS_WINDOWS = System.getProperty("os.name", "").toLowerCase().startsWith("win");
+
     public CompletableFuture<SetBreakpointsResponse> setBreakpoints(SetBreakpointsArguments arguments, DebugAdapterContext context) {
         CompletableFuture<SetBreakpointsResponse> resultFuture = new CompletableFuture<>();
         if (context.getDebugSession() == null) {
-            resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException("Empty debug session.", ErrorCode.EMPTY_DEBUG_SESSION));
+            ErrorUtilities.completeExceptionally(resultFuture, "Empty debug session.", ResponseErrorCode.InvalidParams);
             return resultFuture;
         }
         String clientPath = arguments.getSource().getPath();
-        if (AdapterUtils.isWindows()) {
-            // VSCode may send drive letters with inconsistent casing which will mess up the key
-            // in the BreakpointManager. See https://github.com/Microsoft/vscode/issues/6268
-            // Normalize the drive letter casing. Note that drive letters
-            // are not localized so invariant is safe here.
+        if (IS_WINDOWS) {
+            // Normalize the drive letter case:
             String drivePrefix = FilenameUtils.getPrefix(clientPath);
-            if (drivePrefix != null && drivePrefix.length() >= 2
-                    && Character.isLowerCase(drivePrefix.charAt(0)) && drivePrefix.charAt(1) == ':') {
-                drivePrefix = drivePrefix.substring(0, 2); // d:\ is an illegal regex string, convert it to d:
-                clientPath = clientPath.replaceFirst(drivePrefix, drivePrefix.toUpperCase());
+            if (drivePrefix != null && drivePrefix.length() >= 2 && Character.isLowerCase(drivePrefix.charAt(0)) && drivePrefix.charAt(1) == ':') {
+                clientPath = Character.toUpperCase(clientPath.charAt(0)) + clientPath.substring(1);
             }
         }
-        String sourcePath = clientPath;
-        if (StringUtils.isNotBlank(clientPath)) {
-            // See the bug https://github.com/Microsoft/vscode/issues/30996
-            // Source.path in the SetBreakpointArguments could be a file system path or uri.
-            sourcePath = AdapterUtils.convertPath(clientPath, AdapterUtils.isUri(clientPath), context.isDebuggerPathsAreUri());
+        String sourcePath = null;
+        if (clientPath != null) {
+            sourcePath = context.getDebuggerPath(clientPath.trim());
         }
-        if (StringUtils.isBlank(sourcePath)) {
-            resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException(
-                String.format("Failed to setBreakpoint. Reason: '%s' is an invalid path.", arguments.getSource().getPath()),
-                ErrorCode.SET_BREAKPOINT_FAILURE));
+        if (sourcePath == null || sourcePath.isEmpty()) {
+            ErrorUtilities.completeExceptionally(resultFuture,
+                String.format("Failed to setBreakpoint, unresolved path '%s'.", clientPath),
+                ResponseErrorCode.InvalidParams);
             return resultFuture;
         }
         List<Breakpoint> res = new ArrayList<>();
         NbBreakpoint[] toAdds = this.convertClientBreakpointsToDebugger(sourcePath, arguments.getBreakpoints(), context);
-        // See the VSCode bug https://github.com/Microsoft/vscode/issues/36471.
-        // The source uri sometimes is encoded by VSCode, the debugger will decode it to keep the uri consistent.
-        NbBreakpoint[] added = context.getBreakpointManager().setBreakpoints(AdapterUtils.decodeURIComponent(sourcePath), toAdds, arguments.getSourceModified());
+        // Decode the URI if it comes encoded:
+        NbBreakpoint[] added = context.getBreakpointManager().setBreakpoints(decodeURI(sourcePath), toAdds, arguments.getSourceModified());
         for (int i = 0; i < arguments.getBreakpoints().length; i++) {
             // For newly added breakpoint, should install it to debuggee first.
             if (toAdds[i] == added[i] && added[i].className() != null) {
@@ -113,10 +109,18 @@ public final class NbBreakpointsRequestHandler {
         return resultFuture;
     }
 
+    private static String decodeURI(String uri) {
+        try {
+            return URLDecoder.decode(uri, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            return uri;
+        }
+    }
+
     public CompletableFuture<Void> setExceptionBreakpoints(SetExceptionBreakpointsArguments arguments, DebugAdapterContext context) {
         CompletableFuture<Void> resultFuture = new CompletableFuture<>();
         if (context.getDebugSession() == null) {
-            resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException("Empty debug session.", ErrorCode.EMPTY_DEBUG_SESSION));
+            ErrorUtilities.completeExceptionally(resultFuture, "Empty debug session.", ResponseErrorCode.InvalidParams);
             return resultFuture;
         }
         String[] filters = arguments.getFilters();
@@ -129,7 +133,7 @@ public final class NbBreakpointsRequestHandler {
     private Breakpoint convertDebuggerBreakpointToClient(NbBreakpoint breakpoint, DebugAdapterContext context) {
         int id = (int) breakpoint.getProperty("id");
         boolean verified = breakpoint.getProperty("verified") != null && (boolean) breakpoint.getProperty("verified");
-        int lineNumber = AdapterUtils.convertLineNumber(breakpoint.getLineNumber(), context.isDebuggerLinesStartAt1(), context.isClientLinesStartAt1());
+        int lineNumber = context.getClientLine(breakpoint.getLineNumber());
         Breakpoint bp = new Breakpoint();
         bp.setId(id);
         bp.setVerified(verified);
@@ -139,17 +143,18 @@ public final class NbBreakpointsRequestHandler {
     }
 
     private NbBreakpoint[] convertClientBreakpointsToDebugger(String sourceFile, SourceBreakpoint[] sourceBreakpoints, DebugAdapterContext context) {
-            //throws DebugException {
-        int[] lines = Arrays.asList(sourceBreakpoints).stream().map(sourceBreakpoint -> {
-            return AdapterUtils.convertLineNumber(sourceBreakpoint.getLine(), context.isClientLinesStartAt1(), context.isDebuggerLinesStartAt1());
-        }).mapToInt(line -> line).toArray();
-        NbBreakpoint[] breakpoints = new NbBreakpoint[lines.length];
-        for (int i = 0; i < lines.length; i++) {
+        int n = sourceBreakpoints.length;
+        int[] lines = new int[n];
+        for (int i = 0; i < n; i++) {
+            lines[i] = context.getDebuggerLine(sourceBreakpoints[i].getLine());
+        }
+        NbBreakpoint[] breakpoints = new NbBreakpoint[n];
+        for (int i = 0; i < n; i++) {
             int hitCount = 0;
             try {
                 hitCount = Integer.parseInt(sourceBreakpoints[i].getHitCondition());
             } catch (NumberFormatException e) {
-                hitCount = 0; // If hitCount is an illegal number, ignore hitCount condition.
+                hitCount = 0; // If hitCount is not a number, ignore the hitCount.
             }
             breakpoints[i] = new NbBreakpoint(sourceFile, lines[i], hitCount, sourceBreakpoints[i].getCondition(), sourceBreakpoints[i].getLogMessage());
         }

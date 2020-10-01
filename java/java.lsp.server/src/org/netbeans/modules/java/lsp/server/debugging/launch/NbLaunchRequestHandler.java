@@ -37,10 +37,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.lsp4j.debug.OutputEventArguments;
 import org.eclipse.lsp4j.debug.Source;
 import org.eclipse.lsp4j.debug.TerminatedEventArguments;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
 import org.netbeans.modules.java.lsp.server.debugging.NbSourceProvider;
-import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
-import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorUtilities;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 
@@ -63,18 +63,18 @@ public final class NbLaunchRequestHandler {
         List<String> classPaths = (List<String>) launchArguments.getOrDefault("classPaths", Collections.emptyList());
         if (StringUtils.isBlank((String)launchArguments.get("mainClass"))
                 || modulePaths.isEmpty() && classPaths.isEmpty()) {
-            resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException(
+            ErrorUtilities.completeExceptionally(resultFuture,
                 "Failed to launch debuggee VM. Missing mainClass or modulePaths/classPaths options in launch configuration.",
-                ErrorCode.ARGUMENT_MISSING));
+                ResponseErrorCode.serverErrorStart);
             return resultFuture;
         }
         if (StringUtils.isBlank((String)launchArguments.get("encoding"))) {
             context.setDebuggeeEncoding(StandardCharsets.UTF_8);
         } else {
             if (!Charset.isSupported((String)launchArguments.get("encoding"))) {
-                resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException(
+                ErrorUtilities.completeExceptionally(resultFuture,
                     "Failed to launch debuggee VM. 'encoding' options in the launch configuration is not recognized.",
-                    ErrorCode.INVALID_ENCODING));
+                    ResponseErrorCode.serverErrorStart);
                 return resultFuture;
             }
             context.setDebuggeeEncoding(Charset.forName((String)launchArguments.get("encoding")));
@@ -93,9 +93,9 @@ public final class NbLaunchRequestHandler {
         String filePath = (String)launchArguments.get("mainClass");
         FileObject file = filePath != null ? FileUtil.toFileObject(new File(filePath)) : null;
         if (file == null) {
-            resultFuture.completeExceptionally(AdapterUtils.createResponseErrorException(
+            ErrorUtilities.completeExceptionally(resultFuture,
                     "Missing file: " + filePath,
-                    ErrorCode.LAUNCH_FAILURE));
+                    ResponseErrorCode.serverErrorStart);
             return resultFuture;
         }
         activeLaunchHandler.nbLaunch(file, context, !noDebug, new OutputListener(context)).thenRun(() -> {
