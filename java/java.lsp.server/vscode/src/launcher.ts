@@ -20,6 +20,7 @@
 
 import { ExtensionContext } from 'vscode';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { spawn, ChildProcessByStdio } from 'child_process';
 import * as vscode from 'vscode';
@@ -54,10 +55,13 @@ export function launch(
     }
     let clusters = findClusters();
 
-    const nbexec = path.join(context.extensionPath, 'nb-java-lsp-server', 'platform', 'lib', 'nbexec');
-    let nbexecPerm = fs.statSync(nbexec);
+    let nbexec = os.platform() === 'win32' ? 
+        os.arch() === 'x64' ? 'nbexec64.exe' : 'nbexec.exe' 
+        : 'nbexec';
+    const nbexecPath = path.join(context.extensionPath, 'nb-java-lsp-server', 'platform', 'lib', nbexec);
+    let nbexecPerm = fs.statSync(nbexecPath);
     if (!nbexecPerm.isFile()) {
-        throw `Cannot execute ${nbexec}`;
+        throw `Cannot execute ${nbexecPath}`;
     }
 
     const userDir = path.join(context.extensionPath, "nb-java-lsp-server-user-dir");
@@ -103,9 +107,10 @@ export function launch(
     }
     ideArgs.push(...extraArgs);
 
-    let process: ChildProcessByStdio<null, Readable, Readable> = spawn(nbexec, ideArgs, {
+    let process: ChildProcessByStdio<null, Readable, Readable> = spawn(nbexecPath, ideArgs, {
         cwd : userDir,
-        stdio : ["ignore", "pipe", "pipe"]
+        stdio : ["ignore", "pipe", "pipe"],
+        shell : true
     });
     return process;
 }
