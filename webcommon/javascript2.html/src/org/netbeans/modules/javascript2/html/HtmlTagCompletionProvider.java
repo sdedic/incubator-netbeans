@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.netbeans.modules.csl.api.CodeCompletionContext;
 import org.netbeans.modules.csl.api.CompletionProposal;
 import org.netbeans.modules.csl.api.ElementHandle;
 import org.netbeans.modules.csl.spi.ParserResult;
@@ -33,7 +32,6 @@ import org.netbeans.modules.html.editor.lib.api.model.HtmlModel;
 import org.netbeans.modules.html.editor.lib.api.model.HtmlModelFactory;
 import org.netbeans.modules.html.editor.lib.api.model.HtmlTag;
 import org.netbeans.modules.html.editor.lib.api.model.HtmlTagAttribute;
-import org.netbeans.modules.javascript2.editor.spi.CompletionContext;
 import org.netbeans.modules.javascript2.editor.spi.CompletionProvider;
 import org.netbeans.modules.javascript2.editor.spi.CompletionProviderEx;
 import org.netbeans.modules.javascript2.editor.spi.ProposalRequest;
@@ -45,10 +43,6 @@ import org.netbeans.modules.javascript2.editor.spi.ProposalRequest;
 @CompletionProvider.Registration(priority = 0)
 public class HtmlTagCompletionProvider implements CompletionProviderEx {
 
-    public List<CompletionProposal> complete(CodeCompletionContext ccContext, CompletionContext jsCompletionContext, String prefix) {
-        return null;
-    }
-    
     @Override
     public List<CompletionProposal> complete(ProposalRequest request) {
         if (!request.getSelectors().contains("Element")) { // NOI18N
