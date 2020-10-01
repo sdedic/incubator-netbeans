@@ -52,6 +52,7 @@
         <property name="vsix.version" value="0.1.0"/>
 
         <exec executable="npm" failonerror="true" dir="vscode">
+            <arg value="--allow-same-version"/>
             <arg value="version" />
             <arg value="${vsix.version}" />
             <env key="https_proxy" value="http://${proxyHost}:${proxyPort}"/>
