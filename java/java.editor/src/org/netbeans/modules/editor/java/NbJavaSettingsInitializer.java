@@ -46,13 +46,6 @@ public final class NbJavaSettingsInitializer {
     public static Acceptor getIndentHotCharsAcceptor() {
         return indentHotCharsAcceptor;
     }
-    public static List getTokenContextList() {
-        return Arrays.asList(new TokenContext[] {
-            JavaTokenContext.context,
-            JavaLayerTokenContext.context
-        });
-    }
-    
     private NbJavaSettingsInitializer() {
     }
 
