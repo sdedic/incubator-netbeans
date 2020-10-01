@@ -64,7 +64,7 @@ export function launch(
         throw `Cannot execute ${nbexecPath}`;
     }
 
-    const userDir = path.join(context.extensionPath, "nb-java-lsp-server-user-dir");
+    const userDir = path.join(context.globalStoragePath, "userdir");
     fs.mkdirSync(userDir, {recursive: true});
     let userDirPerm = fs.statSync(userDir);
     if (!userDirPerm.isDirectory()) {
