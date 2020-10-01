@@ -18,30 +18,25 @@
  */
 package org.netbeans.modules.javascript2.editor.spi;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 import java.util.List;
 import org.netbeans.modules.csl.api.CodeCompletionContext;
 import org.netbeans.modules.csl.api.CompletionProposal;
-import org.netbeans.modules.csl.api.ElementHandle;
-import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.javascript2.editor.JsCompletionItem;
 
 /**
  *
- * @author Petr Hejl
+ * @author sdedic
  */
-public interface CompletionProvider {
-
-    List<CompletionProposal> complete(CodeCompletionContext ccContext, CompletionContext jsCompletionContext, String prefix);
-
-    String getHelpDocumentation(ParserResult info, ElementHandle element);
+public interface CompletionProviderEx extends CompletionProvider {
+    /**
+     * Returns completion proposals relevant for the request.
+     * @param request the completion request
+     * @return list of proposals, potentially {@code null}.
+     */
+    List<CompletionProposal> complete(ProposalRequest request);
     
-    @Retention(RetentionPolicy.SOURCE)
-    @Target(ElementType.TYPE)
-    public @interface Registration {
-
-        int priority() default 100;
+    @Override
+    default List<CompletionProposal> complete(CodeCompletionContext ccContext, CompletionContext jsCompletionContext, String prefix) {
+        return complete(JsCompletionItem.createRequest(ccContext, jsCompletionContext, prefix));
     }
 }

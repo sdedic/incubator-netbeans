@@ -16,32 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.javascript2.editor.spi;
+package org.netbeans.modules.javascript2.editor;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 import java.util.List;
 import org.netbeans.modules.csl.api.CodeCompletionContext;
 import org.netbeans.modules.csl.api.CompletionProposal;
 import org.netbeans.modules.csl.api.ElementHandle;
 import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.javascript2.editor.spi.CompletionContext;
+import org.netbeans.modules.javascript2.editor.spi.CompletionProvider;
 
 /**
- *
- * @author Petr Hejl
+ * This is just a marker that breaks the extenders so that 
+ * @author sdedic
  */
-public interface CompletionProvider {
+public class MarkCompletionExtender implements CompletionProvider {
 
-    List<CompletionProposal> complete(CodeCompletionContext ccContext, CompletionContext jsCompletionContext, String prefix);
+    @Override
+    public List<CompletionProposal> complete(CodeCompletionContext ccContext, CompletionContext jsCompletionContext, String prefix) {
+        return null;
+    }
 
-    String getHelpDocumentation(ParserResult info, ElementHandle element);
-    
-    @Retention(RetentionPolicy.SOURCE)
-    @Target(ElementType.TYPE)
-    public @interface Registration {
-
-        int priority() default 100;
+    @Override
+    public String getHelpDocumentation(ParserResult info, ElementHandle element) {
+        return null;
     }
 }

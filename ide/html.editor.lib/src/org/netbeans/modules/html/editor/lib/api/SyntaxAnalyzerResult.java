@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.netbeans.api.annotations.common.NonNull;
+import org.netbeans.api.editor.mimelookup.MimePath;
 import org.netbeans.api.html.lexer.HTMLTokenId;
 import org.netbeans.api.lexer.TokenHierarchy;
 import org.netbeans.api.lexer.TokenSequence;
@@ -31,8 +32,14 @@ import org.netbeans.modules.html.editor.lib.*;
 import org.netbeans.modules.html.editor.lib.api.elements.*;
 import org.netbeans.modules.html.editor.lib.api.model.HtmlModel;
 import org.netbeans.modules.html.editor.lib.api.model.HtmlModelFactory;
+import org.netbeans.modules.parsing.api.Embedding;
+import org.netbeans.modules.parsing.api.ParserManager;
+import org.netbeans.modules.parsing.api.ResultIterator;
 import org.netbeans.modules.parsing.api.Snapshot;
+import org.netbeans.modules.parsing.api.UserTask;
+import org.netbeans.modules.parsing.spi.Parser;
 import org.netbeans.modules.web.common.api.LexerUtils;
+import org.netbeans.modules.web.common.api.WebPageMetadata;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Lookup;
 import org.openide.util.lookup.AbstractLookup;
@@ -675,6 +682,49 @@ public class SyntaxAnalyzerResult {
             long end = System.currentTimeMillis();
             log(String.format("getAllDeclaredNamespaces() took %s ms.", (end - start)));
         }
+    }
+
+    /**
+     * 
+     * Returns an artificial mimetype so the user can enable/disable the error checks
+     * for particular content. For example the {@code text/facelets+xhtml} mimetype is returned for
+    .* xhtml pages with facelets content. This allows to normally verify the plain xhtml file
+     * even if their mimetype is {@code text/html} sure the correct solution would be to let the 
+     * mimeresolver to create different mimetype, but since the resolution can be pretty complex it 
+     * is not done this way.
+     * <p>
+     * (description copied from org.netbeans.modules.html.editor.api.Utils)
+     * <p>
+     * If the paased {@code result} does not contain relevant information, the underlying file or source's
+     * MIME type is returned.
+     * 
+     * @param result SyntaxAnalyzerResult instance
+     * @return supplemental MIME type.
+     * @since 3.43
+     */
+    public static String getContentMimeType(SyntaxAnalyzerResult result) {
+        FileObject fo;
+        
+        InstanceContent ic = new InstanceContent();
+        ic.add(result);
+        WebPageMetadata wpmeta = WebPageMetadata.getMetadata(new AbstractLookup(ic));
+
+        if (wpmeta != null) {
+            //get an artificial mimetype for the web page, this doesn't have to be equal
+            //to the fileObjects mimetype.
+            String mimeType = (String) wpmeta.value(WebPageMetadata.MIMETYPE);
+            if (mimeType != null) {
+                return mimeType;
+            }
+        }
+        fo = result.getSource().getSourceFileObject();
+        if (fo != null) {
+            return fo.getMIMEType();
+        } else {
+            //no fileobject?
+            return result.getSource().getSnapshot().getMimeType();
+        }
+
     }
 
     private void log(String message) {

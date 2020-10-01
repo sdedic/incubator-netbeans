@@ -18,30 +18,10 @@
  */
 package org.netbeans.modules.javascript2.editor.spi;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import java.util.List;
-import org.netbeans.modules.csl.api.CodeCompletionContext;
-import org.netbeans.modules.csl.api.CompletionProposal;
-import org.netbeans.modules.csl.api.ElementHandle;
-import org.netbeans.modules.csl.spi.ParserResult;
-
 /**
- *
- * @author Petr Hejl
+ * Mixin interface for ElementHandles to provide a documentation.
+ * @author sdedic
  */
-public interface CompletionProvider {
-
-    List<CompletionProposal> complete(CodeCompletionContext ccContext, CompletionContext jsCompletionContext, String prefix);
-
-    String getHelpDocumentation(ParserResult info, ElementHandle element);
-    
-    @Retention(RetentionPolicy.SOURCE)
-    @Target(ElementType.TYPE)
-    public @interface Registration {
-
-        int priority() default 100;
-    }
+public interface ElementDocumentation {
+    public CharSequence getDocumentation();
 }

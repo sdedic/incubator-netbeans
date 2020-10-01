@@ -54,8 +54,6 @@ import org.netbeans.modules.html.editor.lib.api.elements.Node;
 import org.netbeans.modules.html.editor.lib.api.foreign.MaskingChSReader;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Exceptions;
-import org.openide.util.Lookup;
-import org.openide.util.lookup.Lookups;
 
 /**
  * HTML parser result
@@ -76,7 +74,7 @@ public class HtmlParserResult extends ParserResult implements HtmlParsingResult 
         super(result.getSource().getSnapshot());
         this.result = result;
     }
-    
+
     @Override
     public SyntaxAnalyzerResult getSyntaxAnalyzerResult() {
         return result;
@@ -362,28 +360,12 @@ public class HtmlParserResult extends ParserResult implements HtmlParsingResult 
     static {
         HtmlParserResultAccessor.set(new Accessor());
     }
-    
-    private static class Lkp extends HtmlParserResult implements Lookup.Provider {
-        private Lookup lkp;
-        
-        private Lkp(SyntaxAnalyzerResult result) {
-            super(result);
-        }
-
-        @Override
-        public Lookup getLookup() {
-            if (lkp == null) {
-                lkp = Lookups.fixed(super.result);
-            }
-            return lkp;
-        }
-    }
 
     private static class Accessor extends HtmlParserResultAccessor {
 
         @Override
         public HtmlParserResult createInstance(SyntaxAnalyzerResult result) {
-            return new Lkp(result);
+            return new HtmlParserResult(result);
         }
     }
 }

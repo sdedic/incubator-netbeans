@@ -87,6 +87,7 @@
                         <specification-version>1.0</specification-version>
                     </run-dependency>
                 </dependency>
+                <!--
                 <dependency>
                     <code-name-base>org.netbeans.modules.css.editor</code-name-base>
                     <build-prerequisite/>
@@ -96,6 +97,7 @@
                         <specification-version>1.26</specification-version>
                     </run-dependency>
                 </dependency>
+                                -->
                 <dependency>
                     <code-name-base>org.netbeans.modules.css.lib</code-name-base>
                     <build-prerequisite/>
@@ -209,7 +211,7 @@
                         <specification-version>1.46</specification-version>
                     </run-dependency>
                 </dependency>
-                <dependency>
+<!--                <dependency>
                     <code-name-base>org.netbeans.modules.html.editor</code-name-base>
                     <build-prerequisite/>
                     <compile-dependency/>
@@ -227,6 +229,7 @@
                         <specification-version>3.2</specification-version>
                     </run-dependency>
                 </dependency>
+                    -->
                 <dependency>
                     <code-name-base>org.netbeans.modules.html.lexer</code-name-base>
                     <build-prerequisite/>
@@ -560,6 +563,9 @@
                         <code-name-base>org.netbeans.modules.parsing.api</code-name-base>
                         <test/>
                     </test-dependency>
+                    <test-dependency>
+                        <code-name-base>org.netbeans.modules.javascript2.html</code-name-base>
+                    </test-dependency>
                 </test-type>
                 <test-type>
                     <name>qa-functional</name>
@@ -587,6 +593,9 @@
                     <test-dependency>
                         <code-name-base>org.netbeans.modules.projectapi.nb</code-name-base>
                     </test-dependency>
+                    <test-dependency>
+                        <code-name-base>org.netbeans.modules.javascript2.html</code-name-base>
+                    </test-dependency>
                 </test-type>
             </test-dependencies>
             <friend-packages>
@@ -597,6 +606,7 @@
                 <friend>org.netbeans.modules.javascript2.gj.bootstrap</friend>
                 <friend>org.netbeans.modules.javascript2.gj.react</friend>
                 <friend>org.netbeans.modules.javascript2.gj.typescript</friend>
+                <friend>org.netbeans.modules.javascript2.html</friend>
                 <friend>org.netbeans.modules.javascript2.react</friend>
                 <friend>org.netbeans.modules.javascript2.jquery</friend>
                 <friend>org.netbeans.modules.javascript2.kendo</friend>
