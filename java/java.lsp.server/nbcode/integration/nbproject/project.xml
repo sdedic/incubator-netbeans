@@ -19,7 +19,14 @@
     under the License.
 
 -->
-<project name="org.netbeans.modules.vscapp.integration" default="netbeans" basedir=".">
-    <description>Builds, tests, and runs the project org.netbeans.modules.vscapp.integration.</description>
-    <import file="nbproject/build-impl.xml"/>
+<project xmlns="http://www.netbeans.org/ns/project/1">
+    <type>org.netbeans.modules.apisupport.project</type>
+    <configuration>
+        <data xmlns="http://www.netbeans.org/ns/nb-module-project/3">
+            <code-name-base>org.netbeans.modules.nbcode.integration</code-name-base>
+            <suite-component/>
+            <module-dependencies/>
+            <public-packages/>
+        </data>
+    </configuration>
 </project>

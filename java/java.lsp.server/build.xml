@@ -29,8 +29,14 @@
         <setproxy proxyhost="${proxyHost}" proxyPort="${proxyPort}"/>
     </target>
     <target name="build-lsp-server" depends="-set-use-jdk-javac,build,test-init,proxy-setup" description="Prepares NetBeans bits for vscode extensions">
-        <ant dir="vscapp" target="build-zip" inheritall="false" inheritrefs="false" />
-        <unzip src="vscapp/dist/nb-java-lsp-server.zip" dest="${lsp.build.dir}/../" />
+        <ant dir="nbcode" target="build-zip" inheritall="false" inheritrefs="false" />
+        <unzip src="nbcode/dist/nbcode.zip" dest="${lsp.build.dir}/../" />
+        <mkdir dir="${lsp.build.dir}/bin" />
+        <copy todir="${lsp.build.dir}/bin" file="script/bin/nbcode" overwrite="true" />
+        <mkdir dir="${lsp.build.dir}/etc" />
+        <copy todir="${lsp.build.dir}/etc" file="script/etc/nbcode.conf" overwrite="true" />
+        <copy todir="${lsp.build.dir}/etc" file="script/etc/nbcode.clusters" overwrite="true" />
+        <chmod file="${lsp.build.dir}/bin/nbcode" perm="u+x" />
         <chmod file="${lsp.build.dir}/platform/lib/nbexec" perm="u+x"/>
         <chmod file="${lsp.build.dir}/java/maven/bin/mvn" perm="u+x" />
         <delete file="${lsp.build.dir}/lib/nb-javac-9-api.jar" />
@@ -46,7 +52,7 @@
     <target name="clean-vscode-ext" depends="clean" description="Cleans all VSCode related artifacts">
         <delete dir="${lsp.build.dir}" />
         <delete dir="vscode/node_modules" />
-        <ant dir="vscapp" target="clean" inheritall="false" inheritrefs="false"/>
+        <ant dir="nbcode" target="clean" inheritall="false" inheritrefs="false"/>
     </target>
     <target name="build-vscode-ext" depends="build-lsp-server" description="Build the Visual Studio Code extension.">
         <property name="vsix.version" value="0.1.0"/>

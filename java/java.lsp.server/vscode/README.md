@@ -64,7 +64,7 @@ The idea when debugging Java code is to launch the NetBeans part of the LSP
 system first, provide suitable debug arguments:
 
 ```bash
-vscode$ ./nb-java-lsp-server/bin/nb-java-lsp-server -J-agentlib:jdwp=transport=dt_socket,server=y,address=8000
+vscode$ ./nbcode/bin/nbcode -J-agentlib:jdwp=transport=dt_socket,server=y,address=8000
 ```
 
 and then connect to with debugger setup all breakpoints and then also connect

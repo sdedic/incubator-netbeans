@@ -34,7 +34,7 @@ export function launch(
     function findClusters(): string[] {
         let clusters = [];
         for (let e of vscode.extensions.all) {
-            const dir = path.join(e.extensionPath, 'nb-java-lsp-server');
+            const dir = path.join(e.extensionPath, 'nbcode');
             if (!fs.existsSync(dir)) {
                 continue;
             }
@@ -58,7 +58,7 @@ export function launch(
     let nbexec = os.platform() === 'win32' ? 
         os.arch() === 'x64' ? 'nbexec64.exe' : 'nbexec.exe' 
         : 'nbexec';
-    const nbexecPath = path.join(context.extensionPath, 'nb-java-lsp-server', 'platform', 'lib', nbexec);
+    const nbexecPath = path.join(context.extensionPath, 'nbcode', 'platform', 'lib', nbexec);
     let nbexecPerm = fs.statSync(nbexecPath);
     if (!nbexecPerm.isFile()) {
         throw `Cannot execute ${nbexecPath}`;
@@ -73,7 +73,7 @@ export function launch(
 
     let clusterPath = clusters.join(path.delimiter);
     let ideArgs: string[] = [
-        "--nosplash", "--nogui", "--branding", "vscapp",
+        "--nosplash", "--nogui", "--branding", "nbcode",
         "-J-Djava.awt.headless=true",
         "-J-Dnetbeans.logger.console=true",
 

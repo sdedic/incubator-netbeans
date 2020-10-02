@@ -103,3 +103,5 @@ derby.log
 /extide/gradle/release/modules/gradle/daemon-loader/.gradle/
 /nbbuild/misc/prepare-bundles/target/
 /java/java.lsp.server/vscapp/integration/build/
+/java/java.lsp.server/nbcode/integration/build/
+/java/java.lsp.server/nbcode/integration/nbproject/private/
