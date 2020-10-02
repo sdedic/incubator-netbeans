@@ -363,7 +363,14 @@ public class HtmlParserResult extends ParserResult implements HtmlParsingResult 
         HtmlParserResultAccessor.set(new Accessor());
     }
     
-    private static class Lkp extends HtmlParserResult implements Lookup.Provider {
+    /**
+     * This class is actually returned as Parser.Result instance for clients.
+     * It implements Lookup.Provider, so that web.common module may pass the 
+     * SyntaxAnalyzerResult on to the metadata providers. The only current user
+     * of the metadata API attempts to look up SyntaxAnalyzerResult directly.
+     * The addition of Lookup.Provider need not to be visible in APIs.
+     */
+    private static final class Lkp extends HtmlParserResult implements Lookup.Provider {
         private Lookup lkp;
         
         private Lkp(SyntaxAnalyzerResult result) {
@@ -373,7 +380,7 @@ public class HtmlParserResult extends ParserResult implements HtmlParsingResult 
         @Override
         public Lookup getLookup() {
             if (lkp == null) {
-                lkp = Lookups.fixed(super.result);
+                lkp = Lookups.fixed(getSyntaxAnalyzerResult());
             }
             return lkp;
         }

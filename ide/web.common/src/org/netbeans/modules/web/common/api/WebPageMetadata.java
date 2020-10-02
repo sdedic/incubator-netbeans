@@ -77,7 +77,7 @@ public final class WebPageMetadata {
      * @param parsed parser result instance
      * @param useSnapshot if true, will default to source or file MIME type.
      * @return supplemental MIME type.
-     * @since 3.43
+     * @since 1.109
      */
     public static String getContentMimeType(Parser.Result parsed, boolean useSnapshot) {
         FileObject fo;
