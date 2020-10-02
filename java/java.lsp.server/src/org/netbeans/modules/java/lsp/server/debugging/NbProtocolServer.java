@@ -1,172 +1,454 @@
-/*******************************************************************************
-* Copyright (c) 2017 Microsoft Corporation and others.
-* All rights reserved. This program and the accompanying materials
-* are made available under the terms of the Eclipse Public License v1.0
-* which accompanies this distribution, and is available at
-* http://www.eclipse.org/legal/epl-v10.html
-*
-* Contributors:
-*     Microsoft Corporation - initial API and implementation
-*******************************************************************************/
-
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.netbeans.modules.java.lsp.server.debugging;
 
-import com.sun.jdi.VMDisconnectedException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.net.URI;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.AbstractProtocolServer;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Events.DebugEvent;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Events.StoppedEvent;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
-import org.netbeans.modules.java.lsp.server.debugging.utils.AdapterUtils;
-import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorCode;
-import org.netbeans.modules.java.lsp.server.debugging.utils.UsageDataSession;
 
-public class NbProtocolServer extends AbstractProtocolServer {
+import org.apache.commons.lang3.StringUtils;
+import org.eclipse.lsp4j.debug.Capabilities;
+import org.eclipse.lsp4j.debug.ConfigurationDoneArguments;
+import org.eclipse.lsp4j.debug.ContinueArguments;
+import org.eclipse.lsp4j.debug.ContinueResponse;
+import org.eclipse.lsp4j.debug.DisconnectArguments;
+import org.eclipse.lsp4j.debug.EvaluateArguments;
+import org.eclipse.lsp4j.debug.EvaluateResponse;
+import org.eclipse.lsp4j.debug.ExceptionBreakMode;
+import org.eclipse.lsp4j.debug.ExceptionBreakpointsFilter;
+import org.eclipse.lsp4j.debug.ExceptionInfoArguments;
+import org.eclipse.lsp4j.debug.ExceptionInfoResponse;
+import org.eclipse.lsp4j.debug.InitializeRequestArguments;
+import org.eclipse.lsp4j.debug.NextArguments;
+import org.eclipse.lsp4j.debug.PauseArguments;
+import org.eclipse.lsp4j.debug.Scope;
+import org.eclipse.lsp4j.debug.ScopesArguments;
+import org.eclipse.lsp4j.debug.ScopesResponse;
+import org.eclipse.lsp4j.debug.SetBreakpointsArguments;
+import org.eclipse.lsp4j.debug.SetBreakpointsResponse;
+import org.eclipse.lsp4j.debug.SetExceptionBreakpointsArguments;
+import org.eclipse.lsp4j.debug.SetVariableArguments;
+import org.eclipse.lsp4j.debug.SetVariableResponse;
+import org.eclipse.lsp4j.debug.Source;
+import org.eclipse.lsp4j.debug.SourceArguments;
+import org.eclipse.lsp4j.debug.SourceResponse;
+import org.eclipse.lsp4j.debug.StackFrame;
+import org.eclipse.lsp4j.debug.StackTraceArguments;
+import org.eclipse.lsp4j.debug.StackTraceResponse;
+import org.eclipse.lsp4j.debug.StepInArguments;
+import org.eclipse.lsp4j.debug.StepOutArguments;
+import org.eclipse.lsp4j.debug.StoppedEventArguments;
+import org.eclipse.lsp4j.debug.ThreadsResponse;
+import org.eclipse.lsp4j.debug.VariablesArguments;
+import org.eclipse.lsp4j.debug.VariablesResponse;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
+import org.netbeans.api.debugger.ActionsManager;
+import org.netbeans.api.debugger.DebuggerManager;
+import org.netbeans.api.debugger.jpda.InvalidExpressionException;
+import org.netbeans.api.debugger.jpda.JPDADebugger;
+import org.netbeans.api.debugger.jpda.ObjectVariable;
+import org.netbeans.api.debugger.jpda.Variable;
+import org.netbeans.modules.debugger.jpda.truffle.vars.TruffleVariable;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbDisconnectRequestHandler;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbLaunchRequestHandler;
+import org.netbeans.modules.java.lsp.server.debugging.breakpoints.NbBreakpointsRequestHandler;
+import org.netbeans.modules.java.lsp.server.debugging.variables.NbVariablesRequestHandler;
+import org.netbeans.modules.java.lsp.server.debugging.utils.ErrorUtilities;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVFrame;
+import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
-    private static final Logger LOG = Logger.getLogger(NbProtocolServer.class.getName());
+/**
+ *
+ * @author Dusan Balek
+ */
+public final class NbProtocolServer implements IDebugProtocolServer {
 
-    private final IDebugAdapter debugAdapter;
-    private final UsageDataSession usageDataSession = new UsageDataSession();
+    private final DebugAdapterContext context;
+    private final NbLaunchRequestHandler launchRequestHandler = new NbLaunchRequestHandler();
+    private final NbDisconnectRequestHandler disconnectRequestHandler = new NbDisconnectRequestHandler();
+    private final NbBreakpointsRequestHandler breakpointsRequestHandler = new NbBreakpointsRequestHandler();
+    private final NbVariablesRequestHandler variablesRequestHandler = new NbVariablesRequestHandler();
+    private boolean initialized = false;
 
-    private final Object lock = new Object();
-    private boolean isDispatchingRequest = false;
-    private final ConcurrentLinkedQueue<DebugEvent> eventQueue = new ConcurrentLinkedQueue<>();
-
-    /**
-     * Constructs a protocol server instance based on the given input stream and output stream.
-     * @param input
-     *              the input stream
-     * @param output
-     *              the output stream
-     * @param context
-     *              provider context for a series of provider implementation
-     */
-    public NbProtocolServer(InputStream input, OutputStream output, IProviderContext context) {
-        super(input, output);
-        debugAdapter = new NbDebugAdapter(this, context);
+    public NbProtocolServer(DebugAdapterContext context) {
+        this.context = context;
     }
 
-    /**
-     * A while-loop to parse input data and send output data constantly.
-     */
     @Override
-    public void run() {
-        usageDataSession.reportStart();
-        super.run();
-        usageDataSession.reportStop();
-        usageDataSession.submitUsageData();
+    public CompletableFuture<Capabilities> initialize(InitializeRequestArguments args) {
+        if (!initialized) {
+            initialized = true;
+            // Called from postLaunch:
+            context.getThreadsProvider().initialize(context, Collections.emptyMap());
+        }
+        context.setClientLinesStartAt1(args.getLinesStartAt1());
+        context.setClientColumnsStartAt1(args.getColumnsStartAt1());
+        String pathFormat = args.getPathFormat();
+        if (pathFormat != null) {
+            switch (pathFormat) {
+                case "uri":
+                    context.setClientPathsAreUri(true);
+                    break;
+                default:
+                    context.setClientPathsAreUri(false);
+            }
+        }
+        context.setSupportsRunInTerminalRequest(args.getSupportsRunInTerminalRequest());
+
+        Capabilities caps = new Capabilities();
+        caps.setSupportsConfigurationDoneRequest(true);
+        caps.setSupportsHitConditionalBreakpoints(true);
+        caps.setSupportsConditionalBreakpoints(true);
+        caps.setSupportsSetVariable(true);
+        caps.setSupportTerminateDebuggee(true);
+        caps.setSupportsCompletionsRequest(true);
+        caps.setSupportsRestartFrame(true);
+        caps.setSupportsLogPoints(true);
+        caps.setSupportsEvaluateForHovers(true);
+
+        ExceptionBreakpointsFilter uncaught = new ExceptionBreakpointsFilter();
+        uncaught.setFilter(NbBreakpointsRequestHandler.UNCAUGHT_EXCEPTION_FILTER_NAME);
+        uncaught.setLabel("Uncaught Exceptions");
+        ExceptionBreakpointsFilter caught = new ExceptionBreakpointsFilter();
+        caught.setFilter(NbBreakpointsRequestHandler.CAUGHT_EXCEPTION_FILTER_NAME);
+        caught.setLabel("Caught Exceptions");
+        caps.setExceptionBreakpointFilters(new ExceptionBreakpointsFilter[]{uncaught, caught});
+        caps.setSupportsExceptionInfoRequest(true);
+        return CompletableFuture.completedFuture(caps);
     }
 
-    @Override
-    public void sendResponse(Messages.Response response) {
-        usageDataSession.recordResponse(response);
-        super.sendResponse(response);
-    }
-
-    @Override
-    public CompletableFuture<Messages.Response> sendRequest(Messages.Request request) {
-        LOG.log(Level.FINE, "SEND REQUEST: {0} {1}", new Object[]{request.command, request.arguments});
-        usageDataSession.recordRequest(request);
-        return super.sendRequest(request);
-    }
-
-    @Override
-    public CompletableFuture<Messages.Response> sendRequest(Messages.Request request, long timeout) {
-        LOG.log(Level.FINE, "SEND REQUEST: {0} {1}", new Object[]{request.command, request.arguments});
-        usageDataSession.recordRequest(request);
-        return super.sendRequest(request, timeout);
-    }
-
-    @Override
-    public void sendEvent(DebugEvent event) {
-        LOG.log(Level.FINE, "SEND Event: {0} {1}", new Object[]{event.type, event});
-        // See the two bugs https://github.com/Microsoft/java-debug/issues/134 and https://github.com/Microsoft/vscode/issues/58327,
-        // it requires the java-debug to send the StoppedEvent after ContinueResponse/StepResponse is received by DA.
-        if (event instanceof StoppedEvent) {
-            sendEventLater(event);
+    public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        NbDebugSession debugSession = context.getDebugSession();
+        if (debugSession != null) {
+            // Breakpoints were submitted, we can resume the debugger
+            context.getConfigurationSemaphore().notifyCongigurationDone();;
+            future.complete(null);
         } else {
-            super.sendEvent(event);
+            ErrorUtilities.completeExceptionally(future, "Failed to launch debug session, the debugger will exit.", ResponseErrorCode.serverErrorStart);
         }
-
-    }
-
-    /**
-     * If the the dispatcher is idle, then send the event to the DA immediately.
-     * Else add the new event to an eventQueue first and send them when dispatcher becomes idle again.
-     */
-    private void sendEventLater(DebugEvent event) {
-        synchronized (lock) {
-            if (this.isDispatchingRequest) {
-                this.eventQueue.offer(event);
-            } else {
-                super.sendEvent(event);
-            }
-        }
+        return future;
     }
 
     @Override
-    protected void dispatchRequest(Messages.Request request) {
-        usageDataSession.recordRequest(request);
-        try {
-            synchronized (lock) {
-                this.isDispatchingRequest = true;
+    public CompletableFuture<Void> launch(Map<String, Object> args) {
+        return launchRequestHandler.launch(args, context);
+    }
+
+    @Override
+    public CompletableFuture<Void> disconnect(DisconnectArguments args) {
+        return disconnectRequestHandler.disconnect(args, context);
+    }
+
+    @Override
+    public CompletableFuture<SetBreakpointsResponse> setBreakpoints(SetBreakpointsArguments args) {
+        return breakpointsRequestHandler.setBreakpoints(args, context);
+    }
+
+    @Override
+    public CompletableFuture<Void> setExceptionBreakpoints(SetExceptionBreakpointsArguments args) {
+        return breakpointsRequestHandler.setExceptionBreakpoints(args, context);
+    }
+
+    @Override
+    public CompletableFuture<ContinueResponse> continue_(ContinueArguments args) {
+        ContinueResponse response = new ContinueResponse();
+        if (args.getThreadId() > 0) {
+            DVThread dvThread = context.getThreadsProvider().getThread(args.getThreadId());
+            if (dvThread != null) {
+                dvThread.resume();
+                context.getRecyclableIdPool().removeObjectsByOwner(args.getThreadId());
             }
-
-            debugAdapter.dispatchRequest(request).thenCompose((response) -> {
-                CompletableFuture<Void> future = new CompletableFuture<>();
-                if (response != null) {
-                    LOG.log(Level.FINE, "Response: {0} {1} body = {2}", new Object[]{response.command, response.message, response.body});
-                    sendResponse(response);
-                    future.complete(null);
-                } else {
-                    future.completeExceptionally(new DebugException("The request dispatcher should not return null response.",
-                            ErrorCode.UNKNOWN_FAILURE.getId()));
-                }
-                return future;
-            }).exceptionally((error) -> {
-                Messages.Response response = new Messages.Response(request.seq, request.command);
-                Throwable ex;
-                if (error instanceof CompletionException && error.getCause() != null) {
-                    ex = error.getCause();
-                } else {
-                    ex = error;
-                }
-                assert ex != null;
-
-                if (ex instanceof VMDisconnectedException) {
-                    // mark it success to avoid reporting error on VSCode.
-                    response.success = true;
-                    sendResponse(response);
-                } else {
-                    String exceptionMessage = ex.getMessage() != null ? ex.getMessage() : ex.toString();
-                    ErrorCode errorCode = ex instanceof DebugException ? ErrorCode.parse(((DebugException) ex).getErrorCode()) : ErrorCode.UNKNOWN_FAILURE;
-                    boolean isUserError = ex instanceof DebugException && ((DebugException) ex).isUserError();
-                    if (isUserError) {
-                        usageDataSession.recordUserError(errorCode);
-                    } else {
-                        LOG.log(Level.SEVERE, String.format("[error response][%s]: %s", request.command, exceptionMessage), ex);
-                    }
-
-                    sendResponse(AdapterUtils.setErrorResponse(response,
-                            errorCode,
-                            exceptionMessage));
-                }
-                return null;
-            }).join();
-        } finally {
-            synchronized (lock) {
-                this.isDispatchingRequest = false;
-            }
-
-            while (this.eventQueue.peek() != null) {
-                super.sendEvent(this.eventQueue.poll());
-            }
+            response.setAllThreadsContinued(false);
+        } else {
+            JPDADebugger debugger = context.getDebugSession().getDebugger();
+            debugger.getSession().getCurrentEngine().getActionsManager().doAction("continue");
+            context.getRecyclableIdPool().removeAllObjects();
+            response.setAllThreadsContinued(true);
         }
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<Void> next(NextArguments args) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        if (context.getDebugSession() == null) {
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
+        } else {
+            ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
+            am.doAction("stepOver");
+            future.complete(null);
+        }
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> stepIn(StepInArguments args) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        if (context.getDebugSession() == null) {
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
+        } else {
+            ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
+            am.doAction("stepInto");
+            future.complete(null);
+        }
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> stepOut(StepOutArguments args) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        if (context.getDebugSession() == null) {
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
+        } else {
+            ActionsManager am = DebuggerManager.getDebuggerManager().getCurrentEngine().getActionsManager();
+            am.doAction("stepOut");
+            future.complete(null);
+        }
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> pause(PauseArguments args) {
+        final StoppedEventArguments ev;
+        if (args.getThreadId() > 0) {
+            DVThread dvThread = context.getThreadsProvider().getThread(args.getThreadId());
+            if (dvThread != null) {
+                dvThread.suspend();
+                ev = new StoppedEventArguments();
+                ev.setReason("pause");
+                ev.setThreadId(args.getThreadId());
+                ev.setAllThreadsStopped(false);
+            } else {
+                ev = null;
+            }
+        } else {
+            JPDADebugger debugger = context.getDebugSession().getDebugger();
+            debugger.getSession().getCurrentEngine().getActionsManager().doAction("pause");
+            ev = new StoppedEventArguments();
+            ev.setReason("pause");
+            ev.setThreadId(0);
+            ev.setAllThreadsStopped(true);
+        }
+        if (ev != null) {
+            context.getClient().stopped(ev);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
+        CompletableFuture<StackTraceResponse> future = new CompletableFuture<>();
+        if (context.getDebugSession() == null) {
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
+        } else {
+            List<StackFrame> result = new ArrayList<>();
+            int cnt = 0;
+            DVThread dvThread = context.getThreadsProvider().getThread(args.getThreadId());
+            if (dvThread != null) {
+                cnt = dvThread.getFrameCount();
+                int from = args.getStartFrame() != null ? args.getStartFrame() : 0;
+                int to = args.getLevels() != null ? from + args.getLevels() : Integer.MAX_VALUE;
+                List<DVFrame> stackFrames = dvThread.getFrames(from, to);
+                for (DVFrame frame : stackFrames) {
+                    int frameId = context.getRecyclableIdPool().addObject(args.getThreadId(), new NbFrame(args.getThreadId(), frame));
+                    int line = frame.getLine();
+                    if (line < 0) { // unknown
+                        line = 0;
+                    }
+                    int column = frame.getColumn();
+                    if (column < 0) { // unknown
+                        column = 0;
+                    }
+                    StackFrame stackFrame = new StackFrame();
+                    stackFrame.setId(frameId);
+                    stackFrame.setName(frame.getName());
+                    URI sourceURI = frame.getSourceURI();
+                    if (sourceURI != null && sourceURI.getPath() != null) {
+                        Source source = new Source();
+                        source.setName(Paths.get(sourceURI.getPath()).getFileName().toString());
+                        source.setPath(sourceURI.getPath());
+                        source.setSourceReference(0);
+                        stackFrame.setSource(source);
+                    }
+                    stackFrame.setLine(line);
+                    stackFrame.setColumn(column);
+                    result.add(stackFrame);
+                }
+            }
+            StackTraceResponse response = new StackTraceResponse();
+            response.setStackFrames(result.toArray(new StackFrame[result.size()]));
+            response.setTotalFrames(cnt);
+            future.complete(response);
+        }
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<ScopesResponse> scopes(ScopesArguments args) {
+        List<Scope> result = new ArrayList<>();
+        NbFrame stackFrame = (NbFrame) context.getRecyclableIdPool().getObjectById(args.getFrameId());
+        if (stackFrame != null) {
+            stackFrame.getDVFrame().makeCurrent(); // The scopes and variables are always provided with respect to the current frame
+            // TODO: Provide Truffle scopes.
+            NbScope localScope = new NbScope(stackFrame, "Local");
+            int localScopeId = context.getRecyclableIdPool().addObject(stackFrame.getThreadId(), localScope);
+            Scope scope = new Scope();
+            scope.setName(localScope.getName());
+            scope.setVariablesReference(localScopeId);
+            scope.setExpensive(false);
+            result.add(scope);
+        }
+        ScopesResponse response = new ScopesResponse();
+        response.setScopes(result.toArray(new Scope[result.size()]));
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<VariablesResponse> variables(VariablesArguments args) {
+        return variablesRequestHandler.variables(args, context);
+    }
+
+    @Override
+    public CompletableFuture<SetVariableResponse> setVariable(SetVariableArguments args) {
+        return variablesRequestHandler.setVariable(args, context);
+    }
+
+    @Override
+    public CompletableFuture<SourceResponse> source(SourceArguments args) {
+        CompletableFuture<SourceResponse> future = new CompletableFuture<>();
+        int sourceReference = args.getSourceReference();
+        if (sourceReference <= 0) {
+            ErrorUtilities.completeExceptionally(future, "SourceRequest: property 'sourceReference' is missing, null, or empty", ResponseErrorCode.InvalidParams);
+        } else {
+            String uri = context.getSourceUri(sourceReference);
+            NbSourceProvider sourceProvider = context.getSourceProvider();
+            SourceResponse response = new SourceResponse();
+            response.setMimeType("text/x-java"); // Set mimeType to tell clients to recognize the source contents as java source
+            response.setContent(sourceProvider.getSourceContents(uri));
+            future.complete(response);
+        }
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<ThreadsResponse> threads() {
+        CompletableFuture<ThreadsResponse> future = new CompletableFuture<>();
+        if (context.getDebugSession() == null) {
+            ErrorUtilities.completeExceptionally(future, "Debug Session doesn't exist.", ResponseErrorCode.InvalidParams);
+        } else {
+            List<org.eclipse.lsp4j.debug.Thread> result = new ArrayList<>();
+            context.getThreadsProvider().visitThreads((id, dvThread) -> {
+                org.eclipse.lsp4j.debug.Thread thread = new org.eclipse.lsp4j.debug.Thread();
+                thread.setId(id);
+                thread.setName(dvThread.getName());
+                result.add(thread);
+            });
+            ThreadsResponse response = new ThreadsResponse();
+            response.setThreads(result.toArray(new org.eclipse.lsp4j.debug.Thread[result.size()]));
+            future.complete(response);
+        }
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<EvaluateResponse> evaluate(EvaluateArguments args) {
+        return CompletableFuture.supplyAsync(() -> {
+            String expression = args.getExpression();
+            if (StringUtils.isBlank(expression)) {
+                throw ErrorUtilities.createResponseErrorException(
+                    "Failed to evaluate. Reason: Empty expression cannot be evaluated.",
+                    ResponseErrorCode.InvalidParams);
+            }
+            NbFrame stackFrame = (NbFrame) context.getRecyclableIdPool().getObjectById(args.getFrameId());
+            if (stackFrame == null) {
+                throw ErrorUtilities.createResponseErrorException(
+                    "Failed to evaluate. Reason: Unknown frame " + args.getFrameId(),
+                    ResponseErrorCode.InvalidParams);
+            }
+            stackFrame.getDVFrame().makeCurrent(); // The evaluation is always performed with respect to the current frame
+            DVThread dvThread = stackFrame.getDVFrame().getThread();
+            int threadId = context.getThreadsProvider().getId(dvThread);
+            JPDADebugger debugger = ((NbDebugSession) context.getDebugSession()).getDebugger();
+            Variable variable;
+            try {
+                variable = debugger.evaluate(expression);
+            } catch (InvalidExpressionException ex) {
+                throw ErrorUtilities.createResponseErrorException(
+                    "Failed to evaluate. Reason: " + ex.getLocalizedMessage(),
+                    ResponseErrorCode.ParseError);
+            }
+            EvaluateResponse response = new EvaluateResponse();
+            TruffleVariable truffleVariable = TruffleVariable.get(variable);
+            if (truffleVariable != null) {
+                int referenceId = context.getRecyclableIdPool().addObject(threadId, truffleVariable);
+                response.setResult(truffleVariable.getDisplayValue());
+                response.setVariablesReference(referenceId);
+                response.setType(truffleVariable.getType());
+                response.setIndexedVariables(truffleVariable.isLeaf() ? 0 : Integer.MAX_VALUE);
+            } else {
+                if (variable instanceof ObjectVariable) {
+                    int referenceId = context.getRecyclableIdPool().addObject(threadId, variable);
+                    int indexedVariables = ((ObjectVariable) variable).getFieldsCount();
+                    String toString;
+                    try {
+                        toString = ((ObjectVariable) variable).getToStringValue();
+                    } catch (InvalidExpressionException ex) {
+                        toString = variable.getValue();
+                    }
+                    response.setResult(toString);
+                    response.setVariablesReference(referenceId);
+                    response.setType(variable.getType());
+                    response.setIndexedVariables(Math.max(indexedVariables, 0));
+                } else {
+                    response.setResult(variable.getValue());
+                    response.setVariablesReference(0);
+                    response.setType(variable.getType());
+                    response.setIndexedVariables(0);
+                }
+            }
+            return response;
+        });
+    }
+
+    @Override
+    public CompletableFuture<ExceptionInfoResponse> exceptionInfo(ExceptionInfoArguments args) {
+        CompletableFuture<ExceptionInfoResponse> future = new CompletableFuture<>();
+        ExceptionManager.ExceptionInfo exceptionInfo = context.getExceptionManager().getException(args.getThreadId());
+        if (exceptionInfo == null) {
+            ErrorUtilities.completeExceptionally(future, "No exception exists in thread " + args.getThreadId(), ResponseErrorCode.InvalidParams);
+        } else {
+            String typeName = exceptionInfo.getException().getLocalizedMessage(); // TODO
+            String exceptionToString = exceptionInfo.getException().toString();
+
+            ExceptionInfoResponse response = new ExceptionInfoResponse();
+            response.setExceptionId(typeName);
+            response.setDescription(exceptionToString);
+            response.setBreakMode(exceptionInfo.isCaught() ? ExceptionBreakMode.ALWAYS : ExceptionBreakMode.USER_UNHANDLED);
+            future.complete(response);
+        }
+        return future;
     }
 }

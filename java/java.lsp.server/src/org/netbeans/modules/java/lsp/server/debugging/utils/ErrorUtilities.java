@@ -16,16 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging;
+package org.netbeans.modules.java.lsp.server.debugging.utils;
+
+import java.util.concurrent.CompletableFuture;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 
 /**
  *
  * @author martin
  */
-public interface IConfigurationSemaphore extends IProvider {
+public final class ErrorUtilities {
 
-    void waitForConfigurationDone();
+    private ErrorUtilities() {
+    }
 
-    void notifyCongigurationDone();
+    public static void completeExceptionally(CompletableFuture<?> future, String message, ResponseErrorCode errorCode) {
+        future.completeExceptionally(createResponseErrorException(message, errorCode));
+    }
 
+    public static ResponseErrorException createResponseErrorException(String message, ResponseErrorCode errorCode) {
+        return new ResponseErrorException(new ResponseError(errorCode, message, null));
+    }
 }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.debugging.requests;
+package org.netbeans.modules.java.lsp.server.debugging.variables;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,276 +1,239 @@
-/*******************************************************************************
-* Copyright (c) 2017 Microsoft Corporation and others.
-* All rights reserved. This program and the accompanying materials
-* are made available under the terms of the Eclipse Public License v1.0
-* which accompanies this distribution, and is available at
-* http://www.eclipse.org/legal/epl-v10.html
-*
-* Contributors:
-*     Microsoft Corporation - initial API and implementation
-*******************************************************************************/
-
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.netbeans.modules.java.lsp.server.debugging;
 
+import java.io.IOError;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.nio.file.Path;
-import java.util.Collections;
-import java.util.Map;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.IProtocolServer;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests.StepFilters;
+import java.nio.file.FileSystemNotFoundException;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Paths;
+
+import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
+
+import org.netbeans.modules.java.lsp.server.debugging.breakpoints.BreakpointManager;
+import org.netbeans.modules.java.lsp.server.debugging.launch.NbDebugSession;
 import org.netbeans.modules.java.lsp.server.debugging.utils.IdCollection;
-import org.netbeans.modules.java.lsp.server.debugging.utils.LRUCache;
 import org.netbeans.modules.java.lsp.server.debugging.utils.RecyclableObjectPool;
 
-public class DebugAdapterContext implements IDebugAdapterContext {
-    private static final int MAX_CACHE_ITEMS = 10000;
-    private Map<String, String> sourceMappingCache = Collections.synchronizedMap(new LRUCache<>(MAX_CACHE_ITEMS));
-    private IProviderContext providerContext;
-    private IProtocolServer server;
+public final class DebugAdapterContext {
 
-    private IDebugSession debugSession;
-    private boolean debuggerLinesStartAt1 = true;
-    private boolean debuggerPathsAreUri = true;
+    private IDebugProtocolClient client;
+    private NbDebugSession debugSession;
     private boolean clientLinesStartAt1 = true;
     private boolean clientColumnsStartAt1 = true;
+    private final boolean debuggerLinesStartAt1 = true;
     private boolean clientPathsAreUri = false;
-    private boolean supportsRunInTerminalRequest;
+    private final boolean debuggerPathsAreUri = true;
+    private boolean supportsRunInTerminalRequest = false;
     private boolean isAttached = false;
     private String[] sourcePaths;
     private Charset debuggeeEncoding;
-    private transient boolean vmTerminated;
     private boolean isVmStopOnEntry = false;
-    private LaunchMode launchMode = LaunchMode.DEBUG;
-    private Process debuggeeProcess;
-    private String mainClass;
-    private StepFilters stepFilters;
-    private Path classpathJar = null;
-    private Path argsfile = null;
+    private boolean isDebugMode = true;
 
-    private IdCollection<String> sourceReferences = new IdCollection<>();
-    private RecyclableObjectPool<Long, Object> recyclableIdPool = new RecyclableObjectPool<>();
+    private final IdCollection<String> sourceReferences = new IdCollection<>();
+    private final RecyclableObjectPool<Integer, Object> recyclableIdPool = new RecyclableObjectPool<>();
 
-    private IExceptionManager exceptionManager = new ExceptionManager();
+    private final NBConfigurationSemaphore configurationSemaphore = new NBConfigurationSemaphore();
+    private final NbSourceProvider sourceProvider = new NbSourceProvider(this);
+    private final NbThreads threadsProvider = new NbThreads();
+    private final BreakpointManager breakpointManager = new BreakpointManager();
+    private final ExceptionManager exceptionManager = new ExceptionManager();
 
-    public DebugAdapterContext(IProtocolServer server, IProviderContext providerContext) {
-        this.providerContext = providerContext;
-        this.server = server;
+    public DebugAdapterContext() {
     }
 
-    @Override
-    public IProtocolServer getProtocolServer() {
-        return server;
+    public IDebugProtocolClient getClient() {
+        return client;
     }
 
-    @Override
-    public <T extends IProvider> T getProvider(Class<T> clazz) {
-        return providerContext.getProvider(clazz);
+    void setClient(IDebugProtocolClient client) {
+        this.client = client;
     }
 
-    @Override
-    public void setDebugSession(IDebugSession session) {
-        debugSession = session;
-    }
-
-    @Override
-    public IDebugSession getDebugSession() {
+    public NbDebugSession getDebugSession() {
         return debugSession;
     }
 
-    @Override
-    public boolean isDebuggerLinesStartAt1() {
-        return debuggerLinesStartAt1;
+    public void setDebugSession(NbDebugSession session) {
+        debugSession = session;
     }
 
-    @Override
-    public void setDebuggerLinesStartAt1(boolean debuggerLinesStartAt1) {
-        this.debuggerLinesStartAt1 = debuggerLinesStartAt1;
+    void setClientLinesStartAt1(Boolean clientLinesStartAt1) {
+        if (clientLinesStartAt1 != null) {
+            this.clientLinesStartAt1 = clientLinesStartAt1;
+        }
     }
 
-    @Override
-    public boolean isDebuggerPathsAreUri() {
-        return debuggerPathsAreUri;
+    void setClientColumnsStartAt1(Boolean clientColumnsStartAt1) {
+        if (clientColumnsStartAt1 != null) {
+            this.clientColumnsStartAt1 = clientColumnsStartAt1;
+        }
     }
 
-    @Override
-    public void setDebuggerPathsAreUri(boolean debuggerPathsAreUri) {
-        this.debuggerPathsAreUri = debuggerPathsAreUri;
+    public int getClientLine(int debuggerLine) {
+        if (clientLinesStartAt1 == debuggerLinesStartAt1) {
+            return debuggerLine;
+        }
+        if (clientLinesStartAt1) {
+            return debuggerLine + 1;
+        } else {
+            return debuggerLine - 1;
+        }
     }
 
-    @Override
-    public boolean isClientLinesStartAt1() {
-        return clientLinesStartAt1;
+    public int getDebuggerLine(int clientLine) {
+        if (clientLinesStartAt1 == debuggerLinesStartAt1) {
+            return clientLine;
+        }
+        if (debuggerLinesStartAt1) {
+            return clientLine + 1;
+        } else {
+            return clientLine - 1;
+        }
     }
 
-    @Override
-    public void setClientLinesStartAt1(boolean clientLinesStartAt1) {
-        this.clientLinesStartAt1 = clientLinesStartAt1;
-    }
-
-    public boolean isClientColumnsStartAt1() {
-        return clientColumnsStartAt1;
-    }
-
-    public void setClientColumnsStartAt1(boolean clientColumnsStartAt1) {
-        this.clientColumnsStartAt1 = clientColumnsStartAt1;
-    }
-
-    @Override
-    public boolean isClientPathsAreUri() {
-        return clientPathsAreUri;
-    }
-
-    @Override
-    public void setClientPathsAreUri(boolean clientPathsAreUri) {
+    void setClientPathsAreUri(boolean clientPathsAreUri) {
         this.clientPathsAreUri = clientPathsAreUri;
     }
 
-    @Override
-    public void setSupportsRunInTerminalRequest(boolean supportsRunInTerminalRequest) {
-        this.supportsRunInTerminalRequest = supportsRunInTerminalRequest;
+    public String getClientPath(String debuggerPath) {
+        if (clientPathsAreUri == debuggerPathsAreUri) {
+            return debuggerPath;
+        }
+        if (clientPathsAreUri) {
+            return toURI(debuggerPath);
+        } else {
+            return toPath(debuggerPath);
+        }
     }
 
-    @Override
-    public boolean supportsRunInTerminalRequest() {
+    public String getDebuggerPath(String clientPath) {
+        if (clientPathsAreUri == debuggerPathsAreUri) {
+            return clientPath;
+        }
+        if (debuggerPathsAreUri) {
+            return toURI(clientPath);
+        } else {
+            return toPath(clientPath);
+        }
+    }
+
+    private static String toPath(String uri) {
+        try {
+            return Paths.get(new URI(uri)).toString();
+        } catch (URISyntaxException | FileSystemNotFoundException | IllegalArgumentException | SecurityException e) {
+            return null;
+        }
+    }
+
+    private static String toURI(String path) {
+        try {
+            return Paths.get(path).toUri().toString();
+        } catch (InvalidPathException | SecurityException | IOError e) {
+            return null;
+        }
+    }
+
+    public boolean isSupportsRunInTerminalRequest() {
         return supportsRunInTerminalRequest;
     }
 
-    @Override
+    public void setSupportsRunInTerminalRequest(Boolean supportsRunInTerminalRequest) {
+        if (supportsRunInTerminalRequest != null) {
+            this.supportsRunInTerminalRequest = supportsRunInTerminalRequest;
+        }
+    }
+
     public boolean isAttached() {
         return isAttached;
     }
 
-    @Override
-    public void setAttached(boolean attached) {
-        isAttached = attached;
+    public void setAttached(boolean isAttached) {
+        this.isAttached = isAttached;
     }
 
-    @Override
     public String[] getSourcePaths() {
         return sourcePaths;
     }
 
-    @Override
     public void setSourcePaths(String[] sourcePaths) {
         this.sourcePaths = sourcePaths;
     }
 
-    @Override
     public String getSourceUri(int sourceReference) {
         return sourceReferences.get(sourceReference);
     }
 
-    @Override
     public int createSourceReference(String uri) {
         return sourceReferences.create(uri);
     }
 
-    @Override
-    public RecyclableObjectPool<Long, Object> getRecyclableIdPool() {
+    public RecyclableObjectPool<Integer, Object> getRecyclableIdPool() {
         return recyclableIdPool;
     }
 
-    @Override
-    public void setRecyclableIdPool(RecyclableObjectPool<Long, Object> idPool) {
-        recyclableIdPool = idPool;
-    }
-
-    @Override
-    public Map<String, String> getSourceLookupCache() {
-        return sourceMappingCache;
-    }
-
-    @Override
     public void setDebuggeeEncoding(Charset encoding) {
         debuggeeEncoding = encoding;
     }
 
-    @Override
     public Charset getDebuggeeEncoding() {
         return debuggeeEncoding;
     }
 
-    @Override
-    public void setVmTerminated() {
-        vmTerminated = true;
-    }
-
-    @Override
-    public boolean isVmTerminated() {
-        return vmTerminated;
-    }
-
-    @Override
-    public void setVmStopOnEntry(boolean stopOnEntry) {
-        isVmStopOnEntry = stopOnEntry;
-    }
-
-    @Override
     public boolean isVmStopOnEntry() {
         return isVmStopOnEntry;
     }
 
-    @Override
-    public void setMainClass(String mainClass) {
-        this.mainClass = mainClass;
+    public void setVmStopOnEntry(Boolean stopOnEntry) {
+        if (stopOnEntry != null) {
+            isVmStopOnEntry = stopOnEntry;
+        }
     }
 
-    @Override
-    public String getMainClass() {
-        return this.mainClass;
+    public boolean isDebugMode() {
+        return isDebugMode;
     }
 
-    @Override
-    public void setStepFilters(StepFilters stepFilters) {
-        this.stepFilters = stepFilters;
+    public void setDebugMode(boolean mode) {
+        this.isDebugMode = mode;
     }
 
-    @Override
-    public StepFilters getStepFilters() {
-        return stepFilters;
+    public NBConfigurationSemaphore getConfigurationSemaphore() {
+        return this.configurationSemaphore;
     }
 
-    @Override
-    public LaunchMode getLaunchMode() {
-        return launchMode;
+    public NbSourceProvider getSourceProvider() {
+        return this.sourceProvider;
     }
 
-    @Override
-    public void setLaunchMode(LaunchMode launchMode) {
-        this.launchMode = launchMode;
+    public NbThreads getThreadsProvider() {
+        return this.threadsProvider;
     }
 
-    @Override
-    public Process getDebuggeeProcess() {
-        return this.debuggeeProcess;
+    public BreakpointManager getBreakpointManager() {
+        return this.breakpointManager;
     }
 
-    @Override
-    public void setDebuggeeProcess(Process debuggeeProcess) {
-        this.debuggeeProcess = debuggeeProcess;
-    }
-
-    @Override
-    public void setClasspathJar(Path classpathJar) {
-        this.classpathJar = classpathJar;
-    }
-
-    @Override
-    public Path getClasspathJar() {
-        return this.classpathJar;
-    }
-
-    @Override
-    public void setArgsfile(Path argsfile) {
-        this.argsfile = argsfile;
-    }
-
-    @Override
-    public Path getArgsfile() {
-        return this.argsfile;
-    }
-
-    @Override
-    public IExceptionManager getExceptionManager() {
+    public ExceptionManager getExceptionManager() {
         return this.exceptionManager;
     }
 }

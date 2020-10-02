@@ -19,17 +19,11 @@
 package org.netbeans.modules.java.lsp.server.protocol;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.google.gson.TypeAdapter;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonWriter;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.LineMap;
 import com.sun.source.util.TreePath;
-import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
-import com.vladsch.flexmark.parser.Parser;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -57,12 +51,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.prefs.Preferences;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -88,6 +77,7 @@ import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
+import org.eclipse.lsp4j.DefinitionParams;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
@@ -96,13 +86,16 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.DidSaveTextDocumentParams;
 import org.eclipse.lsp4j.DocumentFormattingParams;
 import org.eclipse.lsp4j.DocumentHighlight;
+import org.eclipse.lsp4j.DocumentHighlightParams;
 import org.eclipse.lsp4j.DocumentOnTypeFormattingParams;
 import org.eclipse.lsp4j.DocumentRangeFormattingParams;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.InsertTextFormat;
 import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
@@ -112,11 +105,11 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.ReferenceParams;
 import org.eclipse.lsp4j.RenameParams;
 import org.eclipse.lsp4j.SignatureHelp;
+import org.eclipse.lsp4j.SignatureHelpParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.SymbolKind;
 import org.eclipse.lsp4j.TextDocumentContentChangeEvent;
 import org.eclipse.lsp4j.TextDocumentEdit;
-import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
 import org.eclipse.lsp4j.WorkspaceEdit;
@@ -139,9 +132,6 @@ import org.netbeans.api.java.source.TreePathHandle;
 import org.netbeans.api.java.source.WorkingCopy;
 import org.netbeans.api.java.source.support.ReferencesCount;
 import org.netbeans.api.java.source.ui.ElementJavadoc;
-import org.netbeans.api.java.source.ui.ElementOpen;
-import org.netbeans.api.lexer.TokenHierarchy;
-import org.netbeans.modules.editor.NbEditorUtilities;
 import org.netbeans.modules.editor.java.GoToSupport;
 import org.netbeans.modules.editor.java.GoToSupport.Context;
 import org.netbeans.modules.editor.java.GoToSupport.GoToTarget;
@@ -538,18 +528,18 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
     }
 
     @Override
-    public CompletableFuture<Hover> hover(TextDocumentPositionParams arg0) {
+    public CompletableFuture<Hover> hover(HoverParams params) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public CompletableFuture<SignatureHelp> signatureHelp(TextDocumentPositionParams arg0) {
+    public CompletableFuture<SignatureHelp> signatureHelp(SignatureHelpParams params) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public CompletableFuture<List<? extends Location>> definition(TextDocumentPositionParams params) {
-        JavaSource js = getSource(params.getTextDocument().getUri());
+    public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> definition(DefinitionParams params) {
+            JavaSource js = getSource(params.getTextDocument().getUri());
         GoToTarget[] target = new GoToTarget[1];
         LineMap[] thisFileLineMap = new LineMap[1];
         try {
@@ -591,7 +581,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
                                                   createPosition(thisFileLineMap[0], end))));
             }
         }
-        return CompletableFuture.completedFuture(result);
+        return CompletableFuture.completedFuture(Either.forLeft(result));
     }
 
     @Override
@@ -600,7 +590,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
     }
 
     @Override
-    public CompletableFuture<List<? extends DocumentHighlight>> documentHighlight(TextDocumentPositionParams params) {
+    public CompletableFuture<List<? extends DocumentHighlight>> documentHighlight(DocumentHighlightParams params) {
         class MOHighligther extends MarkOccurrencesHighlighterBase {
             @Override
             protected void process(CompilationInfo arg0, Document arg1, SchedulerEvent arg2) {
@@ -730,10 +720,10 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
         JavaSource js = JavaSource.forDocument(doc);
         List<Either<Command, CodeAction>> result = new ArrayList<>();
         for (Diagnostic diag : params.getContext().getDiagnostics()) {
-            ErrorDescription err = id2Errors.get(diag.getCode());
+            ErrorDescription err = id2Errors.get(diag.getCode().getLeft());
 
             if (err == null) {
-                client.logMessage(new MessageParams(MessageType.Log, "Cannot resolve error, code: " + diag.getCode()));
+                client.logMessage(new MessageParams(MessageType.Log, "Cannot resolve error, code: " + diag.getCode().getLeft()));
                 continue;
             }
 
@@ -796,7 +786,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
                         CodeAction action = new CodeAction(f.getText());
                         action.setDiagnostics(Collections.singletonList(diag));
                         action.setKind(CodeActionKind.QuickFix);
-                        action.setEdit(new WorkspaceEdit(Collections.singletonList(te)));
+                        action.setEdit(new WorkspaceEdit(Collections.singletonList(Either.forLeft(te))));
                         result.add(Either.forRight(action));
                     } catch (IOException ex) {
                         //TODO: include stack trace:

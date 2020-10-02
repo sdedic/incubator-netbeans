@@ -28,7 +28,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
 
 import org.netbeans.api.annotations.common.CheckForNull;
 import org.netbeans.api.debugger.DebuggerManager;
@@ -39,12 +38,8 @@ import org.netbeans.api.java.classpath.ClassPath;
 import org.netbeans.api.java.queries.UnitTestForSourceQuery;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
-import org.netbeans.modules.java.lsp.server.debugging.IConfigurationSemaphore;
-import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
-import org.netbeans.modules.java.lsp.server.debugging.IDebugSession;
-import org.netbeans.modules.java.lsp.server.debugging.ISourceLookUpProvider;
+import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
 import org.netbeans.modules.java.lsp.server.debugging.NbSourceProvider;
-import org.netbeans.modules.java.lsp.server.ui.IOContext;
 import org.netbeans.spi.project.ActionProgress;
 import org.netbeans.spi.project.ActionProvider;
 import org.openide.filesystems.FileObject;
@@ -57,65 +52,66 @@ import org.openide.util.lookup.ProxyLookup;
  *
  * @author martin
  */
-public abstract class NbLaunchDelegate implements ILaunchDelegate {
+public abstract class NbLaunchDelegate {
 
-    private static final Logger LOG = Logger.getLogger(NbLaunchDelegate.class.getName());
+    public abstract void preLaunch(Map<String, Object> launchArguments, DebugAdapterContext context);
 
-    @Override
-    public final CompletableFuture<Void> nbLaunch(FileObject toRun, IDebugAdapterContext context, boolean debug, Consumer<NbProcessConsole.ConsoleMessage> consoleMessages) {
-            Pair<ActionProvider, String> providerAndCommand = findTarget(toRun, debug);
-            if (providerAndCommand == null) {
-                throw new VMDisconnectedException("Cannot find debug action!"); //TODO: message, locations
+    public abstract void postLaunch(Map<String, Object> launchArguments, DebugAdapterContext context);
+
+    public final CompletableFuture<Void> nbLaunch(FileObject toRun, DebugAdapterContext context, boolean debug, Consumer<NbProcessConsole.ConsoleMessage> consoleMessages) {
+        Pair<ActionProvider, String> providerAndCommand = findTarget(toRun, debug);
+        if (providerAndCommand == null) {
+            throw new VMDisconnectedException("Cannot find debug action!"); //TODO: message, locations
+        }
+        NbProcessConsole ioContext = new NbProcessConsole(consoleMessages);
+        ActionProgress progress = new ActionProgress() {
+            @Override
+            protected void started() {}
+            @Override
+            public void finished(boolean success) {
+                ioContext.stop();
             }
-            NbProcessConsole ioContext = new NbProcessConsole(consoleMessages);
-            ActionProgress progress = new ActionProgress() {
+        };
+        CompletableFuture<Void> launchFuture = new CompletableFuture<>();
+        if (debug) {
+            DebuggerManager.getDebuggerManager().addDebuggerListener(new DebuggerManagerAdapter() {
                 @Override
-                protected void started() {}
-                @Override
-                public void finished(boolean success) {
-                    ioContext.stop();
-                }
-            };
-            CompletableFuture<Void> launchFuture = new CompletableFuture<>();
-            if (debug) {
-                DebuggerManager.getDebuggerManager().addDebuggerListener(new DebuggerManagerAdapter() {
-                    @Override
-                    public void sessionAdded(Session session) {
-                        JPDADebugger debugger = session.lookupFirst(null, JPDADebugger.class);
-                        if (debugger != null) {
-                            DebuggerManager.getDebuggerManager().removeDebuggerListener(this);
-                            Map properties = session.lookupFirst(null, Map.class);
-                            NbSourceProvider sourceProvider = (NbSourceProvider) context.getProvider(ISourceLookUpProvider.class);
-                            sourceProvider.setSourcePath(properties != null ? (ClassPath) properties.getOrDefault("sourcepath", ClassPath.EMPTY) : ClassPath.EMPTY);
-                            debugger.addPropertyChangeListener(JPDADebugger.PROP_STATE, new PropertyChangeListener() {
-                                @Override
-                                public void propertyChange(PropertyChangeEvent evt) {
-                                    int newState = (int) evt.getNewValue();
-                                    if (newState == JPDADebugger.STATE_RUNNING) {
-                                        debugger.removePropertyChangeListener(JPDADebugger.PROP_STATE, this);
-                                        IDebugSession debugSession = new NbDebugSession(debugger);
-                                        context.setDebugSession(debugSession);
-                                        launchFuture.complete(null);
-                                        context.getProvider(IConfigurationSemaphore.class).waitForConfigurationDone();
-                                    }
+                public void sessionAdded(Session session) {
+                    JPDADebugger debugger = session.lookupFirst(null, JPDADebugger.class);
+                    if (debugger != null) {
+                        DebuggerManager.getDebuggerManager().removeDebuggerListener(this);
+                        Map properties = session.lookupFirst(null, Map.class);
+                        NbSourceProvider sourceProvider = context.getSourceProvider();
+                        sourceProvider.setSourcePath(properties != null ? (ClassPath) properties.getOrDefault("sourcepath", ClassPath.EMPTY) : ClassPath.EMPTY);
+                        debugger.addPropertyChangeListener(JPDADebugger.PROP_STATE, new PropertyChangeListener() {
+                            @Override
+                            public void propertyChange(PropertyChangeEvent evt) {
+                                int newState = (int) evt.getNewValue();
+                                if (newState == JPDADebugger.STATE_RUNNING) {
+                                    debugger.removePropertyChangeListener(JPDADebugger.PROP_STATE, this);
+                                    NbDebugSession debugSession = new NbDebugSession(debugger);
+                                    context.setDebugSession(debugSession);
+                                    launchFuture.complete(null);
+                                    context.getConfigurationSemaphore().waitForConfigurationDone();
                                 }
-                            });
-                        }
-                    }
-                });
-            } else {
-                launchFuture.complete(null);
-            }
-
-            Lookup launchCtx = new ProxyLookup(
-                Lookups.fixed(
-                    toRun, ioContext, progress
-                ), Lookup.getDefault()
-            );
-            Lookups.executeWith(launchCtx, () -> {
-                providerAndCommand.first().invokeAction(providerAndCommand.second(), Lookups.fixed(toRun, ioContext, progress));
+                            }
+                    });
+                }
+                }
             });
-            return launchFuture;
+        } else {
+            launchFuture.complete(null);
+        }
+
+        Lookup launchCtx = new ProxyLookup(
+            Lookups.fixed(
+                toRun, ioContext, progress
+            ), Lookup.getDefault()
+        );
+        Lookups.executeWith(launchCtx, () -> {
+            providerAndCommand.first().invokeAction(providerAndCommand.second(), Lookups.fixed(toRun, ioContext, progress));
+        });
+        return launchFuture;
     }
 
     
@@ -159,5 +155,4 @@ public abstract class NbLaunchDelegate implements ILaunchDelegate {
 
         return Pair.of(provider, command);
     }
-
 }

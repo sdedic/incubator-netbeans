@@ -24,13 +24,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import org.eclipse.lsp4j.debug.StoppedEventArguments;
 
+import org.eclipse.lsp4j.debug.TerminatedEventArguments;
+import org.eclipse.lsp4j.debug.ThreadEventArguments;
 import org.netbeans.api.debugger.DebuggerEngine;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.DebuggerManagerAdapter;
 import org.netbeans.api.debugger.Session;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Events;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVSupport;
 import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
 
@@ -38,15 +40,14 @@ import org.netbeans.spi.debugger.ui.DebuggingView.DVThread;
  *
  * @author martin
  */
-public final class NbThreads implements IThreadsProvider {
+public final class NbThreads {
 
-    private long lastId = 1L;
+    private int lastId = 1;
     private final AtomicBoolean initialized = new AtomicBoolean(false);
-    private final Map<Long, DVThread> threads = new HashMap<>();
-    private final Map<DVThread, Long> threadIds = new HashMap<>();
+    private final Map<Integer, DVThread> threads = new HashMap<>();
+    private final Map<DVThread, Integer> threadIds = new HashMap<>();
 
-    @Override
-    public void initialize(IDebugAdapterContext context, Map<String, Object> options) {
+    public void initialize(DebugAdapterContext context, Map<String, Object> options) {
         DebuggerManager.getDebuggerManager().addDebuggerListener(DebuggerManager.PROP_SESSIONS, new DebuggerManagerAdapter() {
             @Override
             public void sessionAdded(Session session) {
@@ -57,14 +58,13 @@ public final class NbThreads implements IThreadsProvider {
         });
     }
 
-    private void initThreads(IDebugAdapterContext context, JPDADebugger debugger) {
+    private void initThreads(DebugAdapterContext context, JPDADebugger debugger) {
         debugger.addPropertyChangeListener(JPDADebugger.PROP_STATE, evt -> {
             int newState = (int) evt.getNewValue();
             switch (newState) {
                 case JPDADebugger.STATE_DISCONNECTED:
                     //debugger.removePropertyChangeListener(this);
-                    context.setVmTerminated();
-                    context.getProtocolServer().sendEvent(new Events.TerminatedEvent());
+                    context.getClient().terminated(new TerminatedEventArguments());
                     break;
             }
         });
@@ -89,40 +89,44 @@ public final class NbThreads implements IThreadsProvider {
         }
     }
 
-    private void initThreads(IDebugAdapterContext context, DebuggerEngine engine) {
+    private void initThreads(DebugAdapterContext context, DebuggerEngine engine) {
         DVSupport dvSupport = engine.lookupFirst(null, DVSupport.class);
         dvSupport.addPropertyChangeListener(evt -> {
             switch (evt.getPropertyName()) {
                 case DVSupport.PROP_THREAD_STARTED:
                     DVThread dvThread = (DVThread) evt.getNewValue();
-                    long id;
+                    int id;
                     synchronized (threads) {
-                        Long idLong = threadIds.get(dvThread);
-                        if (idLong == null) {
+                        Integer idInteger = threadIds.get(dvThread);
+                        if (idInteger == null) {
                             id = lastId++;
                             threads.put(id, dvThread);
                             threadIds.put(dvThread, id);
                         } else {
                             // It could be among all threads already
-                            id = idLong;
+                            id = idInteger;
                         }
                     }
-                    Events.ThreadEvent threadStartEvent = new Events.ThreadEvent("started", id);
-                    context.getProtocolServer().sendEvent(threadStartEvent);
+                    ThreadEventArguments threadStartEvent = new ThreadEventArguments();
+                    threadStartEvent.setReason("started");
+                    threadStartEvent.setThreadId(id);
+                    context.getClient().thread(threadStartEvent);
                     break;
                 case DVSupport.PROP_THREAD_DIED:
                     dvThread = (DVThread) evt.getNewValue();
-                    id = 0L;
+                    id = 0;
                     synchronized (threads) {
-                        Long idObject = threadIds.remove(dvThread);
+                        Integer idObject = threadIds.remove(dvThread);
                         if (idObject != null) {
                             id = idObject;
                             threads.remove(id);
                         }
                     }
                     if (id > 0) {
-                        Events.ThreadEvent threadDeathEvent = new Events.ThreadEvent("exited", id);
-                        context.getProtocolServer().sendEvent(threadDeathEvent);
+                        ThreadEventArguments threadDeathEvent = new ThreadEventArguments();
+                        threadDeathEvent.setReason("exited");
+                        threadDeathEvent.setThreadId(id);
+                        context.getClient().thread(threadDeathEvent);
                     }
                     break;
                 case DVSupport.PROP_THREAD_SUSPENDED:
@@ -138,7 +142,10 @@ public final class NbThreads implements IThreadsProvider {
                         } else {
                             eventName = "pause";
                         }
-                        context.getProtocolServer().sendEvent(new Events.StoppedEvent(eventName, id));
+                        StoppedEventArguments stoppedEvent = new StoppedEventArguments();
+                        stoppedEvent.setReason(eventName);
+                        stoppedEvent.setThreadId(id);
+                        context.getClient().stopped(stoppedEvent);
                     }
                     break;
                 case DVSupport.PROP_THREAD_RESUMED:
@@ -153,7 +160,7 @@ public final class NbThreads implements IThreadsProvider {
         synchronized (threads) {
             for (DVThread dvThread : dvSupport.getAllThreads()) {
                 if (!threadIds.containsKey(dvThread)) { // We could get it twice if thread start event comes now
-                    long id = lastId++;
+                    int id = lastId++;
                     threads.put(id, dvThread);
                     threadIds.put(dvThread, id);
                 }
@@ -164,10 +171,9 @@ public final class NbThreads implements IThreadsProvider {
     /**
      * Get the thread ID, or <code>0</code> if the thread was not found.
      */
-    @Override
-    public long getId(DVThread thread) {
-        long id = 0L;
-        Long idObject;
+    public int getId(DVThread thread) {
+        int id = 0;
+        Integer idObject;
         synchronized (threads) {
             idObject = threadIds.get(thread);
         }
@@ -181,17 +187,15 @@ public final class NbThreads implements IThreadsProvider {
      * Get thread by its ID.
      * @return the thread, or <code>null</code> when no thread with that ID exists.
      */
-    @Override
-    public DVThread getThread(long id) {
+    public DVThread getThread(int id) {
         synchronized (threads) {
             return threads.get(id);
         }
     }
 
-    @Override
-    public void visitThreads(BiConsumer<Long, DVThread> threadsConsumer) {
+    public void visitThreads(BiConsumer<Integer, DVThread> threadsConsumer) {
         synchronized (threads) {
-            for (Map.Entry<Long, DVThread> entry : threads.entrySet()) {
+            for (Map.Entry<Integer, DVThread> entry : threads.entrySet()) {
                 threadsConsumer.accept(entry.getKey(), entry.getValue());
             }
         }

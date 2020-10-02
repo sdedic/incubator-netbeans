@@ -18,20 +18,13 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import com.sun.jdi.ThreadReference;
-import com.sun.jdi.VirtualMachine;
-import java.util.List;
-
-import org.netbeans.api.debugger.Breakpoint;
-import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.jpda.JPDADebugger;
-import org.netbeans.modules.java.lsp.server.debugging.IDebugSession;
 
 /**
  *
  * @author martin
  */
-public final class NbDebugSession implements IDebugSession {
+public final class NbDebugSession {
 
     private final JPDADebugger debugger;
 
@@ -43,49 +36,15 @@ public final class NbDebugSession implements IDebugSession {
         return debugger;
     }
 
-    @Override
-    public void start() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
-    @Override
-    public void suspend() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
-    @Override
-    public void resume() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
-    @Override
     public void detach() {
         terminate(); // NetBeans takes care about not killing the debuggee when attached.
     }
 
-    @Override
     public void terminate() {
         debugger.finish();
     }
 
-    @Override
     public void setExceptionBreakpoints(boolean notifyCaught, boolean notifyUncaught) {
         throw new UnsupportedOperationException("Not supported.");
     }
-
-    @Override
-    public Process process() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
-    @Override
-    public List<ThreadReference> getAllThreads() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
-    @Override
-    public VirtualMachine getVM() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
 }

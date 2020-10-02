@@ -18,17 +18,9 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import com.sun.jdi.connect.IllegalConnectorArgumentsException;
-import com.sun.jdi.connect.VMStartException;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
 
-import org.netbeans.modules.java.lsp.server.debugging.IDebugAdapterContext;
-import org.netbeans.modules.java.lsp.server.debugging.IThreadsProvider;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Events;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Messages;
-import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests;
 
 /**
  *
@@ -37,26 +29,20 @@ import org.netbeans.modules.java.lsp.server.debugging.protocol.Requests;
 public class NbLaunchWithDebuggingDelegate extends NbLaunchDelegate {
 
     @Override
-    // XXX TODO:
-    public CompletableFuture<Messages.Response> launchInTerminal(Requests.LaunchArguments launchArguments, Messages.Response response, IDebugAdapterContext context) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void postLaunch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context) {
-        //context.getProvider(IThreadsProvider.class).initialize(context, Collections.emptyMap());
+    public void postLaunch(Map<String, Object> launchArguments, DebugAdapterContext context) {
+        // context.getTreadsProvider().initialize(context, Collections.emptyMap());
         // send an InitializedEvent to indicate that the debugger is ready to accept
         // configuration requests (e.g. SetBreakpointsRequest, SetExceptionBreakpointsRequest).
-        context.getProtocolServer().sendEvent(new Events.InitializedEvent());
+        context.getClient().initialized();
     }
 
     @Override
-    public void preLaunch(Requests.LaunchArguments launchArguments, IDebugAdapterContext context) {
+    public void preLaunch(Map<String, Object> launchArguments, DebugAdapterContext context) {
         // debug only
         context.setAttached(false);
-        context.setSourcePaths(launchArguments.sourcePaths);
-        context.setVmStopOnEntry(launchArguments.stopOnEntry);
-        //context.setMainClass(LaunchRequestHandler.parseMainClassWithoutModuleName(launchArguments.mainClass));
-        context.setStepFilters(launchArguments.stepFilters);
+        context.setSourcePaths((String[])launchArguments.get("sourcePaths"));
+        context.setVmStopOnEntry((Boolean)launchArguments.get("stopOnEntry"));
+        // context.setMainClass(LaunchRequestHandler.parseMainClassWithoutModuleName(launchArguments.get("mainClass")));
+// TODO:        context.setStepFilters(launchArguments.get("stepFilters"));
     }
 }

@@ -18,31 +18,34 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import java.util.Map;
-import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
+import java.util.logging.Logger;
+import org.eclipse.lsp4j.debug.DisconnectArguments;
 import org.netbeans.modules.java.lsp.server.debugging.DebugAdapterContext;
 
 /**
  *
  * @author martin
  */
-public class NbLaunchWithoutDebuggingDelegate extends NbLaunchDelegate {
+public final class NbDisconnectRequestHandler {
 
-    protected static final long RUNINTERMINAL_TIMEOUT = 10 * 1000;
-    private Consumer<DebugAdapterContext> onFinishCallback;
+    private static final Logger LOGGER = Logger.getLogger(NbDisconnectRequestHandler.class.getName());
 
-    public NbLaunchWithoutDebuggingDelegate(Consumer<DebugAdapterContext> onFinishCallback) {
-        this.onFinishCallback = onFinishCallback;
+    public CompletableFuture<Void> disconnect(DisconnectArguments arguments, DebugAdapterContext context) {
+        destroyDebugSession(arguments, context);
+        context.getBreakpointManager().disposeBreakpoints();
+        return CompletableFuture.completedFuture(null);
     }
 
-    @Override
-    public void postLaunch(Map<String, Object> launchArguments, DebugAdapterContext context) {
-        // Do not send InitializedEvent, so that we do not get DAP requests.
-        return;
+    private void destroyDebugSession(DisconnectArguments arguments, DebugAdapterContext context) {
+        NbDebugSession debugSession = context.getDebugSession();
+        if (debugSession != null) {
+            if (Boolean.TRUE.equals(arguments.getTerminateDebuggee()) && !context.isAttached()) {
+                debugSession.terminate();
+            } else {
+                debugSession.detach();
+            }
+        }
     }
 
-    @Override
-    public void preLaunch(Map<String, Object> launchArguments, DebugAdapterContext context) {
-    }
-    
 }
