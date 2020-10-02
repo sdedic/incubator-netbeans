@@ -38,14 +38,16 @@
         <class package="org.netbeans.modules.csl.api.test" name="TestBase" link="no"/>
     </change>
     <change id="Remove-BaseDocument">
-        <summary>BaseDocument references removed</summary>
+        <summary>BaseDocument references reduced</summary>
         <version major="2" minor="65"/>
         <date day="30" month="9" year="2020"/>
         <author login="sdedic"/>
         <compatibility addition="yes" deprecation="yes"/>
         <description>
-            Removed API dependency on BaseDocument that introduces (unnecessary) dependency on <code>editor.lib</code> module.
+            Decprecated API dependency on BaseDocument that introduces (unnecessary) dependency on <code>editor.lib</code> module
+            in clients.
         </description>
+        <class package="org.netbeans.modules.csl.api" name="EditList"/>
         <class package="org.netbeans.modules.csl.spi" name="GsfUtilities"/>
     </change>
     <change id="TypesSplit">
