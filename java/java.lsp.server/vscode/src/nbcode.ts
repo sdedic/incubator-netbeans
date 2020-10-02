@@ -18,53 +18,29 @@
  */
 'use strict';
 
-import { ExtensionContext } from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { spawn, ChildProcessByStdio } from 'child_process';
-import * as vscode from 'vscode';
 import { Readable } from 'stream';
 
 export function launch(
-    context: ExtensionContext,
+    clusters: string[],
+    extensionPath: string,
+    storagePath: string,
     jdkHome: string | unknown,
     ...extraArgs : string[]
 ): ChildProcessByStdio<null, Readable, Readable> {
-    function findClusters(): string[] {
-        let clusters = [];
-        for (let e of vscode.extensions.all) {
-            const dir = path.join(e.extensionPath, 'nbcode');
-            if (!fs.existsSync(dir)) {
-                continue;
-            }
-            const exists = fs.readdirSync(dir);
-            for (let clusterName of exists) {
-                let clusterPath = path.join(dir, clusterName);
-                let clusterModules = path.join(clusterPath, 'config', 'Modules');
-                if (!fs.existsSync(clusterModules)) {
-                    continue;
-                }
-                let perm = fs.statSync(clusterModules);
-                if (perm.isDirectory()) {
-                    clusters.push(clusterPath);
-                }
-            }
-        }
-        return clusters;
-    }
-    let clusters = findClusters();
-
     let nbexec = os.platform() === 'win32' ? 
         os.arch() === 'x64' ? 'nbexec64.exe' : 'nbexec.exe' 
         : 'nbexec';
-    const nbexecPath = path.join(context.extensionPath, 'nbcode', 'platform', 'lib', nbexec);
+    const nbexecPath = path.join(extensionPath, 'nbcode', 'platform', 'lib', nbexec);
     let nbexecPerm = fs.statSync(nbexecPath);
     if (!nbexecPerm.isFile()) {
         throw `Cannot execute ${nbexecPath}`;
     }
 
-    const userDir = path.join(context.globalStoragePath, "userdir");
+    const userDir = path.join(storagePath, "userdir");
     fs.mkdirSync(userDir, {recursive: true});
     let userDirPerm = fs.statSync(userDir);
     if (!userDirPerm.isDirectory()) {
@@ -107,10 +83,27 @@ export function launch(
     }
     ideArgs.push(...extraArgs);
 
-    let process: ChildProcessByStdio<null, Readable, Readable> = spawn(nbexecPath, ideArgs, {
+    let process: ChildProcessByStdio<any, Readable, Readable> = spawn(nbexecPath, ideArgs, {
         cwd : userDir,
         stdio : ["ignore", "pipe", "pipe"],
         shell : true
     });
     return process;
+}
+
+if (typeof process === 'object' && process.argv0 === 'node') {
+    let cluster = path.join(process.argv[1], '..', '..');
+    let args = process.argv.slice(2);
+    console.log(`args ${args}`);
+    let userDir = path.join(os.homedir(), '.config', 'Code', 'User', 'globalStorage', 'jlahoda.apache-netbeans-java', 'userdir');
+    let p = launch([ cluster ], cluster, userDir, null, ...args);
+    p.stdout.on('data', function(data) {
+        console.log(data.toString());
+    });
+    p.stderr.on('data', function(data) {
+        console.log(data.toString());
+    });
+    p.on('close', (code) => {
+        console.log(`nbcode finished with status ${code}`);
+    });
 }

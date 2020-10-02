@@ -27,14 +27,38 @@ import {
 } from 'vscode-languageclient';
 
 import * as net from 'net';
+import * as fs from 'fs';
 import * as path from 'path';
 import { spawn, ChildProcess, SpawnOptions } from 'child_process';
 import * as vscode from 'vscode';
-import * as launcher from './launcher';
+import * as launcher from './nbcode';
 
 let client: LanguageClient;
 let nbProcess : ChildProcess | null = null;
 let debugPort: number = -1;
+
+function findClusters(): string[] {
+    let clusters = [];
+    for (let e of vscode.extensions.all) {
+        const dir = path.join(e.extensionPath, 'nbcode');
+        if (!fs.existsSync(dir)) {
+            continue;
+        }
+        const exists = fs.readdirSync(dir);
+        for (let clusterName of exists) {
+            let clusterPath = path.join(dir, clusterName);
+            let clusterModules = path.join(clusterPath, 'config', 'Modules');
+            if (!fs.existsSync(clusterModules)) {
+                continue;
+            }
+            let perm = fs.statSync(clusterModules);
+            if (perm.isDirectory()) {
+                clusters.push(clusterPath);
+            }
+        }
+    }
+    return clusters;
+}
 
 export function activate(context: ExtensionContext) {
     //verify acceptable JDK is available/set:
@@ -68,7 +92,7 @@ export function activate(context: ExtensionContext) {
                 collectedText = null;
             }
         }
-        let p = launcher.launch(context, specifiedJDK, "--modules", "--list");
+        let p = launcher.launch(findClusters(), context.extensionPath, context.globalStoragePath, specifiedJDK, "--modules", "--list");
         p.stdout.on('data', function(d: any) {
             logAndWaitForEnabled(d.toString());
         });
@@ -110,7 +134,9 @@ export function activate(context: ExtensionContext) {
             });
             server.listen(async () => {
                 const address: any = server.address();
-                const srv = launcher.launch(context, specifiedJDK,
+                const srv = launcher.launch(findClusters(),
+                    context.extensionPath, context.globalStoragePath,
+                    specifiedJDK,
                     `--start-java-language-server=connect:${address.port}`,
                     `--start-java-debug-adapter-server=listen:0`
                 );
@@ -210,10 +236,10 @@ export function deactivate(): Thenable<void> {
     if (nbProcess != null) {
         nbProcess.kill();
     }
-	if (!client) {
-		return Promise.resolve();
-	}
-	return client.stop();
+    if (!client) {
+        return Promise.resolve();
+    }
+    return client.stop();
 }
 
 class NetBeansDebugAdapterDescriptionFactory implements vscode.DebugAdapterDescriptorFactory {
