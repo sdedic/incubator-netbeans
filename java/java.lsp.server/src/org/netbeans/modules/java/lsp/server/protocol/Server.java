@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -151,6 +152,7 @@ public final class Server {
             capabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental);
             CompletionOptions completionOptions = new CompletionOptions();
             completionOptions.setResolveProvider(true);
+            completionOptions.setTriggerCharacters(Collections.singletonList("."));
             capabilities.setCompletionProvider(completionOptions);
             capabilities.setCodeActionProvider(true);
             capabilities.setDocumentSymbolProvider(true);
