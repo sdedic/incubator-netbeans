@@ -24,8 +24,11 @@ import org.netbeans.modules.csl.api.CompletionProposal;
 import org.netbeans.modules.javascript2.editor.JsCompletionItem;
 
 /**
- *
+ * Contributes {@CompletionProposal}s into javascript completion. Supersedes {@link CompletionProvider},
+ * allows to pass more context in the {!link ProposalRequest} parameter object.
+ * 
  * @author sdedic
+ * @since 0.84
  */
 public interface CompletionProviderEx extends CompletionProvider {
     /**
@@ -35,6 +38,15 @@ public interface CompletionProviderEx extends CompletionProvider {
      */
     List<CompletionProposal> complete(ProposalRequest request);
     
+    /**
+     * Convenience bridge for older API callers. Invokes {@link #complete(org.netbeans.modules.javascript2.editor.spi.ProposalRequest)}.
+     * Do not override unless for very specific needs.
+     * 
+     * @param ccContext parsing context
+     * @param jsCompletionContext
+     * @param prefix
+     * @return 
+     */
     @Override
     default List<CompletionProposal> complete(CodeCompletionContext ccContext, CompletionContext jsCompletionContext, String prefix) {
         return complete(JsCompletionItem.createRequest(ccContext, jsCompletionContext, prefix));

@@ -955,11 +955,15 @@ public class JsCompletionItem implements CompletionProposal {
         public OffsetRange getOffsetRange(ParserResult result) {
             return OffsetRange.NONE;
         }
-        
-        @Override
-        abstract public CharSequence getDocumentation();
     }
     
+    /**
+     * Creates default ProposalRequest. Used by compatibility bridge in new CC interface.
+     * @param ccContext parser context
+     * @param jsCompletionContext js completion type
+     * @param prefix typed prefix
+     * @return initialized ProposalRequest
+     */
     public static ProposalRequest createRequest(CodeCompletionContext ccContext, CompletionContext jsCompletionContext, String prefix) {
         int caretOffset = ccContext.getParserResult().getSnapshot().getEmbeddedOffset(ccContext.getCaretOffset());
         String pref = ccContext.getPrefix();
@@ -967,6 +971,6 @@ public class JsCompletionItem implements CompletionProposal {
                     // can't just use 'prefix.getLength()' here cos it might have been calculated with
                     // the 'upToOffset' flag set to false
                     - pref.length();
-        return new ProposalRequest(jsCompletionContext, ccContext.getParserResult(), offset, null, prefix);
+        return new ProposalRequest(ccContext, jsCompletionContext, null, offset);
     }
 }

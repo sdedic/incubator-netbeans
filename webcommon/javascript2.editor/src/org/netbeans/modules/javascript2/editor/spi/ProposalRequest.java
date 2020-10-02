@@ -20,45 +20,72 @@ package org.netbeans.modules.javascript2.editor.spi;
 
 import java.util.Collection;
 import java.util.Collections;
+import org.netbeans.modules.csl.api.CodeCompletionContext;
 import org.netbeans.modules.csl.spi.ParserResult;
 
 /**
- *
+ * Context information to provide code completion proposals.
+ * 
  * @author sdedic
+ * @since 0.84
  */
 public final class ProposalRequest {
-    private final CompletionContext context;
-    private final ParserResult  info;
-    private final int anchor;
+    private final CodeCompletionContext context;
+    private final CompletionContext type;
     private final Collection<String> selectors;
-    private final String prefix;
-
-    public ProposalRequest(CompletionContext context, ParserResult info, int anchor, Collection<String> selectors, String prefix) {
+    private final int offset;
+    
+    public ProposalRequest(CodeCompletionContext context, CompletionContext type, Collection<String> selectors, int anchor) {
         this.context = context;
-        this.info = info;
-        this.anchor = anchor;
+        this.type = type;
         this.selectors = selectors;
-        this.prefix = prefix;
+        this.offset = anchor;
     }
 
-    public CompletionContext getContext() {
+    /**
+     * @return offset of the supposed symbol start in the AST.
+     */
+    public int getAnchor() {
+        return offset;
+    }
+
+    /**
+     * Provides code completion context from the parser.
+     * @return 
+     */
+    public CodeCompletionContext getContext() {
         return context;
     }
 
+    /**
+     * Determines the requested completion type.
+     * @return 
+     */
+    public CompletionContext getType() {
+        return type;
+    }
+
+    /**
+     * Convenience method to get the parser result.
+     * @return 
+     */
     public ParserResult getInfo() {
-        return info;
+        return context.getParserResult();
     }
 
-    public int getAnchor() {
-        return anchor;
-    }
-
+    /**
+     * Object or variable selectors determined from the prefix and parsed information.
+     * @return selectors.
+     */
     public Collection<String> getSelectors() {
         return selectors == null ? Collections.emptyList() : selectors;
     }
 
+    /**
+     * Convenience method that returns symbol prefix.
+     * @return symbol prefix.
+     */
     public String getPrefix() {
-        return prefix;
+        return context.getPrefix();
     }
-
 }

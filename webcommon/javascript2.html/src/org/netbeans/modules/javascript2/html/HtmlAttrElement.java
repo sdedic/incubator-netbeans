@@ -20,11 +20,13 @@ package org.netbeans.modules.javascript2.html;
 
 import java.util.Collections;
 import java.util.Set;
+import org.netbeans.modules.csl.api.Documentation;
 import org.netbeans.modules.csl.api.ElementHandle;
 import org.netbeans.modules.csl.api.ElementKind;
 import org.netbeans.modules.csl.api.Modifier;
 import org.netbeans.modules.csl.api.OffsetRange;
 import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.html.editor.lib.api.HelpItem;
 import org.netbeans.modules.html.editor.lib.api.model.HtmlTagAttribute;
 import org.netbeans.modules.javascript2.editor.spi.ElementDocumentation;
 import org.openide.filesystems.FileObject;
@@ -82,14 +84,19 @@ class HtmlAttrElement implements ElementHandle, ElementDocumentation {
     }
 
     @Override
-    public CharSequence getDocumentation() {
+    public Documentation getDocumentation() {
+        HelpItem hi = attribute.getHelp();
+        if (hi == null) {
+            return null;
+        }
         String content = attribute.getHelp().getHelpContent();
         if (content == null) {
             if (attribute.getHelp().getHelpResolver() != null && attribute.getHelp().getHelpURL() != null) {
                 content = attribute.getHelp().getHelpResolver().getHelpContent(attribute.getHelp().getHelpURL());
             }
         }
-        return content;
+        // PENDING: it's now possible to return URL, that will be loaded by editor infrastructure.
+        return Documentation.create(content);
     }
     
 }

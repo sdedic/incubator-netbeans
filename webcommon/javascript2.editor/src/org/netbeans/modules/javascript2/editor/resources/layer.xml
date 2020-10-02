@@ -575,12 +575,6 @@
        </folder>
        <folder name="JavaScript">
            <folder name="Editor">
-               <folder name="CompletionInterceptors">
-                   <file name="org-netbeans-modules-javascript2-editor-MarkCompletionExtender.instance">
-                       <attr name="position" intvalue="1"/>
-                       <attr name="instanceOf" stringvalue="org.netbeans.modules.javascript2.editor.spi.CompletionProvider"/>
-                   </file>
-               </folder>
            </folder>
            <folder name="Model">
                <folder name="MethodCallProcessors">

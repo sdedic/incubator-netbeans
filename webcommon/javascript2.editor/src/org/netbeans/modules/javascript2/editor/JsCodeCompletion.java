@@ -109,19 +109,19 @@ class JsCodeCompletion implements CodeCompletionHandler2 {
         LOGGER.log(Level.FINE, String.format("CC context: %s", context.toString()));
         
         JsCompletionItem.CompletionRequest request = new JsCompletionItem.CompletionRequest();
-            String pref = ccContext.getPrefix();
-            //pref = pref == null ? "" : pref;
+        final String pref = ccContext.getPrefix();
+        //pref = pref == null ? "" : pref;
 
-            request.anchor = pref == null ? caretOffset : caretOffset
-                    // can't just use 'prefix.getLength()' here cos it might have been calculated with
-                    // the 'upToOffset' flag set to false
-                    - pref.length();
-            request.result = jsParserResult;
-            request.info = info;
-            request.prefix = pref;
-            request.completionContext = context;
-            request.addHtmlTagAttributes = false;
-            request.cancelSupport = cancelSupport;
+        request.anchor = pref == null ? caretOffset : caretOffset
+                // can't just use 'prefix.getLength()' here cos it might have been calculated with
+                // the 'upToOffset' flag set to false
+                - pref.length();
+        request.result = jsParserResult;
+        request.info = info;
+        request.prefix = pref;
+        request.completionContext = context;
+        request.addHtmlTagAttributes = false;
+        request.cancelSupport = cancelSupport;
         
         Model.getModel(jsParserResult, false).resolve();
         final List<CompletionProposal> resultList = new ArrayList<CompletionProposal>();
@@ -246,19 +246,11 @@ class JsCodeCompletion implements CodeCompletionHandler2 {
         long end = System.currentTimeMillis();
         ProposalRequest propReq = null;
         for (CompletionProvider interceptor : EditorExtender.getDefault().getCompletionProviders()) {
-            if (interceptor instanceof MarkCompletionExtender) {
-                // maintain the order between Html tag attributes and the former Css ID attributes
-                if (request.addHtmlTagAttributes) {
-                    // completeTagAttributes(request, resultList);
-                }
-                end = System.currentTimeMillis();
-                continue;
-            }
             List<CompletionProposal> proposals;
             
             if (interceptor instanceof CompletionProviderEx) {
                 if (propReq == null) {
-                    propReq = new ProposalRequest(context, info, request.anchor, request.fqnTypes, pref);
+                    propReq = new ProposalRequest(ccContext, context, request.fqnTypes, request.anchor);
                 }
                 proposals = ((CompletionProviderEx)interceptor).complete(propReq);
             } else {
@@ -360,8 +352,7 @@ class JsCodeCompletion implements CodeCompletionHandler2 {
         }
 
         if (element instanceof ElementDocumentation) {
-            CharSequence documentation = ((ElementDocumentation) element).getDocumentation();
-            return documentation != null ? Documentation.create(documentation.toString()) : null;
+            return ((ElementDocumentation) element).getDocumentation();
         }
         if (OffsetRange.NONE.equals(element.getOffsetRange(info))) {
             return Documentation.create(NbBundle.getMessage(JsCodeCompletion.class, "MSG_ItemFromUsageDoc"));

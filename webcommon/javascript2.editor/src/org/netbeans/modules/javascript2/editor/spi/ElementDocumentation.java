@@ -18,10 +18,19 @@
  */
 package org.netbeans.modules.javascript2.editor.spi;
 
+import org.netbeans.api.annotations.common.CheckForNull;
+import org.netbeans.modules.csl.api.Documentation;
+
 /**
  * Mixin interface for ElementHandles to provide a documentation.
+ * 
  * @author sdedic
+ * @since 0.84
  */
 public interface ElementDocumentation {
-    public CharSequence getDocumentation();
+    /**
+     * Returns Documentation for the element, either URL or content.
+     * @return documentation object, or {@code null} for none.
+     */
+    @CheckForNull Documentation getDocumentation();
 }
