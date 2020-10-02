@@ -19,14 +19,8 @@
 
 package org.netbeans.modules.editor.java;
 
-import java.util.Arrays;
-import java.util.List;
 import org.netbeans.editor.Acceptor;
 import org.netbeans.editor.AcceptorFactory;
-import org.netbeans.editor.TokenContext;
-import org.netbeans.editor.ext.java.JavaLayerTokenContext;
-import org.netbeans.editor.ext.java.JavaTokenContext;
-import org.openide.text.IndentEngine;
 
 /**
 * Nb settings for Java.
