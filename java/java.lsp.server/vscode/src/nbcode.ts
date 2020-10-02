@@ -95,8 +95,8 @@ if (typeof process === 'object' && process.argv0 === 'node') {
     let cluster = path.join(process.argv[1], '..', '..');
     let args = process.argv.slice(2);
     console.log(`args ${args}`);
-    let userDir = path.join(os.homedir(), '.config', 'Code', 'User', 'globalStorage', 'jlahoda.apache-netbeans-java', 'userdir');
-    let p = launch([ cluster ], cluster, userDir, null, ...args);
+    let globalStorage = path.join(os.homedir(), '.config', 'Code', 'User', 'globalStorage', 'jlahoda.apache-netbeans-java');
+    let p = launch([ cluster ], cluster, globalStorage, null, ...args);
     p.stdout.on('data', function(data) {
         console.log(data.toString());
     });
