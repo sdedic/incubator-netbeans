@@ -22,24 +22,28 @@ import javax.swing.event.ChangeListener;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
 import org.openide.awt.StatusDisplayer;
-import org.openide.util.lookup.ServiceProvider;
 
-@ServiceProvider(service = StatusDisplayer.class, position = 1000)
-public final class LspStatusDisplayer extends StatusDisplayer {
+public abstract class AbstractLspStatusDisplayer extends StatusDisplayer {
     private String text = "";
 
+    protected AbstractLspStatusDisplayer() {
+        if (!"org.netbeans.modules.nbcode.integration.LspStatusDisplayer".equals(getClass().getName())) {
+            throw new IllegalStateException();
+        }
+    }
+
     @Override
-    public String getStatusText() {
+    public final String getStatusText() {
         return text;
     }
 
     @Override
-    public void setStatusText(String text) {
+    public final void setStatusText(String text) {
         setStatusText(text, IMPORTANCE_ANNOTATION);
     }
 
     @Override
-    public Message setStatusText(String text, int importance) {
+    public final Message setStatusText(String text, int importance) {
         this.text = text;
         UIContext ctx = UIContext.find();
         final MessageType type;
@@ -58,10 +62,10 @@ public final class LspStatusDisplayer extends StatusDisplayer {
     }
 
     @Override
-    public void addChangeListener(ChangeListener l) {
+    public final void addChangeListener(ChangeListener l) {
     }
 
     @Override
-    public void removeChangeListener(ChangeListener l) {
+    public final void removeChangeListener(ChangeListener l) {
     }
 }

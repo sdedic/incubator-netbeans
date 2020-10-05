@@ -27,41 +27,45 @@ import java.util.Set;
 import org.netbeans.api.io.Hyperlink;
 import org.netbeans.api.io.OutputColor;
 import org.netbeans.api.io.ShowOperation;
-import org.netbeans.modules.java.lsp.server.ui.LspInputOutputProvider.LspIO;
+import org.netbeans.modules.java.lsp.server.ui.AbstractLspInputOutputProvider.LspIO;
 import org.netbeans.spi.io.InputOutputProvider;
 import org.openide.util.Lookup;
-import org.openide.util.lookup.ServiceProvider;
 
-@ServiceProvider(service = InputOutputProvider.class)
-public final class LspInputOutputProvider implements InputOutputProvider<LspIO, PrintWriter, Void, Void> {
+public abstract class AbstractLspInputOutputProvider implements InputOutputProvider<LspIO, PrintWriter, Void, Void> {
+    protected AbstractLspInputOutputProvider() {
+        if (!"org.netbeans.modules.nbcode.integration.LspInputOutputProvider".equals(getClass().getName())) { // NOI18N
+            throw new IllegalStateException();
+        }
+    }
+
     @Override
-    public String getId() {
+    public final String getId() {
         return "lspio";
     }
 
     @Override
-    public LspIO getIO(String name, boolean newIO, Lookup lookup) {
+    public final LspIO getIO(String name, boolean newIO, Lookup lookup) {
         IOContext ioCtx = IOContext.find();
         return new LspIO(name, ioCtx, lookup);
     }
 
     @Override
-    public Reader getIn(LspIO io) {
+    public final Reader getIn(LspIO io) {
         return io.in;
     }
 
     @Override
-    public PrintWriter getOut(LspIO io) {
+    public final PrintWriter getOut(LspIO io) {
         return io.out;
     }
 
     @Override
-    public PrintWriter getErr(LspIO io) {
+    public final PrintWriter getErr(LspIO io) {
         return io.err;
     }
 
     @Override
-    public void print(LspIO io, PrintWriter writer, String text, Hyperlink link, OutputColor color, boolean printLineEnd) {
+    public final void print(LspIO io, PrintWriter writer, String text, Hyperlink link, OutputColor color, boolean printLineEnd) {
         if (printLineEnd) {
             writer.println(text);
         } else {
@@ -70,56 +74,56 @@ public final class LspInputOutputProvider implements InputOutputProvider<LspIO, 
     }
 
     @Override
-    public Lookup getIOLookup(LspIO io) {
+    public final Lookup getIOLookup(LspIO io) {
         return io.lookup;
     }
 
     @Override
-    public void resetIO(LspIO io) {
+    public final void resetIO(LspIO io) {
     }
 
     @Override
-    public void showIO(LspIO io, Set<ShowOperation> operations) {
+    public final void showIO(LspIO io, Set<ShowOperation> operations) {
     }
 
     @Override
-    public void closeIO(LspIO io) {
+    public final void closeIO(LspIO io) {
     }
 
     @Override
-    public boolean isIOClosed(LspIO io) {
+    public final boolean isIOClosed(LspIO io) {
         return false;
     }
 
     @Override
-    public Void getCurrentPosition(LspIO io, PrintWriter writer) {
+    public final Void getCurrentPosition(LspIO io, PrintWriter writer) {
         return null;
     }
 
     @Override
-    public void scrollTo(LspIO io, PrintWriter writer, Void position) {
+    public final void scrollTo(LspIO io, PrintWriter writer, Void position) {
     }
 
     @Override
-    public Void startFold(LspIO io, PrintWriter writer, boolean expanded) {
+    public final Void startFold(LspIO io, PrintWriter writer, boolean expanded) {
         return null;
     }
 
     @Override
-    public void endFold(LspIO io, PrintWriter writer, Void fold) {
+    public final void endFold(LspIO io, PrintWriter writer, Void fold) {
     }
 
     @Override
-    public void setFoldExpanded(LspIO io, PrintWriter writer, Void fold, boolean expanded) {
+    public final void setFoldExpanded(LspIO io, PrintWriter writer, Void fold, boolean expanded) {
     }
 
     @Override
-    public String getIODescription(LspIO io) {
+    public final String getIODescription(LspIO io) {
         return "";
     }
 
     @Override
-    public void setIODescription(LspIO io, String description) {
+    public final void setIODescription(LspIO io, String description) {
     }
 
     public static final class LspIO {

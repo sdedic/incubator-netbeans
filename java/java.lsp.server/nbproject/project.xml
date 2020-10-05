@@ -470,7 +470,7 @@
                 </test-type>
             </test-dependencies>
             <public-packages>
-                <package>org.netbeans.modules.java.lsp.server.debugging.api</package>
+                <package>org.netbeans.modules.java.lsp.server.ui</package>
             </public-packages>
             <class-path-extension>
                 <runtime-relative-path>ext/org.eclipse.lsp4j.debug-0.9.0.jar</runtime-relative-path>
