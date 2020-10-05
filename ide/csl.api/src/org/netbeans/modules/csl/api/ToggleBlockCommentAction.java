@@ -160,7 +160,7 @@ public class ToggleBlockCommentAction extends BaseAction {
     }
     
     private int findCommentStart(LineDocument doc, CommentHandler handler, int offsetFrom, int offsetTo) throws BadLocationException {
-        int from = LineDocumentUtils.getNextWhitespace(doc, offsetFrom, offsetTo);
+        int from = LineDocumentUtils.getNextNonWhitespace(doc, offsetFrom, offsetTo);
         if (from == -1) {
             return offsetFrom;
         }
