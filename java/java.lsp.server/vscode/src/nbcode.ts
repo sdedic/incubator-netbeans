@@ -92,11 +92,15 @@ export function launch(
 }
 
 if (typeof process === 'object' && process.argv0 === 'node') {
-    let cluster = path.join(process.argv[1], '..', '..');
+    let extension = path.join(process.argv[1], '..', '..');
+    let nbcode = path.join(extension, 'nbcode');
+    if (!fs.existsSync(nbcode)) {
+        throw `Cannot find ${nbcode}. Try npm run compile first!`;
+    }
+    let clusters = fs.readdirSync(nbcode).filter(c => c !== 'bin' && c !== 'etc').map(c => path.join(nbcode, c));
     let args = process.argv.slice(2);
-    console.log(`args ${args}`);
     let globalStorage = path.join(os.homedir(), '.config', 'Code', 'User', 'globalStorage', 'jlahoda.apache-netbeans-java');
-    let p = launch([ cluster ], cluster, globalStorage, null, ...args);
+    let p = launch(clusters, extension, globalStorage, null, ...args);
     p.stdout.on('data', function(data) {
         console.log(data.toString());
     });
