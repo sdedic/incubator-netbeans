@@ -85,19 +85,6 @@ public final class ErrorCheckingSupport {
     }
 
     public static String getMimeType(Parser.Result info) {
-        /*
-        SyntaxAnalyzerResult sr = getSyntaxAnalyzerResult(result);
-        if (sr != null) {
-            return SyntaxAnalyzerResult.getContentMimeType(sr);
-        }
-        FileObject fo = result.getSnapshot().getSource().getFileObject();
-        if (fo != null) {
-            return fo.getMIMEType();
-        } else {
-            // no fileobject?
-            return result.getSnapshot().getMimeType();
-        }
-        */
         String mime = WebPageMetadata.getContentMimeType(info, false);
         if (mime != null) {
             return mime;
@@ -140,55 +127,6 @@ public final class ErrorCheckingSupport {
             return info.getSnapshot().getMimeType();
         }
     }
-
-    /*
-    private static SyntaxAnalyzerResult htmlParsingResult(Parser.Result r) {
-        if (r instanceof HtmlParsingResult) {
-            return ((HtmlParsingResult)r).getSyntaxAnalyzerResult();
-        } else if (r instanceof Lookup.Provider) {
-            return ((Lookup.Provider)r).getLookup().lookup(SyntaxAnalyzerResult.class);
-        } else {
-            return null;
-        }
-    }
-
-    private static SyntaxAnalyzerResult getSyntaxAnalyzerResult(Parser.Result result) {
-        SyntaxAnalyzerResult saresult = htmlParsingResult(result);
-        if (saresult != null) {
-            return saresult;
-        }
-        Snapshot snapshot = result.getSnapshot();
-        // safeguard
-        if (!containsHtml(snapshot)) {
-            return null;
-        }
-
-        final AtomicReference<SyntaxAnalyzerResult> res = new AtomicReference<SyntaxAnalyzerResult>();
-        try {
-            ParserManager.parse(Collections.singletonList(snapshot.getSource()), new UserTask() {
-
-                @Override
-                public void run(ResultIterator resultIterator) throws Exception {
-                    Parser.Result r = resultIterator.getParserResult();
-                    if (result instanceof Lookup.Provider) {
-                        SyntaxAnalyzerResult embResult = htmlParsingResult(r);
-                        if (embResult != null) {
-                            res.set(embResult);
-                            return;
-                        }
-                    }
-                    for (Embedding e : resultIterator.getEmbeddings()) {
-                        run(resultIterator.getResultIterator(e));
-                    }
-                }
-            });
-        } catch (ParseException ex) {
-            // XXX
-            return null;
-        }
-        return res.get();
-    }
-*/
 
     public static HintFix createErrorFixForFile(Snapshot snapshot, boolean enable) {
         return new ErrorChecksFileFix(snapshot, enable);

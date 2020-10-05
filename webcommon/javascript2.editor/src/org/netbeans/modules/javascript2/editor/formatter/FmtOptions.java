@@ -563,7 +563,6 @@ public class FmtOptions {
             pane.setText(previewText);
             pane.setIgnoreRepaint(true);
 
-            // BaseDocument can be replaced by AtomicLockDocument from org.netbeans.modules.editor.document
             final Document doc = pane.getDocument();
             final AtomicLockDocument ald = LineDocumentUtils.as(doc, AtomicLockDocument.class);
             if (ald != null) {

@@ -1226,16 +1226,6 @@ class JsCodeCompletion implements CodeCompletionHandler2 {
         }
     }
 
-/*    
-    private void completeTagAttributes(CompletionRequest request,  List<CompletionProposal> resultList) {
-        
-        for(HtmlTagAttribute attribute: getAllAttributes())  {
-            if (attribute.getName().startsWith(request.prefix)) {
-                resultList.add(new JsCompletionItem.JsHtmlAttributeItem(attribute, request));
-            }
-        }
-    }
-*/  
     private boolean startsWith(String theString, String prefix) {
         if (prefix == null || prefix.length() == 0) {
             return true;
@@ -1319,9 +1309,6 @@ class JsCodeCompletion implements CodeCompletionHandler2 {
             }
         }
         addFqn(request, fqn);
-        if (fqn.equals("Element")) {
-//            request.addHtmlTagAttributes = true;
-        }
     }
     
     private void addPropertyToMap(CompletionRequest request, Map<String, List<JsElement>> addedProperties, JsElement property) {    
@@ -1396,22 +1383,4 @@ class JsCodeCompletion implements CodeCompletionHandler2 {
         int slashIndex = prefix.lastIndexOf('/') + 1; //NOI18N
         return (Math.max(0, Math.max(hashIndex, Math.max(dotIndex, Math.max(parenIndex,Math.max(columnIndex, Math.max(bracketIndex, Math.max(spaceIndex, slashIndex))))))));
     }
-    
-    
-    /*
-    private Collection<HtmlTagAttribute> getAllAttributes() {
-        HtmlModel htmlModel = HtmlModelFactory.getModel(HtmlVersion.HTML5);
-        Map<String, HtmlTagAttribute> result = new HashMap<String, HtmlTagAttribute>();
-        for (HtmlTag htmlTag : htmlModel.getAllTags()) {
-            for (HtmlTagAttribute htmlTagAttribute : htmlTag.getAttributes()) {
-                // attributes can probably differ per tag so we can just offer some of them,
-                // at least for the CC purposes it should be complete list of attributes for unknown tag
-                if (!result.containsKey(htmlTagAttribute.getName())) {
-                    result.put(htmlTagAttribute.getName(), htmlTagAttribute);
-                }
-            }
-        }
-        return result.values();
-    }
-    */
 }

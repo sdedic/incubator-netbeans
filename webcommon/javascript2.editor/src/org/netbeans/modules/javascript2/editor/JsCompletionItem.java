@@ -627,69 +627,6 @@ public class JsCompletionItem implements CompletionProposal {
             return 130;
         }
     }
-/*
-    public static class JsHtmlAttributeItem extends JsCompletionItem {
-        
-        private final HtmlTagAttribute attr;
-        
-        public JsHtmlAttributeItem(HtmlTagAttribute attr, CompletionRequest request) {
-            super(new HtmlAttrElement(attr), request);
-            this.attr = attr;
-        }
-        
-        @Override
-        public String getName() {
-            return attr.getName();
-        }
-        
-        @Override
-        public String getInsertPrefix() {
-            return getName();
-        }
-        
-        @Override
-        public String getLhsHtml(HtmlFormatter formatter) {
-            formatter.reset();
-            formatter.appendText(getName());
-            return formatter.getText();
-        }
-
-        @Override
-        public ElementKind getKind() {
-            return ElementKind.ATTRIBUTE;
-        }
-
-        @Messages("JsCompletionItem.lbl.html.attribute=HTML Attribute")
-        @Override
-        public String getRhsHtml(HtmlFormatter formatter) {
-            formatter.reset();
-            formatter.appendHtml("<font color=#999999>");
-            formatter.appendText(Bundle.JsCompletionItem_lbl_html_attribute());
-            formatter.appendHtml("</font>");
-            return formatter.getText();
-        }
-        
-        private static class HtmlAttrElement extends SimpleDocElement {
-            private final HtmlTagAttribute attribute;
-            
-            public HtmlAttrElement(HtmlTagAttribute attribute) {
-                super(attribute.getName(), ElementKind.ATTRIBUTE);
-                this.attribute = attribute;
-            }
-
-            @Override
-            public String getDocumentation() {
-                String content = attribute.getHelp().getHelpContent();
-                if (content == null) {
-                    if (attribute.getHelp().getHelpResolver() != null && attribute.getHelp().getHelpURL() != null) {
-                        content = attribute.getHelp().getHelpResolver().getHelpContent(attribute.getHelp().getHelpURL());
-                    }
-                }
-                return content;
-            }
-        }
-    }
-    */
     
     public static class JsPropertyCompletionItem extends JsCompletionItem {
 
