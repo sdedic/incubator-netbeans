@@ -43,6 +43,7 @@ import org.netbeans.modules.maven.embedder.EmbedderFactory;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.filesystems.URLMapper;
+import org.openide.util.NbBundle;
 import org.openide.util.NbPreferences;
 import org.openide.util.WeakSet;
 
@@ -284,9 +285,18 @@ public final class MavenSettings  {
     public void setShowLoggingLevel(boolean show) {
         getPreferences().putBoolean(PROP_SHOW_LOGGING_LEVEL, show);
     }
-    
+
+    @NbBundle.Messages({
+        "#reuse output: true, false, never",
+        "#NOI18N",
+        "DEFAULT_REUSE_OUTPUT=true"
+    })
     public boolean isReuseOutputTabs() {
-        return getPreferences().getBoolean(PROP_REUSE_OUTPUT, true);
+        String def = Bundle.DEFAULT_REUSE_OUTPUT();
+        if ("never".equals(def)) { // NOI18N
+            return false;
+        }
+        return getPreferences().getBoolean(PROP_REUSE_OUTPUT, "true".equals(def)); // NOI18N
     }
 
     public void setReuseOutputTabs(boolean reuse) {
