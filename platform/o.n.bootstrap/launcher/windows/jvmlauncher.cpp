@@ -387,6 +387,7 @@ bool JvmLauncher::startOutProcJvm(const char *mainClassName, const std::list<std
         logErr(true, true, "Failed to create process");
         return false;
     }
+    printf("Created a separate JVM process: %d\n", pi.dwProcessId);
 
     disableFolderVirtualization(pi.hProcess);
     ResumeThread(pi.hThread);
