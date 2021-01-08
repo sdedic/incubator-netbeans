@@ -162,6 +162,7 @@ import org.netbeans.modules.java.hints.project.IncompleteClassPath;
 import org.netbeans.modules.java.hints.spiimpl.JavaFixImpl;
 import org.netbeans.modules.java.hints.spiimpl.hints.HintsInvoker;
 import org.netbeans.modules.java.hints.spiimpl.options.HintsSettings;
+import org.netbeans.modules.java.lsp.server.LspServerUtils;
 import org.netbeans.modules.java.lsp.server.Utils;
 import org.netbeans.modules.java.source.ElementHandleAccessor;
 import org.netbeans.modules.java.source.ui.ElementOpenAccessor;
@@ -209,7 +210,8 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
     private final Map<String, Document> openedDocuments = new HashMap<>();
     private final Map<String, RequestProcessor.Task> diagnosticTasks = new HashMap<>();
     private NbCodeLanguageClient client;
-
+    private Lookup clientLookup;
+    
     public TextDocumentServiceImpl() {
     }
 
@@ -222,7 +224,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
             Document doc = ec.openDocument();
             final int caret = Utils.getOffset(doc, params.getPosition());
             final CompletionList completionList = new CompletionList();
-            ParserManager.parse(Collections.singletonList(Source.create(doc)), new UserTask() {
+            ParserManager.parse(Collections.singletonList(Source.create(doc, clientLookup)), new UserTask() {
                 @Override
                 public void run(ResultIterator resultIterator) throws Exception {
                     TokenSequence<JavaTokenId> ts = resultIterator.getSnapshot().getTokenHierarchy().tokenSequence(JavaTokenId.language());
@@ -283,6 +285,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
     @Override
     public void connect(LanguageClient client) {
         this.client = (NbCodeLanguageClient)client;
+        this.clientLookup = LspServerUtils.findClientLookup(this.client);
     }
 
     private static class ItemFactoryImpl implements JavaCompletionTask.ItemFactory<CompletionItem> {
@@ -649,7 +652,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
                 }
             }, () -> false);
             LineMap[] lm = new LineMap[1];
-            ModificationResult mr = ModificationResult.runModificationTask(Collections.singletonList(Source.create(doc)), new UserTask() {
+            ModificationResult mr = ModificationResult.runModificationTask(Collections.singletonList(Source.create(doc, clientLookup)), new UserTask() {
                 @Override
                 public void run(ResultIterator resultIterator) throws Exception {
                     task.run(resultIterator);
@@ -719,7 +722,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
                     return ElementJavadoc.create(compilationInfo, element, cancel).getTextAsync();
                 }
             }, () -> false);
-            ParserManager.parse(Collections.singletonList(Source.create(doc)), new UserTask() {
+            ParserManager.parse(Collections.singletonList(Source.create(doc, clientLookup)), new UserTask() {
                 @Override
                 public void run(ResultIterator resultIterator) throws Exception {
                     task.run(resultIterator);
@@ -1516,7 +1519,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
             FileObject file = Utils.fromUri(uri);
             EditorCookie ec = file.getLookup().lookup(EditorCookie.class);
             Document doc = ec.openDocument();
-            ParserManager.parse(Collections.singletonList(Source.create(doc)), new UserTask() {
+            ParserManager.parse(Collections.singletonList(Source.create(doc, clientLookup)), new UserTask() {
                 @Override
                 public void run(ResultIterator it) throws Exception {
                     CompilationController cc = CompilationController.get(it.getParserResult());

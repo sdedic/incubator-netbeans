@@ -21,11 +21,15 @@ package org.netbeans.modules.java.lsp.server.protocol;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -130,6 +134,30 @@ public final class Server {
     }
     
     static final ThreadLocal<NbCodeLanguageClient>   DISPATCHERS = new ThreadLocal<>();
+    
+    /**
+     * Client to session Lookup registry. Clients are registered when connected to the server. 
+     */
+    static final Map<NbCodeLanguageClient, Reference<Lookup>> clientLookups = new WeakHashMap<>();
+    
+    private static void registerClient(NbCodeLanguageClient client, Lookup lkp) {
+        synchronized (clientLookups) {
+            clientLookups.put(client, new WeakReference<>(lkp));
+        }
+    }
+    
+    private static void unregisterClient(NbCodeLanguageClient client, Lookup lkp) {
+        synchronized (clientLookups) {
+            clientLookups.remove(client);
+        }
+    }
+    
+    public static Lookup findClientLookup(NbCodeLanguageClient client) {
+        synchronized (clientLookups) {
+            Reference<Lookup> r = clientLookups.get(client);
+            return r == null ? null : r.get();
+        }
+    }
     
     /**
      * Processes message while the default Lookup is set to 
@@ -398,6 +426,7 @@ public final class Server {
         @Override
         public void connect(LanguageClient aClient) {
             this.client = new NbCodeClientWrapper((NbCodeLanguageClient)aClient);
+            registerClient(client, sessionLookup);
             sessionServices.add(client);
             sessionServices.add(new WorkspaceIOContext() {
                 @Override

@@ -88,4 +88,12 @@ public class LspServerUtils {
             throw new IllegalStateException("Can not block LSP server message loop. Use RequestProcessor to run the calling code, or use notifyLater()");
         }
     }
+    
+    public static final Lookup findClientLookup(NbCodeLanguageClient client) {
+        Lookup fromClient = Server.findClientLookup(client);
+        if (fromClient != null) {
+            return fromClient;
+        }
+        return Lookup.getDefault();
+    }
 }
