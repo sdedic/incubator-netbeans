@@ -18,16 +18,12 @@
  */
 package org.netbeans.modules.java.lsp.server.debugging.launch;
 
-import com.sun.istack.internal.NotNull;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-<<<<<<< HEAD
-=======
 import java.util.Collections;
->>>>>>> 8d667edd40... WIP
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -38,6 +34,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 
 import org.netbeans.api.annotations.common.CheckForNull;
+import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.api.debugger.DebuggerManager;
 import org.netbeans.api.debugger.DebuggerManagerAdapter;
 import org.netbeans.api.debugger.Session;
@@ -132,7 +129,7 @@ public abstract class NbLaunchDelegate {
                 ExplicitProcessParameters.Builder bld = ExplicitProcessParameters.builder();
                 bld.priorityArgs(vmArgs);
                 bld.args(args);
-                bld.appendToExisting(false);
+                bld.appendArgs(false);
                 fixedLookupContents.add(bld.build());
             }
             Lookup launchCtx = new ProxyLookup(
@@ -148,8 +145,7 @@ public abstract class NbLaunchDelegate {
             });
             
             Lookups.executeWith(launchCtx, () -> {
-                providerAndCommand.first().invokeAction(providerAndCommand.second(), Lookups.fixed(toRun, ioContext, progress));
-                
+                providerAndCommand.first().invokeAction(providerAndCommand.second(), launchCtx);
             });
         }).exceptionally((t) -> {
             launchFuture.completeExceptionally(t);
@@ -158,7 +154,7 @@ public abstract class NbLaunchDelegate {
         return launchFuture;
     }
     
-    @NotNull
+    @NonNull
     private List<String> argsToStringList(Object o) {
         if (o == null) {
             return Collections.emptyList();
