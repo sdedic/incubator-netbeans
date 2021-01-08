@@ -19,6 +19,7 @@
 
 package org.netbeans.modules.gradle.api.execute;
 
+import com.sun.istack.internal.NotNull;
 import java.io.File;
 import org.netbeans.modules.gradle.api.GradleBaseProject;
 import org.netbeans.modules.gradle.api.NbGradleProject;
@@ -42,6 +43,7 @@ import org.openide.windows.InputOutput;
 
 import org.netbeans.modules.gradle.spi.actions.ReplaceTokenProvider;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -49,6 +51,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import org.netbeans.api.extexecution.startup.StartupExtender;
 
 import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.modules.gradle.ProjectTrust;
@@ -57,6 +60,8 @@ import org.netbeans.modules.gradle.api.execute.RunConfig.ExecFlag;
 import org.netbeans.modules.gradle.execute.TrustProjectPanel;
 import org.netbeans.modules.gradle.spi.GradleSettings;
 import org.netbeans.modules.gradle.spi.execute.GradleDistributionProvider;
+import org.netbeans.modules.gradle.spi.execute.GradleJavaPlatformProvider;
+import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.SingleMethod;
 import org.openide.DialogDescriptor;
 import org.openide.DialogDisplayer;
@@ -65,6 +70,8 @@ import org.openide.loaders.DataObject;
 import org.openide.util.BaseUtilities;
 import org.openide.util.NbBundle.Messages;
 import org.openide.util.Pair;
+import org.openide.util.lookup.AbstractLookup;
+import org.openide.util.lookup.InstanceContent;
 
 /**
  * Utilities, that allow to invoke Gradle.
@@ -159,11 +166,67 @@ public final class RunUtils {
         // project allows this (has these tasks or root project with sub projects).
         validateExclude(basecmd, gbp, GradleCommandLine.TEST_TASK);
         validateExclude(basecmd, gbp, GradleCommandLine.CHECK_TASK); //NOI18N
+        
 
-
-        GradleCommandLine cmd = GradleCommandLine.combine(basecmd, new GradleCommandLine(args));
+        GradleCommandLine cmd = GradleCommandLine.combine(basecmd, injectCommandLine(project, action, args));        
         RunConfig ret = new RunConfig(project, action, displayName, flags, cmd);
         return ret;
+    }
+    
+    /**
+     * Injects arguments provided by {@link StartupExtender}s to the command line. The injection happens
+     * just for project execution - related actions. Injected arguments appear at the start of the returned
+     * command line.
+     * 
+     * @param project project being executed
+     * @param actionName the action name
+     * @param args arguments for the execution
+     * @return decorated arguments.
+     */
+    @NotNull
+    private static GradleCommandLine injectCommandLine(Project project, String actionName, String... args) {
+        StartupExtender.StartMode mode;
+        
+        switch (actionName) {
+            case ActionProvider.COMMAND_RUN:
+            case ActionProvider.COMMAND_RUN_SINGLE:
+                mode = StartupExtender.StartMode.NORMAL;
+                break;
+            case ActionProvider.COMMAND_DEBUG:
+            case ActionProvider.COMMAND_DEBUG_SINGLE:
+                mode = StartupExtender.StartMode.DEBUG;
+                break;
+            case ActionProvider.COMMAND_PROFILE:
+            case ActionProvider.COMMAND_PROFILE_SINGLE:
+                mode = StartupExtender.StartMode.PROFILE;
+                break;
+            case ActionProvider.COMMAND_TEST:
+            case ActionProvider.COMMAND_TEST_SINGLE:
+                mode = StartupExtender.StartMode.TEST_NORMAL;
+                break;
+            case ActionProvider.COMMAND_DEBUG_TEST_SINGLE:
+                mode = StartupExtender.StartMode.TEST_DEBUG;
+                break;
+            case ActionProvider.COMMAND_PROFILE_TEST_SINGLE:
+                mode = StartupExtender.StartMode.TEST_PROFILE;
+                break;
+            default:
+                return new GradleCommandLine(args);
+        }
+        InstanceContent ic = new InstanceContent();
+        if (project != null) {
+            ic.add(project);
+        }
+        List<String> extraArgs = new ArrayList<>();
+        for (StartupExtender group : StartupExtender.getExtenders(new AbstractLookup(ic), mode)) {
+            extraArgs.addAll(group.getArguments());
+        }
+        if (extraArgs.isEmpty()) {
+            return new GradleCommandLine(args);
+        } else {
+            extraArgs.addAll(Arrays.asList(args));
+        }
+        return new GradleCommandLine(extraArgs.toArray(new String[extraArgs.size()]));
     }
 
     /**

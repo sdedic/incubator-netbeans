@@ -113,7 +113,7 @@ public final class NbLaunchRequestHandler {
             return resultFuture;
         }
         String singleMethod = (String)launchArguments.get("singleMethod");
-        activeLaunchHandler.nbLaunch(file, singleMethod, context, !noDebug, new OutputListener(context)).thenRun(() -> {
+        activeLaunchHandler.nbLaunch(file, singleMethod, launchArguments, context, !noDebug, new OutputListener(context)).thenRun(() -> {
             activeLaunchHandler.postLaunch(launchArguments, context);
             resultFuture.complete(null);
         }).exceptionally(e -> {
