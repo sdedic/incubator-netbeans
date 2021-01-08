@@ -98,7 +98,7 @@ public final class NbLaunchRequestHandler {
                     ResponseErrorCode.serverErrorStart);
             return resultFuture;
         }
-        activeLaunchHandler.nbLaunch(file, context, !noDebug, new OutputListener(context)).thenRun(() -> {
+        activeLaunchHandler.nbLaunch(file, launchArguments, context, !noDebug, new OutputListener(context)).thenRun(() -> {
             activeLaunchHandler.postLaunch(launchArguments, context);
             resultFuture.complete(null);
         }).exceptionally(e -> {
