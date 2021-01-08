@@ -19,7 +19,6 @@
 
 package org.netbeans.modules.gradle.api.execute;
 
-import com.sun.istack.internal.NotNull;
 import java.io.File;
 import org.netbeans.modules.gradle.api.GradleBaseProject;
 import org.netbeans.modules.gradle.api.NbGradleProject;
@@ -51,6 +50,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import org.netbeans.api.annotations.common.NonNull;
+import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 import org.netbeans.api.extexecution.startup.StartupExtender;
 
 import org.netbeans.api.project.ui.OpenProjects;
@@ -148,6 +149,10 @@ public final class RunUtils {
      * @since 1.5
      */
     public static RunConfig createRunConfig(Project project, String action, String displayName, Set<ExecFlag> flags, String... args) {
+        return createRunConfig(project, Lookup.getDefault(), action, displayName, flags, args);
+    }
+    
+    public static RunConfig createRunConfig(Project project, Lookup context, String action, String displayName, Set<ExecFlag> flags, String... args) {
         GradleBaseProject gbp = GradleBaseProject.get(project);
 
         GradleCommandLine syscmd = GradleCommandLine.getDefaultCommandLine();
@@ -168,7 +173,7 @@ public final class RunUtils {
         validateExclude(basecmd, gbp, GradleCommandLine.CHECK_TASK); //NOI18N
         
 
-        GradleCommandLine cmd = GradleCommandLine.combine(basecmd, injectCommandLine(project, action, args));        
+        GradleCommandLine cmd = GradleCommandLine.combine(basecmd, injectCommandLine(project, context, action, args));        
         RunConfig ret = new RunConfig(project, action, displayName, flags, cmd);
         return ret;
     }
@@ -183,8 +188,8 @@ public final class RunUtils {
      * @param args arguments for the execution
      * @return decorated arguments.
      */
-    @NotNull
-    private static GradleCommandLine injectCommandLine(Project project, String actionName, String... args) {
+    @NonNull
+    private static GradleCommandLine injectCommandLine(Project project, Lookup runContext, String actionName, String... args) {
         StartupExtender.StartMode mode;
         
         switch (actionName) {
@@ -217,16 +222,33 @@ public final class RunUtils {
         if (project != null) {
             ic.add(project);
         }
+        
         List<String> extraArgs = new ArrayList<>();
         for (StartupExtender group : StartupExtender.getExtenders(new AbstractLookup(ic), mode)) {
             extraArgs.addAll(group.getArguments());
         }
-        if (extraArgs.isEmpty()) {
-            return new GradleCommandLine(args);
-        } else {
-            extraArgs.addAll(Arrays.asList(args));
+        
+        ExplicitProcessParameters contextParams = ExplicitProcessParameters.buildExplicitParameters(runContext);
+        ExplicitProcessParameters combined = ExplicitProcessParameters.builder().
+                priorityArgs(extraArgs).
+                combine(
+                        // get just the priority params
+                        ExplicitProcessParameters.builder().
+                                priorityArgs(contextParams.getPriorityArguments()).
+                                appendPriorityArgs(!contextParams.isPriorityArgReplacement()).
+                                build()
+                ).build();
+        // args actually contain gradle launcher parameters, so get them first
+        List<String> resultArgs = new ArrayList<>(Arrays.asList(args));
+        resultArgs.addAll(combined.getAllArguments());
+        combined = ExplicitProcessParameters.builder().
+                    args(contextParams.getArguments()).
+                    appendArgs(!contextParams.isArgReplacement()).
+                    build();
+        if (combined.getArguments() != null) {
+            resultArgs.add("--args " + String.join(" ", combined.getAllArguments()));
         }
-        return new GradleCommandLine(extraArgs.toArray(new String[extraArgs.size()]));
+        return new GradleCommandLine(resultArgs.toArray(new String[resultArgs.size()]));
     }
 
     /**
