@@ -51,9 +51,11 @@ import org.netbeans.modules.java.api.common.project.ui.ProjectUISupport;
 import org.netbeans.modules.maven.NbMavenProjectImpl;
 import org.netbeans.modules.maven.api.customizer.ModelHandle2;
 import org.netbeans.modules.maven.classpath.MavenSourcesImpl;
+import org.netbeans.modules.maven.execute.MavenExecuteUtils;
 import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.options.MavenSettings;
+import org.netbeans.modules.maven.runjar.RunJarStartupArgs;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ui.support.ProjectCustomizer;
 import org.openide.DialogDescriptor;
@@ -75,6 +77,8 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
     private boolean isCurrentRun = true;
     private boolean isCurrentDebug = true;
     private boolean isCurrentProfile = true;
+    private static final String RUN_VM_PARAMS = "exec.vmArgs"; //NOI18N
+    private static final String RUN_APP_PARAMS = "exec.appArgs"; //NOI18N
     private static final String RUN_PARAMS = "exec.args"; //NOI18N
     private static final String RUN_WORKDIR = "exec.workingdir"; //NOI18N
     private static final String DEFAULT_DEBUG_PARAMS = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}"; //NOI18N
@@ -178,6 +182,30 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
         txtWorkDir.getDocument().removeDocumentListener(docListener);
     }
     
+    
+    private String fallbackParams(String paramName) {
+        String val = run.getProperties().get(paramName);
+        if (val == null && debug != null) {
+            val = debug.getProperties().get(paramName);
+        }
+        if (val == null && profile != null) {
+            val = profile.getProperties().get(paramName);
+        }
+        return val == null ? "" : val; // NOI18N
+    }
+    
+    private String appendIfNotEmpty(String a, String b) {
+        if (a == null || a.isEmpty()) {
+            return b;
+        }
+        if (b == null || b.isEmpty()) {
+            return a;
+        }
+        return a + " " + b;
+    }
+    
+    private MavenExecuteUtils.ExecutionEnvHelper execEnvHelper;
+    
     @NbBundle.Messages({"MsgModifiedAction=One of Run/Debug/Profile Project actions has been modified and the Run panel cannot be safely edited"})
     private void initValues() {
         run = null;
@@ -206,6 +234,8 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
         if (profile == null) {
             profile = ModelHandle2.getDefaultMapping(PROFILE_CMD, project);
         }
+        execEnvHelper = MavenExecuteUtils.createExecutionEnvHelper(project, run, debug, profile, mapp);
+        
         isCurrentRun = checkNewMapping(run);
         isCurrentDebug = checkNewMapping(debug);
         isCurrentProfile = checkNewMapping(profile);
@@ -226,15 +256,18 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
             }
             if (params != null) {
                 oldAllParams = params;
-                oldVMParams = splitJVMParams(params, true);
-                if (oldVMParams != null && oldVMParams.contains("-classpath %classpath")) {
-                    oldVMParams = oldVMParams.replace("-classpath %classpath", "");
+                String oldSplitVMParams = splitJVMParams(params, true);
+                if (!oldSplitVMParams.isEmpty()) {
+                    if (oldSplitVMParams != null && oldSplitVMParams.contains("-classpath %classpath")) {
+                        oldSplitVMParams = oldSplitVMParams.replace("-classpath %classpath", "");
+                    }
+                    oldVMParams = appendIfNotEmpty(oldVMParams, oldSplitVMParams);
                 }
                 oldMainClass = splitMainClass(params);
                 if (oldMainClass != null && oldMainClass.equals("${packageClassName}")) {
                     oldMainClass = "";
                 }
-                oldParams = splitParams(params);
+                oldParams = appendIfNotEmpty(oldParams, splitParams(params));
             } else {
                 oldAllParams = "";
             }
@@ -490,7 +523,10 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
             } else {
                 newAllParams = newAllParams + "${packageClassName} "; //NOI18N
             }
-            newAllParams = newAllParams + newParams;
+            if (!newParams.isEmpty()) {
+                // mark the extra parameters, so that ExplicitProcessParameters can eventually replace them
+                newAllParams = newAllParams + RunJarStartupArgs.USER_PROGRAM_ARGS_MARKER + " " + newParams;
+            }
             newAllParams = newAllParams.trim();
             if (isCurrentRun) {
                 boolean changed = false;
@@ -549,10 +585,18 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
             String goal = (String) it.next();
             if (goal.matches("org\\.codehaus\\.mojo\\:exec-maven-plugin\\:(.)+\\:exec") //NOI18N
                     || goal.indexOf("exec:exec") > -1) { //NOI18N
-                if (map.getProperties() != null && map.getProperties().containsKey("exec.args")) {
-                    String execArgs = map.getProperties().get("exec.args");
-                    if (execArgs.contains("-classpath")) {
-                        return true;
+                if (map.getProperties() != null) {
+                    if (map.getProperties().containsKey("exec.args")) {
+                        String execArgs = map.getProperties().get("exec.args");
+                        if (execArgs.contains("-classpath")) {
+                            return true;
+                        }
+                    }
+                    if (map.getProperties().containsKey("exec.vmArgs")) {
+                        String execArgs = map.getProperties().get("exec.vmArgs");
+                        if (execArgs.contains("-classpath")) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -587,52 +631,15 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
     }
     
     private static String splitJVMParams(String line, boolean newLines) {
-        PropertySplitter ps = new PropertySplitter(line);
-        ps.setSeparator(' '); //NOI18N
-        String s = ps.nextPair();
-        String jvms = ""; //NOI18N
-        while (s != null) {
-            if (s.startsWith("-") || /* #199411 */s.startsWith("\"-") || s.contains("%classpath")) { //NOI18N
-                if(s.contains("%classpath")) {
-                    jvms =  jvms + " " + s;
-                } else {
-                    jvms =  jvms + (jvms.isEmpty() ? "" : (newLines ? "\n" : " ")) + s;
-                }
-            } else if (s.equals("${packageClassName}") || s.matches("[\\w]+[\\.]{0,1}[\\w\\.]*")) { //NOI18N
-                break;
-            } else {
-                jvms =  jvms + " " + s;
-            }
-            s = ps.nextPair();
-        }
-        return jvms.trim();
+        return MavenExecuteUtils.splitJVMParams(line, newLines);
     }
     
     static String splitMainClass(String line) {
-        PropertySplitter ps = new PropertySplitter(line);
-        ps.setSeparator(' '); //NOI18N
-        String s = ps.nextPair();
-        while (s != null) {
-            if (s.startsWith("-") || s.contains("%classpath")) { //NOI18N
-                s = ps.nextPair();
-                continue;
-            } else if (s.equals("${packageClassName}") || s.matches("[\\w]+[\\.]{0,1}[\\w\\.]*")) { //NOI18N
-                return s;
-            } else {
-                Logger.getLogger(RunJarPanel.class.getName()).fine("failed splitting main class from=" + line); //NOI18N
-            }
-            s = ps.nextPair();
-        }
-        return ""; //NOI18N
+        return MavenExecuteUtils.splitMainClass(line);
     }
     
     static String splitParams(String line) {
-        String main = splitMainClass(line);
-        int i = line.indexOf(main);
-        if (i > -1) {
-            return line.substring(i + main.length()).trim();
-        }
-        return ""; //NOI18N
+        return MavenExecuteUtils.splitParams(line);
     }
     
     // Variables declaration - do not modify//GEN-BEGIN:variables

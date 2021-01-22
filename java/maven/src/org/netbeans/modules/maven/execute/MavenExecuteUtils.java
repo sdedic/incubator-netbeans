@@ -1,0 +1,642 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.netbeans.modules.maven.execute;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.logging.Logger;
+import java.util.regex.Pattern;
+import org.codehaus.plexus.util.cli.CommandLineUtils;
+import org.netbeans.api.annotations.common.NonNull;
+import org.netbeans.modules.maven.NbMavenProjectImpl;
+import org.netbeans.modules.maven.api.customizer.ModelHandle2;
+import org.netbeans.modules.maven.customizer.RunJarPanel;
+import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
+import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
+import org.netbeans.modules.maven.runjar.RunJarStartupArgs;
+import org.netbeans.spi.project.ActionProvider;
+
+/**
+ *
+ * @author sdedic
+ */
+public final class MavenExecuteUtils {
+    public static final String RUN_VM_PARAMS = "exec.vmArgs"; //NOI18N
+    public static final String RUN_MAIN_CLASS = "exec.mainClass"; //NOI18N
+    public static final String RUN_APP_PARAMS = "exec.appArgs"; //NOI18N
+    public static final String RUN_PARAMS = "exec.args"; //NOI18N
+    public static final String RUN_WORKDIR = "exec.workingdir"; //NOI18N
+    
+    private static final String RUN_VM_PARAMS_TOKEN = "${" + RUN_VM_PARAMS + "}"; //NOI18N
+    private static final String RUN_APP_PARAMS_TOKEN = "${" + RUN_APP_PARAMS + "}"; //NOI18N
+    private static final String RUN_MAIN_CLASS_TOKEN = "${" + RUN_MAIN_CLASS + "}"; //NOI18N
+    private static final String PACKAGE_CLASS_NAME_TOKEN = "${packageClassName}"; //NOI18N
+    private static final String DEFAULT_DEBUG_PARAMS = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}"; //NOI18N
+
+    public static final String PROFILE_CMD = "profile"; // NOI18N
+    
+    public final static class ExecutionEnvHelper {
+        private final ActionToGoalMapping goalMappings;
+        private final NbMavenProjectImpl project;
+        
+        private String oldAllParams;
+        private String oldVmParams;
+        private String oldAppParams;
+        private String oldWorkDir;
+        private String oldMainClass;
+        
+        private boolean currentRun;
+        private boolean currentDebug;
+        private boolean currentProfile;
+        
+        private String execParams;
+        private String vmParams;
+        private String appParams;
+        private String workDir;
+        private String mainClass;
+        
+        private NetbeansActionMapping run;
+        private NetbeansActionMapping debug;
+        private NetbeansActionMapping profile;
+
+        private boolean mergedConfig;
+        private boolean modified;
+
+        ExecutionEnvHelper(
+                NbMavenProjectImpl project,
+                NetbeansActionMapping run,
+                NetbeansActionMapping debug,
+                NetbeansActionMapping profile,
+                ActionToGoalMapping goalMappings) {
+            this.project = project;
+            this.goalMappings = goalMappings;
+            this.run = run;
+            this.debug = debug;
+            this.profile = profile;
+        }
+        
+        private String fallbackParams(String paramName) {
+            String val = run != null ? run.getProperties().get(paramName) : null;
+            if (val == null && debug != null) {
+                val = debug.getProperties().get(paramName);
+            }
+            if (val == null && profile != null) {
+                val = profile.getProperties().get(paramName);
+            }
+            return val == null ? "" : val.trim(); // NOI18N
+        }
+
+        private String appendIfNotEmpty(String a, String b) {
+            if (a == null || a.isEmpty()) {
+                return b;
+            }
+            if (b == null || b.isEmpty()) {
+                return a;
+            }
+            return a + " " + b;
+        }
+
+        public boolean isModified() {
+            return modified;
+        }
+
+        public boolean isValid() {
+            return currentRun && currentDebug && currentProfile;
+        }
+
+        public boolean isCurrentRun() {
+            return currentRun;
+        }
+
+        public boolean isCurrentDebug() {
+            return currentDebug;
+        }
+
+        public boolean isCurrentProfile() {
+            return currentProfile;
+        }
+        
+        public void setMainClass(String mainClass) {
+            this.mainClass = mainClass;
+        }
+
+        public void setExecParams(String execParams) {
+            this.execParams = execParams;
+        }
+
+        public void setVmParams(String vmParams) {
+            this.vmParams = vmParams;
+        }
+
+        public void setAppParams(String appParams) {
+            this.appParams = appParams;
+        }
+
+        public NbMavenProjectImpl getProject() {
+            return project;
+        }
+
+        public String getWorkDir() {
+            return oldWorkDir;
+        }
+
+        public String getMainClass() {
+            return oldMainClass;
+        }
+
+        public NetbeansActionMapping getRun() {
+            return run;
+        }
+
+        public NetbeansActionMapping getProfile() {
+            return profile;
+        }
+
+        public String getAllParams() {
+            return oldAllParams;
+        }
+
+        public String getVmParams() {
+            return oldVmParams;
+        }
+
+        public String getAppParams() {
+            return oldAppParams;
+        }
+        
+        private NetbeansActionMapping getMapping(String a) {
+            NetbeansActionMapping m = ActionToGoalUtils.getDefaultMapping(a, project);
+            return m;
+        }
+        
+        /**
+         * Loads and parses values from the project's nbactions.xml
+         */
+        public void loadFromProject() {
+            NetbeansActionMapping m;
+            
+            if (run == null) {
+                run = getMapping(ActionProvider.COMMAND_RUN);
+            }
+            if (debug == null) {
+                debug = getMapping(ActionProvider.COMMAND_DEBUG);
+            }
+            if (profile == null) {
+                profile = getMapping(PROFILE_CMD);
+            }
+            
+            currentRun = checkNewMapping(run);
+            currentDebug = checkNewMapping(debug);
+            currentProfile = checkNewMapping(profile);
+            
+            oldWorkDir = fallbackParams(RUN_WORKDIR);
+            oldAllParams = fallbackParams(RUN_PARAMS);
+            oldVmParams = fallbackParams(RUN_VM_PARAMS);
+            oldAppParams = fallbackParams(RUN_APP_PARAMS);
+            oldWorkDir = fallbackParams(RUN_WORKDIR);
+            oldMainClass = fallbackParams(RUN_MAIN_CLASS);
+            
+            mergedConfig = (oldVmParams.isEmpty() && oldAppParams.isEmpty() && oldMainClass.isEmpty());
+            
+            appendVMParamsFromOldParams();
+            addAppParamsFromOldParams();
+            loadMainClass();
+        }
+        
+        private String eraseTokens(String original, boolean withNewlines, String... tokens) {
+            StringBuilder sb = new StringBuilder();
+            for (String p : tokens) {
+                if (sb.length() > 0) {
+                    sb.append("|");
+                }
+                sb.append(Pattern.quote(p));
+                if (withNewlines) {
+                    sb.append("\\n?");
+                }
+            }
+            return original.replaceAll(sb.toString(), "").trim();
+        }
+        
+        private void appendVMParamsFromOldParams() {
+            String oldSplitVMParams = splitJVMParams(oldAllParams, true);
+            if (!oldSplitVMParams.isEmpty()) {
+                // try to get VM arguments out of all exec.args, but ignore -classpath added automatically, and
+                // exec.vmArgs present / added by default.
+                oldSplitVMParams = eraseTokens(oldSplitVMParams, true, "-classpath %classpath", RUN_VM_PARAMS_TOKEN);
+                oldVmParams = appendIfNotEmpty(oldVmParams, oldSplitVMParams);
+            }
+        }
+        
+        private void addAppParamsFromOldParams() {
+            String p = splitParams(oldAllParams);
+            if (!p.isEmpty()) {
+                p = eraseTokens(p, false, RUN_APP_PARAMS_TOKEN);
+                oldAppParams = appendIfNotEmpty(oldAppParams, p);
+            }
+        }
+        
+        private void loadMainClass() {
+            if (oldMainClass.trim().isEmpty()) {
+                oldMainClass = splitMainClass(oldAllParams);
+                // splitMainClass is never null
+            }
+            if (PACKAGE_CLASS_NAME_TOKEN.equals(oldMainClass) || RUN_MAIN_CLASS_TOKEN.equals(oldMainClass)) {
+                oldMainClass = "";
+            }
+        }
+
+        private boolean checkNewMapping(NetbeansActionMapping map) {
+            if (map == null || map.getGoals() == null) {
+                return false; //#164323
+            }
+            Iterator it = map.getGoals().iterator();
+            while (it.hasNext()) {
+                String goal = (String) it.next();
+                if (goal.matches("org\\.codehaus\\.mojo\\:exec-maven-plugin\\:(.)+\\:exec") //NOI18N
+                        || goal.indexOf("exec:exec") > -1) { //NOI18N
+                    if (map.getProperties() != null) {
+                        if (map.getProperties().containsKey("exec.args")) {
+                            String execArgs = map.getProperties().get("exec.args");
+                            if (execArgs.contains("-classpath")) {
+                                return true;
+                            }
+                        }
+                        if (map.getProperties().containsKey("exec.vmArgs")) {
+                            String execArgs = map.getProperties().get("exec.vmArgs");
+                            if (execArgs.contains("-classpath")) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        
+        public void applyToMappings() {
+            if (!(currentRun || currentDebug || currentProfile)) {
+                return;
+            }
+            
+            if (currentRun) {
+                updateAction(run, "");
+                updateAction(debug, DEFAULT_DEBUG_PARAMS);
+                updateAction(profile, "");
+            }
+        }
+        
+        private void updateAction(NetbeansActionMapping mapping, String debuVMArgs) {
+            boolean changed = false;
+            
+            if (!oldWorkDir.equals(workDir)) {
+                mapping.addProperty(RUN_WORKDIR, workDir);
+                changed = true;
+            }
+            if (!oldAppParams.equals(appParams)) {
+                mapping.addProperty(RUN_APP_PARAMS, appParams);
+                changed = true;
+            }
+            String newMainClass = this.mainClass;
+            if (newMainClass.trim().length() == 0) {
+                newMainClass = PACKAGE_CLASS_NAME_TOKEN;
+            }
+            if (!oldMainClass.equals(newMainClass)) {
+                mapping.addProperty(RUN_MAIN_CLASS, newMainClass);
+                changed = true;
+            }
+            String newVMParams = appendIfNotEmpty(vmParams, debuVMArgs);
+            if (!oldVmParams.equals(newVMParams)) {
+                mapping.addProperty(RUN_VM_PARAMS, newVMParams);
+                changed = true;
+            }
+            
+            if (mergedConfig) {
+                mapping.addProperty(RUN_PARAMS, 
+                    "${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}"
+                );
+                changed = true;
+            }
+            
+            if (changed) {
+                ModelHandle2.setUserActionMapping(mapping, goalMappings);
+                modified = true;
+            }
+        }
+    }
+    
+    public static ExecutionEnvHelper createExecutionEnvHelper(
+            NbMavenProjectImpl project,
+            NetbeansActionMapping run,
+            NetbeansActionMapping debug,
+            NetbeansActionMapping profile,
+            ActionToGoalMapping goalMappings) {
+        return new ExecutionEnvHelper(project, run, debug, profile, goalMappings);
+    }
+    
+    public static String joinParameters(String... params) {
+        if (params == null) {
+            return ""; // NOI18N
+        }
+        return joinParameters(Arrays.asList(params));
+    }
+    
+    public static String joinParameters(List<String> params) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : params) {
+            if (s == null) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(" ");
+            }
+            if (!s.contains(" ")) {
+                sb.append(s.replace("'", "\\'").replace("\"", "\\\""));
+            } else {
+                sb.append("\"").append(
+                        s.replace("\"", "\\\"")
+                ).append("\"");
+            }
+        }
+        return sb.toString();
+    }
+    
+    public static List<String> extractDebugJVMOptions(String argLine) throws Exception {
+        String[] split = CommandLineUtils.translateCommandline(argLine);
+        List<String> toRet = new ArrayList<String>();
+        for (String arg : split) {
+            if ("-Xdebug".equals(arg)) { //NOI18N
+                continue;
+            }
+            if ("-Djava.compiler=none".equals(arg)) { //NOI18N
+                continue;
+            }
+            if ("-Xnoagent".equals(arg)) { //NOI18N
+                continue;
+            }
+            if (arg.startsWith("-Xrunjdwp")) { //NOI18N
+                continue;
+            }
+            if (arg.equals("-agentlib:jdwp")) { //NOI18N
+                continue;
+            }
+            if (arg.startsWith("-agentlib:jdwp=")) { //NOI18N
+                continue;
+            }
+            if (arg.trim().length() == 0) {
+                continue;
+            }
+            toRet.add(arg);
+        }
+        return toRet;
+    }
+
+    
+    /**
+     * used by quickrun configuration.
+     * @param argline
+     * @return
+     */
+    public static String[] splitAll(String argline, boolean filterClassPath) {
+        String jvm = splitJVMParams(argline, false);
+        String mainClazz = splitMainClass(argline);
+        String args = splitParams(argline);
+        if (filterClassPath && jvm != null && jvm.contains("-classpath %classpath")) {
+            jvm = jvm.replace("-classpath %classpath", "");
+        }
+        if (mainClazz != null && mainClazz.equals("${packageClassName}")) {
+                    mainClazz = "";
+        }
+        return new String[] {
+            (jvm != null ? jvm : ""),
+            (mainClazz != null ? mainClazz : ""),
+            (args != null ? args : "")
+        };
+    }
+    
+    @NonNull
+    public static String splitJVMParams(String line, boolean newLines) {
+        PropertySplitter ps = new PropertySplitter(line);
+        ps.setSeparator(' '); //NOI18N
+        String s = ps.nextPair();
+        String jvms = ""; //NOI18N
+        while (s != null) {
+            if (s.startsWith("-") || /* #199411 */s.startsWith("\"-") || s.contains("%classpath")) { //NOI18N
+                if(s.contains("%classpath")) {
+                    jvms =  jvms + " " + s;
+                } else {
+                    jvms =  jvms + (jvms.isEmpty() ? "" : (newLines ? "\n" : " ")) + s;
+                }
+            } else if (s.equals(PACKAGE_CLASS_NAME_TOKEN) || s.equals(RUN_MAIN_CLASS_TOKEN) || s.matches("[\\w]+[\\.]{0,1}[\\w\\.]*")) { //NOI18N
+                break;
+            } else {
+                jvms =  jvms + " " + s;
+            }
+            s = ps.nextPair();
+        }
+        return jvms.trim();
+    }
+    
+    @NonNull
+    public static String splitMainClass(String line) {
+        PropertySplitter ps = new PropertySplitter(line);
+        ps.setSeparator(' '); //NOI18N
+        String s = ps.nextPair();
+        while (s != null) {
+            if (s.startsWith("-") || s.contains("%classpath")) { //NOI18N
+                s = ps.nextPair();
+                continue;
+            } else if (s.equals(PACKAGE_CLASS_NAME_TOKEN) || s.equals(RUN_MAIN_CLASS_TOKEN) || s.matches("[\\w]+[\\.]{0,1}[\\w\\.]*")) { //NOI18N
+                return s;
+            } else {
+                Logger.getLogger(RunJarPanel.class.getName()).fine("failed splitting main class from=" + line); //NOI18N
+            }
+            s = ps.nextPair();
+        }
+        return ""; //NOI18N
+    }
+    
+    @NonNull
+    public static String splitParams(String line) {
+        int argsIndex = line.indexOf(RunJarStartupArgs.USER_PROGRAM_ARGS_MARKER);
+        if (argsIndex > -1) {
+            return line.substring(argsIndex + RunJarStartupArgs.USER_PROGRAM_ARGS_MARKER.length()).trim();
+        }
+        String main = splitMainClass(line);
+        int i = line.indexOf(main);
+        if (i > -1) {
+            return line.substring(i + main.length()).trim();
+        }
+        return ""; //NOI18N
+    }
+    /**
+     * Splits the line into sequence of arguments, respects quoting.
+     * @param line the line as a string
+     * @return arguments in an iterable
+     */
+    public static Iterable<String> propertySplitter(String line) {
+        return propertySplitter(line, true);
+    }
+    
+    public static Iterable<String> propertySplitter(String line, boolean outputQuotes) {
+        class SplitIt implements Iterator<String> {
+            private final PropertySplitter spl = new PropertySplitter(line);
+            private String nextPair;
+
+            public SplitIt() {
+                spl.setSeparator(' ');
+                spl.setOutputQuotes(outputQuotes);
+            }
+            
+            @Override
+            public boolean hasNext() {
+                if (nextPair == null) {
+                    nextPair = spl.nextPair();
+                }
+                return nextPair != null;
+            }
+
+            @Override
+            public String next() {
+                String s;
+                if (nextPair == null) {
+                    nextPair = spl.nextPair();
+                }
+                s = nextPair;
+                nextPair = null;
+                if (s != null) {
+                    return s;
+                } else {
+                    throw new NoSuchElementException();
+                }
+            }
+        }
+        return new Iterable<String>() {
+            @Override
+            public Iterator<String> iterator() {
+                return new SplitIt();
+            }
+        };
+    }
+    
+    /**
+     *
+     * @author mkleint
+     */
+    static class PropertySplitter {
+
+        private String line;
+        private char[] quotes;
+        private char separator;
+        private char newline;
+        private boolean trim = true;
+        private char escape;
+        private boolean outputQuotes = true;
+
+        private int location = 0;
+        private char quoteChar = 0;
+        private boolean inQuote = false;
+        private boolean escapeNext = false;
+        private boolean preserveWhitespace = true;
+
+        public PropertySplitter(String line) {
+            this(line, new char[]{'"', '\''}, '\\', '\n', '\n'); //NOI18N
+        }
+
+        private PropertySplitter(String line, char[] quotes, char escape, char separator, char nl) {
+            this.line = line;
+            this.quotes = quotes;
+            this.separator = separator;
+            this.escape = escape;
+            newline = nl;
+        }
+
+        void setSeparator(char sep) {
+            separator = sep;
+        }
+
+        public void setOutputQuotes(boolean outputQuotes) {
+            this.outputQuotes = outputQuotes;
+        }
+
+        public String nextPair() {
+            StringBuilder buffer = new StringBuilder();
+            if (location >= line.length()) {
+                return null;
+            }
+            //TODO should probably also handle (ignore) spaces before or after the = char somehow
+            while (location < line.length()) {
+                if (!(inQuote || escapeNext)) {
+                    if (line.charAt(location) == separator || line.charAt(location) == newline) {
+                        if (preserveWhitespace || buffer.length() > 0) {
+                            break;
+                        } else {
+                            location++;
+                            continue;
+                        }
+                    }
+                }
+                char c = line.charAt(location);
+                X: if (escapeNext) {
+                    if (c == newline) {
+                        //just continue.. equals to \ + newline
+                    } else {
+                        buffer.append(escape).append(c);
+                    }
+                    escapeNext = false;
+                } else if (!inQuote && c == escape) {
+                    escapeNext = true;
+                } else if (inQuote) {
+                    if (c == quoteChar) {
+                        inQuote = false;
+                        if (!outputQuotes) {
+                            break X;
+                        }
+                    }
+                    buffer.append(c);
+                } else {
+                    if (isQuoteChar(c)) {
+                        inQuote = true;
+                        quoteChar = c;
+                        if (!outputQuotes) {
+                            break X;
+                        }
+                    }
+                    buffer.append(c);
+                }
+                location++;
+            }
+            location++;
+            return trim ? buffer.toString().trim() : buffer.toString();
+        }
+
+        private boolean isQuoteChar(char c) {
+            for (int i = 0; i < quotes.length; i++) {
+                char quote = quotes[i];
+                if (c == quote) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+    }
+}

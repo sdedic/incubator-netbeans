@@ -62,7 +62,7 @@ public class PropertySplitter {
             //TODO should probably also handle (ignore) spaces before or after the = char somehow
             while (location < line.length()
                     && ((line.charAt(location) != separator && line.charAt(location) != newline) 
-                                                           || inQuote || escapeNext)) {
+                        || inQuote || escapeNext)) {
                 char c = line.charAt(location);
                 if (escapeNext) {
                     if (c == newline) {

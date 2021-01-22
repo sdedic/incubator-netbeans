@@ -83,6 +83,18 @@ public final class ExplicitProcessParameters {
         this.appendArgs = appendArgs;
         this.appendPriorityArgs = appendPriorityArgs;
     }
+    
+    /**
+     * Returns true, if the instance has no effect when {@link Builder#combine}d onto base parameters.
+     * @return true, if no effect is expected.
+     */
+    public boolean isEmpty() {
+        boolean change = false;
+        if (isArgReplacement() || isPriorityArgReplacement()) {
+            return false;
+        }
+        return (((arguments == null) || arguments.isEmpty()) && (priorityArguments == null || priorityArguments.isEmpty()));
+    }
 
     /**
      * Returns the arguments to be passed. Returns {@code null} if the object does not
@@ -178,7 +190,7 @@ public final class ExplicitProcessParameters {
      * a replacement, all arguments (priority arguments) collected to that point are discarded. Item's arguments (priority arguments)
      * will become the only ones listed.
      * <p>
-     * <i>Note:</i> that if the replacement instruction and all the following (if any) have {@link #getArguments()} {@code null} (= no change), 
+     * <i>Note:</i> if a replacement instruction and all the following (if any) have {@link #getArguments()} {@code null} (= no change), 
      * the result will report <b>no change</b>. It is therefore possible to <b>discard all contributions</b> by appending a no-change replacement 
      * last.
      * 
@@ -195,7 +207,7 @@ public final class ExplicitProcessParameters {
             }
             return all.indexOf(a) - all.indexOf(b);
         });
-        Builder b = builder();
+        Builder b = builder().appendArgs(all.isEmpty());
         for (ExplicitProcessParameters item : all) {
             b.combine(item);
         }
@@ -218,8 +230,17 @@ public final class ExplicitProcessParameters {
         private int rank = 0;
         private List<String> priorityArguments = null;
         private List<String> arguments = null;
-        private boolean  appendArgs;
-        private boolean  appendPriorityArgs = true;
+        private Boolean  appendArgs;
+        private Boolean  appendPriorityArgs;
+        
+        private void initArgs() {
+            if (arguments == null) {
+                arguments = new ArrayList<>();
+                if (appendArgs == null) {
+                    appendArgs = false;
+                }
+            }
+        }
         
         /**
          * Appends a single argument. {@code null} is ignored.
@@ -230,9 +251,7 @@ public final class ExplicitProcessParameters {
             if (a == null) {
                 return this;
             }
-            if (arguments == null) {
-                arguments = new ArrayList<>();
-            }
+            initArgs();
             arguments.add(a);
             return this;
         }
@@ -247,6 +266,8 @@ public final class ExplicitProcessParameters {
             if (args == null) {
                 return this;
             }
+            // init even if the list is empty.
+            initArgs();
             args.forEach(this::arg);
             return this;
         }
@@ -264,6 +285,15 @@ public final class ExplicitProcessParameters {
             return args(Arrays.asList(args));
         }
         
+        private void initPriorityArgs() {
+            if (priorityArguments == null) {
+                priorityArguments = new ArrayList<>();
+                if (appendPriorityArgs == null) {
+                    appendPriorityArgs = true;
+                }
+            }
+        }
+        
         /**
          * Appends a single priority argument. {@code null} is ignored.
          * @param a priority argument
@@ -273,9 +303,7 @@ public final class ExplicitProcessParameters {
             if (a == null) {
                 return this;
             }
-            if (priorityArguments == null) {
-                priorityArguments = new ArrayList<>();
-            }
+            initPriorityArgs();
             priorityArguments.add(a);
             return this;
         }
@@ -290,9 +318,7 @@ public final class ExplicitProcessParameters {
             if (args == null) {
                 return this;
             }
-            if (priorityArguments == null) {
-                priorityArguments = new ArrayList<>();
-            }
+            initPriorityArgs();
             args.forEach(this::priorityArg);
             return this;
         }
@@ -358,16 +384,16 @@ public final class ExplicitProcessParameters {
                 return this;
             }
             if (p.isPriorityArgReplacement()) {
+                priorityArguments = null;
                 if (p.getPriorityArguments() != null) {
-                    priorityArguments = null;
+                    appendPriorityArgs = false;
                 }
-                appendPriorityArgs = false;
             }
             if (p.isArgReplacement()) {
+                arguments = null;
                 if (p.getArguments() != null) {
-                    arguments = null;
+                    appendArgs = false;
                 }
-                appendArgs = false;
             }
             if (p.getPriorityArguments() != null) {
                 priorityArgs(p.getPriorityArguments());
@@ -383,7 +409,10 @@ public final class ExplicitProcessParameters {
          * @return the {@link ExplicitProcessParameters} instance.
          */
         public ExplicitProcessParameters build() {
-            return new ExplicitProcessParameters(rank, priorityArguments, arguments, appendArgs, appendPriorityArgs);
+            return new ExplicitProcessParameters(rank, priorityArguments, arguments, 
+                    // if no args / priority args given and no explicit instruction on append,
+                    // make the args appending.
+                    appendArgs != Boolean.FALSE, appendPriorityArgs != Boolean.FALSE);
         }
     }
 }
