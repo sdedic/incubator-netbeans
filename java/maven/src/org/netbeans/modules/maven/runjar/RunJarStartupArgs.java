@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 import org.netbeans.api.extexecution.startup.StartupExtender;
 import org.netbeans.api.project.Project;
 import org.netbeans.modules.maven.ActionProviderImpl;
@@ -31,15 +32,39 @@ import org.netbeans.modules.maven.api.execute.ActiveJ2SEPlatformProvider;
 import org.netbeans.modules.maven.api.execute.ExecutionContext;
 import org.netbeans.modules.maven.api.execute.LateBoundPrerequisitesChecker;
 import org.netbeans.modules.maven.api.execute.RunConfig;
+import org.netbeans.modules.maven.customizer.PropertySplitter;
 import org.netbeans.modules.maven.execute.BeanRunConfig;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ProjectServiceProvider;
+import org.openide.util.Lookup;
 import org.openide.util.lookup.AbstractLookup;
 import org.openide.util.lookup.InstanceContent;
 
 @ProjectServiceProvider(service=LateBoundPrerequisitesChecker.class, projectType="org-netbeans-modules-maven/" + NbMavenProject.TYPE_JAR)
 public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
-
+    /**
+     * Marker that separates VM args main class name from 'user specified arguments', whatever that
+     * means for a selected goal.
+     * If not present, then any injected arguments will be appended at the end of 'exec.args' property. If
+     * present, the action context can <b>replace</b> the arguments.
+     * @since 2.143
+     */
+    public static final String USER_PROGRAM_ARGS_MARKER = "%args"; // NOI18N
+    
+    /**
+     * Splits a command line, pays respect to quoting and newlines.
+     * @param line original line
+     * @return line split into individual arguments.
+     */
+    private static String[] splitCommandLine(String line) {
+        PropertySplitter spl = new PropertySplitter(line);
+        List<String> result = new ArrayList<>();
+        for (String part = spl.nextPair(); part != null; part = spl.nextPair()) {
+            result.add(part);
+        }
+        return result.toArray(new String[result.size()]);
+    }
+    
     @Override public boolean checkRunConfig(RunConfig config, ExecutionContext con) {
         String actionName = config.getActionName();
         StartupExtender.StartMode mode;
@@ -57,7 +82,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
         }
         boolean isTestScope = false;
         for (Map.Entry<? extends String, ? extends String> entry : config.getProperties().entrySet()) {
-            if (entry.getKey().equals("exec.args")) {
+            if (entry.getKey().equals("exec.args")) { // NOI18N
                 List<String> args = new ArrayList<String>();
                 InstanceContent ic = new InstanceContent();
                 Project p = config.getProject();
@@ -71,13 +96,34 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 for (StartupExtender group : StartupExtender.getExtenders(new AbstractLookup(ic), mode)) {
                     args.addAll(group.getArguments());
                 }
-                if (!args.isEmpty()) {
-                    StringBuilder b = new StringBuilder();
-                    for (String arg : args) {
-                        b.append(arg).append(' ');
-                    }
-                    b.append(entry.getValue());
-                    config.setProperty(entry.getKey(), b.toString());
+                
+                // split the 'exec.args' property to main and user arguments; userArgs will be null
+                // if no user arguments are present or the marker is not found
+                String[] existingArgs = splitCommandLine(entry.getValue());
+                String[] userArgs = null;
+                int indexOfUser = Arrays.asList(existingArgs).indexOf(USER_PROGRAM_ARGS_MARKER);
+                if (indexOfUser > -1) {
+                    userArgs = Arrays.copyOfRange(existingArgs, indexOfUser + 1, existingArgs.length);
+                    existingArgs = Arrays.copyOfRange(existingArgs, 0, indexOfUser);
+                }
+                
+                // TODO: would be better to get them from ExecutionContext.
+                ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
+
+                if (!(args.isEmpty() && injectParams.isEmpty())) {
+                    ExplicitProcessParameters changedParams = ExplicitProcessParameters.
+                        builder().
+                        // get extender input as a base
+                        priorityArgs(args).
+                        // include user arguments, if any
+                        args(userArgs).
+                        // allow to append or override from context injectors.
+                        combine(
+                            injectParams
+                        ).build();
+                    // the existing args is a series of VM parameters and the main class name
+                    String newParams = String.join(" ", changedParams.getAllArguments(existingArgs));
+                    config.setProperty(entry.getKey(), newParams);
                 }
             }
             if (entry.getKey().equals("exec.classpathScope") && "test".equals(entry.getValue())) {
