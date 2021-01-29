@@ -64,12 +64,13 @@ public final class ModelRunConfig extends BeanRunConfig {
         for (Map.Entry<String,String> entry : model.getProperties().entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
-            if(EXEC_ARGS.equals(key)) {                                
-                if(value != null && value.trim().equals(DEFAULT_EXEC_ARGS_CLASSPATH)) {
+            if(EXEC_ARGS.equals(key)) {     
+                String defaultArgsTemplate = MavenExecuteUtils.doesNotSpecifyCustomExecArgs(model);
+                if (defaultArgsTemplate != null) {
                     String execArgsByPom = getExecArgsByPom(model, proj);
                     if(execArgsByPom != null) {
                         if(execArgsByPom.contains(CP_PLACEHOLDER)) {
-                            value = execArgsByPom.replace(CP_PLACEHOLDER, DEFAULT_EXEC_ARGS_CLASSPATH);                            
+                            value = execArgsByPom.replace(CP_PLACEHOLDER, defaultArgsTemplate);                            
                         } else {
                             value = execArgsByPom; 
                         }  

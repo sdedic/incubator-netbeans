@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+import org.apache.maven.wagon.Streams;
 import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 import org.netbeans.api.extexecution.startup.StartupExtender;
 import org.netbeans.api.project.Project;
@@ -32,8 +34,8 @@ import org.netbeans.modules.maven.api.execute.ActiveJ2SEPlatformProvider;
 import org.netbeans.modules.maven.api.execute.ExecutionContext;
 import org.netbeans.modules.maven.api.execute.LateBoundPrerequisitesChecker;
 import org.netbeans.modules.maven.api.execute.RunConfig;
-import org.netbeans.modules.maven.customizer.PropertySplitter;
 import org.netbeans.modules.maven.execute.BeanRunConfig;
+import org.netbeans.modules.maven.execute.MavenExecuteUtils;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ProjectServiceProvider;
 import org.openide.util.Lookup;
@@ -57,9 +59,15 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
      * @return line split into individual arguments.
      */
     private static String[] splitCommandLine(String line) {
-        PropertySplitter spl = new PropertySplitter(line);
+        if (line == null) {
+            return new String[0];
+        }
+        String l = line.trim();
+        if (l.isEmpty()) {
+            return new String[0];
+        }
         List<String> result = new ArrayList<>();
-        for (String part = spl.nextPair(); part != null; part = spl.nextPair()) {
+        for (String part : MavenExecuteUtils.propertySplitter(l, true)) {
             result.add(part);
         }
         return result.toArray(new String[result.size()]);
@@ -83,7 +91,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
         boolean isTestScope = false;
         for (Map.Entry<? extends String, ? extends String> entry : config.getProperties().entrySet()) {
             if (entry.getKey().equals("exec.args")) { // NOI18N
-                List<String> args = new ArrayList<String>();
+                List<String> fixedArgs = new ArrayList<String>();
                 InstanceContent ic = new InstanceContent();
                 Project p = config.getProject();
                 if (p != null) {
@@ -94,27 +102,32 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                     }
                 }
                 for (StartupExtender group : StartupExtender.getExtenders(new AbstractLookup(ic), mode)) {
-                    args.addAll(group.getArguments());
+                    fixedArgs.addAll(group.getArguments());
                 }
                 
                 // split the 'exec.args' property to main and user arguments; userArgs will be null
                 // if no user arguments are present or the marker is not found
-                String[] existingArgs = splitCommandLine(entry.getValue());
-                String[] userArgs = null;
-                int indexOfUser = Arrays.asList(existingArgs).indexOf(USER_PROGRAM_ARGS_MARKER);
-                if (indexOfUser > -1) {
-                    userArgs = Arrays.copyOfRange(existingArgs, indexOfUser + 1, existingArgs.length);
-                    existingArgs = Arrays.copyOfRange(existingArgs, 0, indexOfUser);
+                String[] argParts = MavenExecuteUtils.splitAll(entry.getValue(), false);
+                
+                String[] vmArgs = splitCommandLine(argParts[0]);
+                String[] mainClass = splitCommandLine(argParts[1]);
+                String[] userArgs = splitCommandLine(argParts[2]);
+                if (mainClass.length == 0) {
+                    // accept userargs, since we don't know where the division is, make it fixed in the processing.
+                    mainClass = userArgs;
+                    userArgs = null;
                 }
+                String[] fixed = null;
+                fixedArgs.addAll(Arrays.asList(mainClass));
                 
                 // TODO: would be better to get them from ExecutionContext.
                 ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
 
-                if (!(args.isEmpty() && injectParams.isEmpty())) {
+                if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
                     ExplicitProcessParameters changedParams = ExplicitProcessParameters.
                         builder().
                         // get extender input as a base
-                        priorityArgs(args).
+                        priorityArgs(vmArgs).
                         // include user arguments, if any
                         args(userArgs).
                         // allow to append or override from context injectors.
@@ -122,7 +135,8 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                             injectParams
                         ).build();
                     // the existing args is a series of VM parameters and the main class name
-                    String newParams = String.join(" ", changedParams.getAllArguments(existingArgs));
+                    
+                    String newParams = String.join(" ", changedParams.getAllArguments(fixedArgs));
                     config.setProperty(entry.getKey(), newParams);
                 }
             }
