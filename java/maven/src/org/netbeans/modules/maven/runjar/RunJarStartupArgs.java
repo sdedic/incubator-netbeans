@@ -89,22 +89,47 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
             return true;
         }
         boolean isTestScope = false;
+        Map<? extends String, ? extends String> props = config.getProperties();
+        boolean vmArgsPresent = props.containsKey(MavenExecuteUtils.RUN_VM_PARAMS);
+        boolean appArgsPresent = props.containsKey(MavenExecuteUtils.RUN_APP_PARAMS);
+        boolean execArgsPresent = props.containsKey(MavenExecuteUtils.RUN_PARAMS);
+        
+        List<String> fixedArgs = new ArrayList<String>();
+        if (execArgsPresent || vmArgsPresent || appArgsPresent) {
+            // define exec.vmArgs and exec.appArgs
+            InstanceContent ic = new InstanceContent();
+            Project p = config.getProject();
+            if (p != null) {
+                ic.add(p);
+                ActiveJ2SEPlatformProvider pp = p.getLookup().lookup(ActiveJ2SEPlatformProvider.class);
+                if (pp != null) {
+                    ic.add(pp.getJavaPlatform());
+                }
+            }
+            for (StartupExtender group : StartupExtender.getExtenders(new AbstractLookup(ic), mode)) {
+                fixedArgs.addAll(group.getArguments());
+            }
+        }
+        ExplicitProcessParameters changedParams = null;
+        
+        if (vmArgsPresent || appArgsPresent) {
+            ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
+            String[] vmArgsValue = splitCommandLine(props.get(MavenExecuteUtils.RUN_VM_PARAMS));
+            String[] appArgsValue = splitCommandLine(props.get(MavenExecuteUtils.RUN_APP_PARAMS));
+
+            changedParams = ExplicitProcessParameters.
+                builder().
+                // get extender input as a base
+                priorityArgs(vmArgsValue).
+                // include user arguments, if any
+                args(appArgsValue).
+                // allow to append or override from context injectors.
+                combine(
+                    injectParams
+                ).build();
+        } 
         for (Map.Entry<? extends String, ? extends String> entry : config.getProperties().entrySet()) {
             if (entry.getKey().equals("exec.args")) { // NOI18N
-                List<String> fixedArgs = new ArrayList<String>();
-                InstanceContent ic = new InstanceContent();
-                Project p = config.getProject();
-                if (p != null) {
-                    ic.add(p);
-                    ActiveJ2SEPlatformProvider pp = p.getLookup().lookup(ActiveJ2SEPlatformProvider.class);
-                    if (pp != null) {
-                        ic.add(pp.getJavaPlatform());
-                    }
-                }
-                for (StartupExtender group : StartupExtender.getExtenders(new AbstractLookup(ic), mode)) {
-                    fixedArgs.addAll(group.getArguments());
-                }
-                
                 // split the 'exec.args' property to main and user arguments; userArgs will be null
                 // if no user arguments are present or the marker is not found
                 String[] argParts = MavenExecuteUtils.splitAll(entry.getValue(), false);
@@ -124,7 +149,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
 
                 if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
-                    ExplicitProcessParameters changedParams = ExplicitProcessParameters.
+                    changedParams = ExplicitProcessParameters.
                         builder().
                         // get extender input as a base
                         priorityArgs(vmArgs).
