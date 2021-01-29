@@ -32,9 +32,11 @@ import java.util.function.Predicate;
 import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluationException;
 import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluator;
 import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
+import org.netbeans.api.extexecution.startup.StartupExtender;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectManager;
 import org.netbeans.junit.NbTestCase;
+import org.netbeans.modules.extexecution.startup.StartupExtenderRegistrationProcessor;
 import org.netbeans.modules.maven.NbMavenProjectImpl;
 import org.netbeans.modules.maven.api.PluginPropertyUtils;
 import org.netbeans.modules.maven.api.customizer.ModelHandle2;
@@ -46,10 +48,13 @@ import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3Reader;
 import org.netbeans.modules.maven.runjar.RunJarPrereqChecker;
+import org.netbeans.spi.extexecution.startup.StartupExtenderImplementation;
 import org.openide.execution.ExecutorTask;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.filesystems.test.TestFileUtils;
+import org.openide.loaders.DataFolder;
+import org.openide.loaders.InstanceDataObject;
 import org.openide.util.Lookup;
 import org.openide.util.NbPreferences;
 import org.openide.util.test.MockLookup;
@@ -74,6 +79,13 @@ public class ExecutionEnvHelperTest extends NbTestCase {
     protected void setUp() throws Exception {
         super.setUp(); 
         clearWorkDir();
+        MockLookup.setLayersAndInstances();
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        TestExtender.vmArg = null;
+        super.tearDown();
     }
     
     
@@ -476,7 +488,6 @@ public class ExecutionEnvHelperTest extends NbTestCase {
     /**
      * Checks that without mapping maven arguments are properly passed to exec.args, so
      * they are not overriden.
-     * @throws Exception 
      */
     public void test123DefaultProjectPassesPOMArguments() throws Exception {
         makeOldDefaultProperties();
@@ -513,23 +524,27 @@ public class ExecutionEnvHelperTest extends NbTestCase {
     
     private static final String DEFAULT_MAIN_CLASS_TOKEN = "main.class.TokenMarker";
     
+    
+    private void initSplitPropertiesWithArguments() throws Exception {
+        initSplitProperties();
+        createPomWithArguments();
+        runP.put(MavenExecuteUtils.RUN_APP_PARAMS, "firstParam nextParam");
+        runP.put(MavenExecuteUtils.RUN_VM_PARAMS, "-DvmArg=1");
+    }
+    
     /**
      * Checks that if a mapping defines arguments, they are used in preference to the 
      * POM ones.
      */
     public void testNewDefaultMappingPassesArguments() throws Exception {
-        initSplitProperties();
-        createPomWithArguments();
-        runP.put(MavenExecuteUtils.RUN_APP_PARAMS, "firstParam nextParam");
-        runP.put(MavenExecuteUtils.RUN_VM_PARAMS, "-DvmArg=1");
-        
+        initSplitPropertiesWithArguments();
         assertActionOverridesArguments("-DvmArg=1", null, "firstParam nextParam");
     }
     
     /**
-     * Checks that pre-12.3 default actions will inject arguments from Lookup.
+     * Checks that pre-12.3 default actions will inject VM arguments and arguments from Lookup.
      */
-    public void test123DefaultActionWithArgumentInjection() throws Exception {
+    public void test123DefaultActionWithAddition() throws Exception {
         makeOldDefaultProperties();
         createNbActions(runP, debugP, profileP);
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
@@ -547,7 +562,7 @@ public class ExecutionEnvHelperTest extends NbTestCase {
      * should be added <b>in addition to the existing ones</b> while application args
      * should be replaced.
      */
-    public void test123DefaultActionWithVMArgsReplacement() throws Exception {
+    public void test123DefaultActionWithVMReplacement() throws Exception {
         makeOldDefaultProperties();
         createNbActions(runP, debugP, profileP);
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
@@ -561,6 +576,113 @@ public class ExecutionEnvHelperTest extends NbTestCase {
         assertFalse(mavenVmArgs.contains("-DsomeProperty="));
     }
     
+    /**
+     * New actions: Checks that explicit params by default _append_ VM args and
+     * replaces args.
+     */
+    public void testNewActionWithVMAdditionAndArgReplacement() throws Exception {
+        initSplitPropertiesWithArguments();
+        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+                priorityArg("-DvmArg2=2").
+                arg("paramY").build();
+        MockLookup.setLayersAndInstances(explicit);
+        createPomWithArguments();
+        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        // check that default pom arguments are not present
+        assertTrue(mavenVmArgs.contains("-DvmArg=1"));
+        // by default arguments are replaced:
+        assertFalse(mavenAppArgs.contains("firstParam nextParam"));
+    }
+    
+    /**
+     * New actions: Checks that args can be appended, if necessary.
+     */
+    public void testNewActionWithArgAddition() throws Exception {
+        initSplitPropertiesWithArguments();
+        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+                priorityArg("-DvmArg2=2").
+                arg("paramY").build();
+        MockLookup.setLayersAndInstances(explicit);
+        createPomWithArguments();
+        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        // check that default pom arguments are not present
+        assertFalse(mavenVmArgs.contains("-DsomeProperty="));
+    }
+
+    /**
+     * New actions: checks that VM args can be replaced.
+     */
+    public void testNewActionWithVMReplacement() throws Exception {
+        initSplitPropertiesWithArguments();
+        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+                appendPriorityArgs(false).
+                priorityArg("-DvmArg2=2").
+                arg("paramY").build();
+        MockLookup.setLayersAndInstances(explicit);
+        createPomWithArguments();
+        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        // check that default pom arguments are not present
+        assertFalse(mavenVmArgs.contains("-DvmArg=1"));
+    }
+    
+    static class TestExtender implements StartupExtenderImplementation {
+        static String vmArg;
+        
+        @Override
+        public List<String> getArguments(Lookup context, StartupExtender.StartMode mode) {
+            return vmArg == null ? Collections.emptyList() : Collections.singletonList(vmArg);
+        }
+    }
+    
+    private void registerExtender() throws IOException {
+        FileObject p = FileUtil.getConfigFile(StartupExtenderRegistrationProcessor.PATH);
+        if (p == null) {
+            p = FileUtil.getConfigRoot().createFolder(StartupExtenderRegistrationProcessor.PATH);
+        }
+        DataFolder fld = DataFolder.findFolder(p);
+        InstanceDataObject.create(fld, "test-extender", TestExtender.class);
+    }
+    
+    /**
+     * New actions: checks that appended VM args are also merged with a
+     * startup extender
+     */
+    public void testNewActionVMAppendMergesWithExtenders() throws Exception {
+        initSplitPropertiesWithArguments();
+        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+//                appendPriorityArgs(false).
+                priorityArg("-DvmArg2=2").
+                arg("paramY").build();
+        registerExtender();
+        TestExtender.vmArg = "-Dbar=foo";
+        MockLookup.setLayersAndInstances(explicit);
+        createPomWithArguments();
+        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        // check that default pom arguments are not present
+        assertTrue(mavenVmArgs.contains("-DvmArg=1"));
+        assertTrue(mavenVmArgs.contains("-Dbar=foo"));
+    }
+    
+    /**
+     * New actions: checks that appended VM args are merged with a
+     * startup extender EVEN If config args are replaced.
+     */
+    public void testNewActionVMReplaceSillMergesWithExtenders() throws Exception {
+        initSplitPropertiesWithArguments();
+        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+                appendPriorityArgs(false).
+                priorityArg("-DvmArg2=2").
+                arg("paramY").build();
+        registerExtender();
+        TestExtender.vmArg = "-Dbar=foo";
+        MockLookup.setLayersAndInstances(explicit);
+        createPomWithArguments();
+        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        // check that default pom arguments are not present
+        assertFalse(mavenVmArgs.contains("-DvmArg=1"));
+        assertTrue(mavenVmArgs.contains("-Dbar=foo"));
+    }
+
     private String mavenVmArgs = ""; // NOI18N
     private String mavenAppArgs = ""; // NOI18N
     private Map<String, String> mavenExecutorDefines = new HashMap<>();

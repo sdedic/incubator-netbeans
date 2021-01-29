@@ -211,7 +211,7 @@ public final class ExplicitProcessParameters {
             }
             return all.indexOf(a) - all.indexOf(b);
         });
-        Builder b = builder().appendArgs(all.isEmpty());
+        Builder b = builder(); // .appendArgs(all.isEmpty());
         for (ExplicitProcessParameters item : all) {
             b.combine(item);
         }
@@ -389,20 +389,16 @@ public final class ExplicitProcessParameters {
             }
             if (p.isPriorityArgReplacement()) {
                 priorityArguments = null;
-                if (p.getPriorityArguments() != null) {
-                    appendPriorityArgs = false;
-                }
             }
             if (p.isArgReplacement()) {
                 arguments = null;
-                if (p.getArguments() != null) {
-                    appendArgs = false;
-                }
             }
             if (p.getPriorityArguments() != null) {
+                appendPriorityArgs = !p.isPriorityArgReplacement();
                 priorityArgs(p.getPriorityArguments());
             }
             if (p.getArguments() != null) {
+                appendArgs = !p.isArgReplacement();
                 args(p.getArguments());
             }
             return this;
