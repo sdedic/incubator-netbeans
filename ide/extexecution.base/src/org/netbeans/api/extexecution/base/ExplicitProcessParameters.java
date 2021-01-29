@@ -148,6 +148,20 @@ public final class ExplicitProcessParameters {
         return !appendPriorityArgs;
     }
     
+    public @NonNull List<String> getAllArguments(List<String> middle) {
+        List<String> a = new ArrayList<>();
+        if (priorityArguments != null) {
+            a.addAll(priorityArguments);
+        }
+        if (middle != null && !middle.isEmpty()) {
+            a.addAll(middle);
+        }
+        if (arguments != null) {
+            a.addAll(arguments);
+        }
+        return a;
+    }
+    
     /**
      * Returns the argument lists merged. Priority arguments (if any) are passed first, followed
      * by {@code middle} (if any), then (normal) arguments. The method is a convenience to build
@@ -155,17 +169,7 @@ public final class ExplicitProcessParameters {
      * @return combined arguments.
      */
     public @NonNull List<String> getAllArguments(@NullAllowed String... middle) {
-        List<String> a = new ArrayList<>();
-        if (priorityArguments != null) {
-            a.addAll(priorityArguments);
-        }
-        if (middle != null && middle.length > 0) {
-            a.addAll(Arrays.asList(middle));
-        }
-        if (arguments != null) {
-            a.addAll(arguments);
-        }
-        return a;
+        return getAllArguments(middle == null ? Collections.emptyList() : Arrays.asList(middle));
     }
 
     /**
@@ -333,7 +337,7 @@ public final class ExplicitProcessParameters {
             if (args == null) {
                 return this;
             }
-            return args(Arrays.asList(args));
+            return priorityArgs(Arrays.asList(args));
         }
         
         /**
@@ -358,7 +362,7 @@ public final class ExplicitProcessParameters {
          * @return the builder
          */
         public Builder appendPriorityArgs(boolean append) {
-            this.appendArgs = append;
+            this.appendPriorityArgs = append;
             return this;
         }
 

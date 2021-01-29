@@ -24,21 +24,36 @@ import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluationException;
+import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluator;
+import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectManager;
 import org.netbeans.junit.NbTestCase;
 import org.netbeans.modules.maven.NbMavenProjectImpl;
+import org.netbeans.modules.maven.api.PluginPropertyUtils;
 import org.netbeans.modules.maven.api.customizer.ModelHandle2;
+import org.netbeans.modules.maven.api.execute.PrerequisitesChecker;
 import org.netbeans.modules.maven.configurations.M2ConfigProvider;
+import org.netbeans.modules.maven.embedder.EmbedderFactory;
 import org.netbeans.modules.maven.execute.MavenExecuteUtils.ExecutionEnvHelper;
 import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3Reader;
+import org.netbeans.modules.maven.runjar.RunJarPrereqChecker;
+import org.openide.execution.ExecutorTask;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.filesystems.test.TestFileUtils;
+import org.openide.util.Lookup;
+import org.openide.util.NbPreferences;
+import org.openide.util.test.MockLookup;
+import org.openide.windows.InputOutput;
 
 /**
  *
@@ -48,10 +63,20 @@ public class ExecutionEnvHelperTest extends NbTestCase {
     Map<String, String> runP = new HashMap<>();
     Map<String, String> debugP = new HashMap<>();
     Map<String, String> profileP = new HashMap<>();
-
+    FileObject pom;
+    FileObject nbActions;
+    
     public ExecutionEnvHelperTest(String name) {
         super(name);
     }
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp(); 
+        clearWorkDir();
+    }
+    
+    
     
     private String substProperties(String input, String token, Map<String, String> properties) {
         int pos;
@@ -135,63 +160,172 @@ public class ExecutionEnvHelperTest extends NbTestCase {
     }
     
     /**
-     * Checks that exec.args are correctly split into vm, app and main class.
+     * Sets up properties for pre-12.3 maven projects, with some customizations
+     * <ul>
+     * <li>a system property
+     * <li>classpath
+     * <li>an application parameter
+     * </ul>
      */
-    public void testLoadFromExecArgs() throws Exception {
-        runP.put("exec.executable", "java");
+    private void initOldProperties() {
+        makeOldDefaultProperties();
+        
         runP.put("exec.args", "-Dprop=val -classpath %classpath test.mavenapp.App param1");
         profileP.putAll(runP);
+        debugP.put("exec.args", "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address} -Dprop=val -classpath %classpath test.mavenapp.App param1");
+    }
+    
+    /**
+     * Sets up DEFAULT pre-12.3 properties, no new properties will be defined at all. Use to test
+     * compatibility with pre-existing projects.
+     */
+    private void makeOldDefaultProperties() {
+        runP.remove("exec.vmArgs");
+        runP.remove("exec.appArgs");
+        runP.remove("exec.mainClass");
+        runP.put("exec.executable", "java");
+        runP.put("exec.args", MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH);
+        profileP.putAll(runP);
 
-        debugP.put("exec.vmArgs", "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}");
+        debugP.put("exec.args", MavenExecuteUtils.DEFAULT_DEBUG_PARAMS + " " + MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH);
         debugP.put("exec.executable", "java");
-        
+    }
+    
+    private ActionToGoalMapping mapp;
+    
+    private ExecutionEnvHelper createAndLoadHelper() throws Exception {
         FileObject actions = createNbActions(runP, debugP, profileP);
-        
         FileObject pom = createPom("", "");
+        
+        this.nbActions = actions;
+        this.pom = pom;
         
         Project project = ProjectManager.getDefault().findProject(pom.getParent());        
         loadActionMappings(project);
         
-        ActionToGoalMapping mapp = new NetbeansBuildActionXpp3Reader().read(new StringReader(actions.asText()));
+        mapp = new NetbeansBuildActionXpp3Reader().read(new StringReader(actions.asText()));
         NbMavenProjectImpl mavenProject = project.getLookup().lookup(NbMavenProjectImpl.class);
         
         ExecutionEnvHelper helper = MavenExecuteUtils.createExecutionEnvHelper(mavenProject, runMapping, debugMapping, profileMapping, mapp);
         helper.loadFromProject();
+        return helper;
+    }
+    
+    /**
+     * Checks that exec.args are correctly split into vm, app and main class.
+     */
+    public void testLoadFromExecArgs() throws Exception {
+        initOldProperties();
         
+        ExecutionEnvHelper helper = createAndLoadHelper();
         assertEquals("-Dprop=val", helper.getVmParams());
         assertEquals("param1", helper.getAppParams());
         assertEquals("test.mavenapp.App", helper.getMainClass());
     }
     
     /**
+     * Sets up project's split properties - individual parts split to separate
+     * properties (vm args, app args, main class).
+     */
+    private void initSplitProperties() {
+        runP.put("exec.executable", "java");
+        runP.put("exec.mainClass", "${packageClassName}");
+        runP.put("exec.vmArgs", "");
+        runP.put("exec.appArgs", "");
+        runP.put("exec.args", MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
+
+        profileP.putAll(runP);
+        debugP.putAll(runP);
+        
+        debugP.put("exec.args", MavenExecuteUtils.DEFAULT_DEBUG_PARAMS + " " + MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
+        debugP.put("exec.executable", "java");
+    }
+    
+    /**
+     * Sets up customized split properties. A VM arg, app arg and a defined main class are present.
+     */
+    private void initCustomizedSplitProperties() {
+        initSplitProperties();
+        runP.put("exec.vmArgs", "-Dprop=val");
+        runP.put("exec.mainClass", "test.mavenapp.App");
+        runP.put("exec.appArgs", "paramX");
+        profileP.putAll(runP);
+        
+        debugP.put("exec.vmArgs", "-Dprop=val");
+        debugP.put("exec.mainClass", "test.mavenapp.App");
+        debugP.put("exec.appArgs", "paramX");
+    }
+    
+    /**
      * Loads action mapping split into multiple properties.
      */
     public void testLoadFromNewCustomizer() throws Exception {
-        runP.put("exec.executable", "java");
-        runP.put("exec.vmArgs", "-Dprop=val");
-        runP.put("exec.mainClass", "test.mavenapp.App");
-        runP.put("exec.appArgs", "param1");
-        profileP.putAll(runP);
-        
-        debugP.put("exec.vmArgs", "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}");
-        debugP.put("exec.executable", "java");
-        
-        FileObject actions = createNbActions(runP, debugP, profileP);
-        
-        FileObject pom = createPom("", "");
-        
-        Project project = ProjectManager.getDefault().findProject(pom.getParent());        
-        loadActionMappings(project);
-        
-        ActionToGoalMapping mapp = new NetbeansBuildActionXpp3Reader().read(new StringReader(actions.asText()));
-        NbMavenProjectImpl mavenProject = project.getLookup().lookup(NbMavenProjectImpl.class);
-        
-        ExecutionEnvHelper helper = MavenExecuteUtils.createExecutionEnvHelper(mavenProject, runMapping, debugMapping, profileMapping, mapp);
-        helper.loadFromProject();
+        initCustomizedSplitProperties();
+        ExecutionEnvHelper helper = createAndLoadHelper();
         
         assertEquals("-Dprop=val", helper.getVmParams());
-        assertEquals("param1", helper.getAppParams());
+        assertEquals("paramX", helper.getAppParams());
         assertEquals("test.mavenapp.App", helper.getMainClass());
+    }
+    
+    /**
+     * Checks that a change to a helper loaded from an old config will result in proper properties being set.
+     * 
+     * @throws Exception 
+     */
+    public void testChangeFromOldConfig() throws Exception {
+        initOldProperties();
+        ExecutionEnvHelper helper = createAndLoadHelper();        
+        
+        helper.setAppParams("param2");
+        helper.setMainClass("bar.FooBar");
+        helper.setVmParams("-Dwhatever=true");
+        
+        helper.applyToMappings();
+        
+        checkActionMapping(getActionMapping("run"), "bar.FooBar", "param2", "-Dwhatever=true");
+        checkActionMapping(getActionMapping("debug"), "bar.FooBar", "param2", "-Dwhatever=true " + MavenExecuteUtils.DEFAULT_DEBUG_PARAMS);
+        checkActionMapping(getActionMapping("profile"), "bar.FooBar", "param2", "-Dwhatever=true");
+    }
+    
+    /**
+     * If the original config was 'mixed', that is did not contain '%classpath' in some of the actions,
+     * that action's properties will not change when altered in the Helper. This is consistent with
+     * previous function of the RunJarPanel.
+     */
+    public void testMixedConfigNotChanged() throws Exception {
+        initOldProperties();
+        
+        // remove the classpath
+        runP.put("exec.args", "-Dprop=val test.mavenapp.App param1");
+
+        ExecutionEnvHelper helper = createAndLoadHelper();        
+        
+        helper.setAppParams("param2");
+        helper.setMainClass("bar.FooBar");
+        helper.setVmParams("-Dwhatever=true");
+        
+        helper.applyToMappings();
+        
+        // changes debug and profile are OK
+        checkActionMapping(getActionMapping("debug"), "bar.FooBar", "param2", "-Dwhatever=true " + MavenExecuteUtils.DEFAULT_DEBUG_PARAMS);
+        checkActionMapping(getActionMapping("profile"), "bar.FooBar", "param2", "-Dwhatever=true");
+        
+        // but 'run' profile didn't contain %classpath, so it should not be changed at all:
+        NetbeansActionMapping rm = getActionMapping("run");
+        assertEquals(runP, rm.getProperties());
+    }
+
+    private void checkActionMapping(NetbeansActionMapping map, String mainClass, String appArgs, String vmArgs) {
+        String execArgs = map.getProperties().get("exec.args");
+        assertTrue(execArgs.contains("${exec.mainClass}"));
+        assertTrue(execArgs.contains("${exec.vmArgs}"));
+        assertTrue(execArgs.contains("${exec.appArgs}"));
+        assertTrue(execArgs.contains("-classpath %classpath"));
+        
+        assertEquals(appArgs, map.getProperties().get("exec.appArgs"));
+        assertEquals(vmArgs, map.getProperties().get("exec.vmArgs"));
+        assertEquals(mainClass, map.getProperties().get("exec.mainClass"));
     }
     
     private FileObject createPom(String argsString, String propString) throws IOException {
@@ -221,5 +355,284 @@ public class ExecutionEnvHelperTest extends NbTestCase {
         Project project = ProjectManager.getDefault().findProject(pom.getParent());        
         NetbeansActionMapping mapp = ModelHandle2.getMapping("run", project, project.getLookup().lookup(M2ConfigProvider.class).getActiveConfiguration());
         a.accept(ModelRunConfig.getExecArgsByPom(mapp, project));
+    }
+
+    
+    private void createPomWithArguments() throws Exception {
+        pom = createPom("<arguments>"
+                    + "<argument>-DsomeProperty=${AA}</argument>"
+                    + "<argument>-classpath</argument>"
+                    + "<classpath></classpath>"
+                + "</arguments>", "<properties><AA>blah</AA></properties>");
+    }
+    
+    private void assertPOMArguments(NetbeansActionMapping mapp, String actionsDefaultArgs) throws Exception {
+        Project project = ProjectManager.getDefault().findProject(pom.getParent());        
+        ModelRunConfig cfg = new ModelRunConfig(project, mapp, "run", null, Lookup.EMPTY, true);
+
+        assertTrue(cfg.getProperties().get(MavenExecuteUtils.RUN_PARAMS).contains("-DsomeProperty=blah"));
+        assertTrue(cfg.getProperties().get(MavenExecuteUtils.RUN_PARAMS).contains(actionsDefaultArgs));
+    }
+    
+    /**
+     * Checks that default actions set up for 12.3 and previous projects will merge in maven
+     * settings.
+     * @throws Exception 
+     */
+    public void testMergedMappingUsesPOMArguments() throws Exception {
+        makeOldDefaultProperties();
+        createNbActions(runP, debugP, profileP);
+        createPomWithArguments();
+        Project project = ProjectManager.getDefault().findProject(pom.getParent());        
+        loadActionMappings(project);
+
+        assertPOMArguments(runMapping, MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH);
+    }
+    
+    /**
+     * Checks that default actions set up for post-12.3 will merge in maven
+     * settings.
+     * @throws Exception 
+     */
+    public void testSplitPropertyMappingUsesPOMArguments() throws Exception {
+        initSplitProperties();
+        createNbActions(runP, debugP, profileP);
+        createPomWithArguments();
+        
+        Project project = ProjectManager.getDefault().findProject(pom.getParent());        
+        loadActionMappings(project);
+
+        assertPOMArguments(runMapping, MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
+    }
+    
+    /**
+     * Checks that a project with no nb-actions still merges in default actions
+     * + the POM settings
+     * @throws Exception 
+     */
+    public void testDefaultNoActionsMappingUsesPOMArguments() throws Exception {
+        createPomWithArguments();
+
+        Project project = ProjectManager.getDefault().findProject(pom.getParent());        
+        loadActionMappings(project);
+
+        assertPOMArguments(runMapping, MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
+    }
+    
+    private NetbeansActionMapping getActionMapping(String aName) {
+        return mapp.getActions().stream().filter(m -> m.getActionName().equals(aName)).findAny().get();
+    }
+    
+    /**
+     * Evaluates property references in arguments. Uses Maven evaluator for the project + properties defined in the 
+     * ModelRunConfig (which are passed as -D to the maven executor).
+     */
+    private List<String> substituteProperties(List<String> args, Project p, Map<? extends String, ? extends String> properties) {
+        ExpressionEvaluator e = PluginPropertyUtils.createEvaluator(p);
+        for (int i = 0; i < args.size(); i++) {
+            String a = args.get(i);
+            int pos;
+            int end = a.length() -1;
+            for (pos = -1; (pos = a.indexOf("${", pos + 1)) > -1; ) {
+                end = a.indexOf("}", pos + 1);
+                String name = a.substring(pos + 2, end);
+                String v = properties.get(name);
+                if (v != null) {
+                    a = a.substring(0, pos) + v + a.substring(end + 1);
+                } else {
+                    pos = end + 1;
+                }
+            }
+            try {
+                a = e.evaluate(a).toString();
+            } catch (ExpressionEvaluationException ex) {
+                // do nothing
+            }
+            args.set(i, a);
+        }
+        return args;
+    }
+
+    private void assertPOMArgumentsUsed() throws Exception {
+        createNbActions(runP, debugP, profileP);
+        createPomWithArguments();
+        if (runMapping == null) {
+            final Project project = ProjectManager.getDefault().findProject(pom.getParent());
+            loadActionMappings(project);
+        }
+        assertRunArguments(runMapping, "-DsomeProperty=blah", DEFAULT_MAIN_CLASS_TOKEN,  null);
+    }
+    
+    private void assertActionOverridesArguments(String vmArg, String mainClass, String appArg) throws Exception {
+        createNbActions(runP, debugP, profileP);
+        createPomWithArguments();
+        if (runMapping == null) {
+            final Project project = ProjectManager.getDefault().findProject(pom.getParent());
+            loadActionMappings(project);
+        }
+        assertRunArguments(runMapping, vmArg, mainClass == null ? DEFAULT_MAIN_CLASS_TOKEN : mainClass,  appArg);
+    }
+    
+    /**
+     * Checks that without mapping maven arguments are properly passed to exec.args, so
+     * they are not overriden.
+     * @throws Exception 
+     */
+    public void test123DefaultProjectPassesPOMArguments() throws Exception {
+        makeOldDefaultProperties();
+        assertPOMArgumentsUsed();
+    }
+    
+    /**
+     * Checks that old mapping (just exec.args) properly passes POM arguments if
+     * exec.args does not define any
+     */
+    public void test123WithActionsAndNoArgsPassesPOMArguments() throws Exception {
+        makeOldDefaultProperties();
+        createNbActions(runP, debugP, profileP);
+        assertPOMArgumentsUsed();
+    }
+    
+    /**
+     * Checks that new default mapping (no customizations) will pass POM arguments.
+     */
+    public void testNewDefaultActionPassesPOMArguments() throws Exception {
+        initSplitProperties();
+        assertPOMArgumentsUsed();
+    }
+
+    /**
+     * Checks that argument in mapping's exec.args overrides POM arguments
+     */
+    public void test123WithActionsArgumentsOverridePOM() throws Exception {
+        makeOldDefaultProperties();
+        runP.put(MavenExecuteUtils.RUN_PARAMS, 
+                "-DdifferentProperty=blurb " + MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH + " ${pkgClassName} param2 prevParam");
+        assertActionOverridesArguments("-DdifferentProperty=blurb", DEFAULT_MAIN_CLASS_TOKEN, "param2 prevParam");
+    }
+    
+    private static final String DEFAULT_MAIN_CLASS_TOKEN = "main.class.TokenMarker";
+    
+    /**
+     * Checks that if a mapping defines arguments, they are used in preference to the 
+     * POM ones.
+     */
+    public void testNewDefaultMappingPassesArguments() throws Exception {
+        initSplitProperties();
+        createPomWithArguments();
+        runP.put(MavenExecuteUtils.RUN_APP_PARAMS, "firstParam nextParam");
+        runP.put(MavenExecuteUtils.RUN_VM_PARAMS, "-DvmArg=1");
+        
+        assertActionOverridesArguments("-DvmArg=1", null, "firstParam nextParam");
+    }
+    
+    /**
+     * Checks that pre-12.3 default actions will inject arguments from Lookup.
+     */
+    public void test123DefaultActionWithArgumentInjection() throws Exception {
+        makeOldDefaultProperties();
+        createNbActions(runP, debugP, profileP);
+        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+                priorityArg("-DvmArg2=2").
+                arg("paramY").build();
+        MockLookup.setLayersAndInstances(explicit);
+        createPomWithArguments();
+        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        // check that default pom arguments are ALSO present
+        assertTrue(mavenVmArgs.contains("-DsomeProperty="));
+    }
+    
+    /**
+     * Checks that pre-12.3 default actions will inject arguments from Lookup. VM args
+     * should be added <b>in addition to the existing ones</b> while application args
+     * should be replaced.
+     */
+    public void test123DefaultActionWithVMArgsReplacement() throws Exception {
+        makeOldDefaultProperties();
+        createNbActions(runP, debugP, profileP);
+        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+                priorityArg("-DvmArg2=2").
+                appendPriorityArgs(false).
+                arg("paramY").build();
+        MockLookup.setLayersAndInstances(explicit);
+        createPomWithArguments();
+        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        // check that default pom arguments are not present
+        assertFalse(mavenVmArgs.contains("-DsomeProperty="));
+    }
+    
+    private String mavenVmArgs = ""; // NOI18N
+    private String mavenAppArgs = ""; // NOI18N
+    private Map<String, String> mavenExecutorDefines = new HashMap<>();
+    
+    private void assertRunArguments(NetbeansActionMapping mapping, String vmArgs, String mainClass, String args) throws Exception {
+        final Project project = ProjectManager.getDefault().findProject(pom.getParent());        
+        
+        final String prefix = "-D" + MavenExecuteUtils.RUN_PARAMS + "=";
+        assertMavenRunAction(project, mapping, "run", (List<String> cmdLine) -> {
+            mavenExecutorDefines.clear();
+            for (String s : cmdLine) {
+                if (s.startsWith("-D")) {
+                    int equalsIndex = s.indexOf('=');
+                    String k = s.substring(2, equalsIndex);
+                    String v = s.substring(equalsIndex + 1);
+                    mavenExecutorDefines.put(k, v);
+                }
+            }
+            String argString = mavenExecutorDefines.get(MavenExecuteUtils.RUN_PARAMS);
+            int indexOfDefine = argString.indexOf(vmArgs);
+            assertTrue(indexOfDefine >= 0);
+            int indexOfMainClass = argString.indexOf(mainClass);
+            assertTrue(indexOfMainClass >= 0);
+            mavenVmArgs = argString.substring(0, indexOfMainClass).trim();
+            mavenAppArgs = argString.substring(indexOfMainClass + mainClass.length()).trim();
+            assertTrue("VM args must precede main class", indexOfDefine < indexOfMainClass);
+            if (args != null) {
+                int indexOfAppParams = argString.indexOf(args);
+                assertTrue(indexOfAppParams >= 0);
+                assertTrue("App args must followmain class", indexOfMainClass <  indexOfAppParams);
+            }
+        });
+    }
+    
+    private void assertMavenRunAction(Project project, NetbeansActionMapping mapping, String actionName, Consumer<List<String>> commandLineAcceptor) throws Exception {
+        NbPreferences.root().node("org/netbeans/modules/maven").put(EmbedderFactory.PROP_COMMANDLINE_PATH, "mvn");
+        ModelRunConfig cfg = new ModelRunConfig(project, mapping, actionName, null, Lookup.EMPTY, true);
+        // prevent displaying dialogs.
+        RunJarPrereqChecker.setMainClass(DEFAULT_MAIN_CLASS_TOKEN);
+        for (PrerequisitesChecker elem : cfg.getProject().getLookup().lookupAll(PrerequisitesChecker.class)) {
+            if (!elem.checkRunConfig(cfg)) {
+                fail("");
+            }
+            if (cfg.getPreExecution() != null) {
+                if (!elem.checkRunConfig(cfg.getPreExecution())) {
+                    fail("");
+                }
+            }
+        }
+        MavenCommandLineExecutor exec = new MavenCommandLineExecutor(cfg, InputOutput.NULL, null) {
+            @Override
+            int executeProcess(CommandLineOutputHandler out, ProcessBuilder builder, Consumer<Process> processSetter) throws IOException, InterruptedException {
+                List<String> args = substituteProperties(builder.command(), project, cfg.getProperties());
+                commandLineAcceptor.accept(args);
+                return 0;
+            }
+        };
+        exec.task = new ExecutorTask(exec) {
+            @Override
+            public void stop() {
+            }
+            
+            @Override
+            public int result() {
+                return 0;
+            }
+            
+            @Override
+            public InputOutput getInputOutput() {
+                return InputOutput.NULL;
+            }
+        };
+        exec.run();
     }
 }

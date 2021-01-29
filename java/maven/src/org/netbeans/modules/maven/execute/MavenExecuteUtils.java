@@ -50,7 +50,10 @@ public final class MavenExecuteUtils {
     private static final String RUN_APP_PARAMS_TOKEN = "${" + RUN_APP_PARAMS + "}"; //NOI18N
     private static final String RUN_MAIN_CLASS_TOKEN = "${" + RUN_MAIN_CLASS + "}"; //NOI18N
     private static final String PACKAGE_CLASS_NAME_TOKEN = "${packageClassName}"; //NOI18N
-    private static final String DEFAULT_DEBUG_PARAMS = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}"; //NOI18N
+    
+    static final String DEFAULT_EXEC_ARGS_CLASSPATH = "-classpath %classpath ${packageClassName}"; // NOI18N
+    static final String DEFAULT_DEBUG_PARAMS = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}"; //NOI18N
+    static final String DEFAULT_EXEC_ARGS_CLASSPATH2 =  "${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}"; // NOI18N
 
     public static final String PROFILE_CMD = "profile"; // NOI18N
     
@@ -94,10 +97,13 @@ public final class MavenExecuteUtils {
             this.profile = profile;
         }
         
-        private String fallbackParams(String paramName) {
+        private String fallbackParams(String paramName, boolean stripDebug) {
             String val = run != null ? run.getProperties().get(paramName) : null;
             if (val == null && debug != null) {
                 val = debug.getProperties().get(paramName);
+                if (val != null && stripDebug) {
+                    val = String.join(" ", extractDebugJVMOptions(val));
+                }
             }
             if (val == null && profile != null) {
                 val = profile.getProperties().get(paramName);
@@ -208,18 +214,22 @@ public final class MavenExecuteUtils {
             currentDebug = checkNewMapping(debug);
             currentProfile = checkNewMapping(profile);
             
-            oldWorkDir = fallbackParams(RUN_WORKDIR);
-            oldAllParams = fallbackParams(RUN_PARAMS);
-            oldVmParams = fallbackParams(RUN_VM_PARAMS);
-            oldAppParams = fallbackParams(RUN_APP_PARAMS);
-            oldWorkDir = fallbackParams(RUN_WORKDIR);
-            oldMainClass = fallbackParams(RUN_MAIN_CLASS);
+            oldWorkDir = fallbackParams(RUN_WORKDIR, false);
+            oldAllParams = fallbackParams(RUN_PARAMS, false);
+            oldVmParams = fallbackParams(RUN_VM_PARAMS, true);
+            oldAppParams = fallbackParams(RUN_APP_PARAMS, false);
+            oldMainClass = fallbackParams(RUN_MAIN_CLASS, false);
             
             mergedConfig = (oldVmParams.isEmpty() && oldAppParams.isEmpty() && oldMainClass.isEmpty());
             
             appendVMParamsFromOldParams();
             addAppParamsFromOldParams();
             loadMainClass();
+            
+            workDir = oldWorkDir;
+            vmParams = oldVmParams;
+            appParams = oldAppParams;
+            mainClass = oldMainClass;
         }
         
         private String eraseTokens(String original, boolean withNewlines, String... tokens) {
@@ -299,7 +309,11 @@ public final class MavenExecuteUtils {
             
             if (currentRun) {
                 updateAction(run, "");
+            }
+            if (currentDebug) {
                 updateAction(debug, DEFAULT_DEBUG_PARAMS);
+            }
+            if (currentProfile) {
                 updateAction(profile, "");
             }
         }
@@ -329,11 +343,10 @@ public final class MavenExecuteUtils {
                 changed = true;
             }
             
-            if (mergedConfig) {
+            if (changed) {
                 mapping.addProperty(RUN_PARAMS, 
                     "${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}"
                 );
-                changed = true;
             }
             
             if (changed) {
@@ -341,6 +354,50 @@ public final class MavenExecuteUtils {
                 modified = true;
             }
         }
+    }
+    
+    private static boolean isNullOrEmpty(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+    
+    /**
+     * Checks that the mapping does not specify custom exec arguments. If
+     * the exec.args is set to {@link #DEFAULT_EXEC_ARGS_CLASSPATH}, the 
+     * `packageClassName' has not been set (= unspecified).
+     * If the exec.args is set tp {@link #DEFAULT_EXEC_ARGS_CLASSPATH2}, then
+     * none of the referenced properties can provide a value (the exec.args itself
+     * is not changed by the IDE, just the referenced properties).
+     * <p>
+     * Other values of `exec.args' means user customizations.
+     * <p>
+     * Returns {@code null}, if there are user customizations. Returns the value of
+     * exec.args (the default string) so the caller can retain the parameter
+     * passing style.
+     * 
+     * @param mapp action mapping.
+     * @return 
+     */
+    public static String doesNotSpecifyCustomExecArgs(NetbeansActionMapping  mapp) {
+        String execArgs = mapp.getProperties().get(RUN_PARAMS);
+        if (DEFAULT_EXEC_ARGS_CLASSPATH.equals(execArgs)) {
+            return DEFAULT_EXEC_ARGS_CLASSPATH;
+        }
+        if (!DEFAULT_EXEC_ARGS_CLASSPATH2.equals(execArgs)) {
+            return null;
+        }
+        
+        // none of the properties refrenced in DEFAULT_EXEC_ARGS_CLASSPATH2 is defined:
+        if (isNullOrEmpty(mapp.getProperties().get(RUN_APP_PARAMS)) && 
+            isNullOrEmpty(mapp.getProperties().get(RUN_VM_PARAMS))) {
+            
+            String mainClass = mapp.getProperties().get(RUN_MAIN_CLASS);
+            if (mainClass == null ||
+                "".equals(mainClass) ||
+                MavenExecuteUtils.PACKAGE_CLASS_NAME_TOKEN.equals(mainClass)) {
+                return DEFAULT_EXEC_ARGS_CLASSPATH2;
+            }
+        }
+        return null;
     }
     
     public static ExecutionEnvHelper createExecutionEnvHelper(
@@ -379,8 +436,8 @@ public final class MavenExecuteUtils {
         return sb.toString();
     }
     
-    public static List<String> extractDebugJVMOptions(String argLine) throws Exception {
-        String[] split = CommandLineUtils.translateCommandline(argLine);
+    public static List<String> extractDebugJVMOptions(String argLine) {
+        Iterable<String> split = propertySplitter(argLine, true);
         List<String> toRet = new ArrayList<String>();
         for (String arg : split) {
             if ("-Xdebug".equals(arg)) { //NOI18N
@@ -481,6 +538,9 @@ public final class MavenExecuteUtils {
             return line.substring(argsIndex + RunJarStartupArgs.USER_PROGRAM_ARGS_MARKER.length()).trim();
         }
         String main = splitMainClass(line);
+        if (main.isEmpty()) {
+            return "";
+        }
         int i = line.indexOf(main);
         if (i > -1) {
             return line.substring(i + main.length()).trim();
