@@ -40,10 +40,32 @@ import org.netbeans.spi.project.ActionProvider;
  * @author sdedic
  */
 public final class MavenExecuteUtils {
+    /**
+     * Name of the property for VM arguments.
+     * @since 2.144
+     */
     public static final String RUN_VM_PARAMS = "exec.vmArgs"; //NOI18N
+
+    /**
+     * Name of the property to pass main class. ${packageClassName} works as well.
+     * @since 2.144
+     */
     public static final String RUN_MAIN_CLASS = "exec.mainClass"; //NOI18N
+
+    /**
+     * Name of the property for applicaiton arguments.
+     * @since 2.144
+     */
     public static final String RUN_APP_PARAMS = "exec.appArgs"; //NOI18N
+
+    /**
+     * Name of the property that collects the entire command line.
+     */
     public static final String RUN_PARAMS = "exec.args"; //NOI18N
+    
+    /**
+     * Name of the property for working directory passed to th exec plugin
+     */
     public static final String RUN_WORKDIR = "exec.workingdir"; //NOI18N
     
     private static final String RUN_VM_PARAMS_TOKEN = "${" + RUN_VM_PARAMS + "}"; //NOI18N
@@ -55,8 +77,16 @@ public final class MavenExecuteUtils {
     static final String DEFAULT_DEBUG_PARAMS = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}"; //NOI18N
     static final String DEFAULT_EXEC_ARGS_CLASSPATH2 =  "${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}"; // NOI18N
 
+    /**
+     * ID of the 'profile' action.
+     */
     public static final String PROFILE_CMD = "profile"; // NOI18N
     
+    /**
+     * A helper that can update action mappings based on changes
+     * made on the helper instance. Use {@link #createExecutionEnvHelper}
+     * to make an instance.
+     */
     public final static class ExecutionEnvHelper {
         private final ActionToGoalMapping goalMappings;
         private final NbMavenProjectImpl project;
@@ -400,6 +430,17 @@ public final class MavenExecuteUtils {
         return null;
     }
     
+    /**
+     * Creates a helper to edit the mapping instances. Individual settings can be
+     * inspected by getters and changed by setters on the helper, changes can be then
+     * applied back to the mappings.
+     * @param project the target project
+     * @param run run action mapping
+     * @param debug debug action mapping
+     * @param profile profile action mapping
+     * @param goalMappings the mapping registry
+     * @return 
+     */
     public static ExecutionEnvHelper createExecutionEnvHelper(
             NbMavenProjectImpl project,
             NetbeansActionMapping run,
@@ -409,11 +450,21 @@ public final class MavenExecuteUtils {
         return new ExecutionEnvHelper(project, run, debug, profile, goalMappings);
     }
     
+    /**
+     * Joins parameters into a single string. Quotes as necessary if parameters contain
+     * spaces. Checks for already quoted or escaped parameters.
+     * @param params List of parameters.
+     * @return single command line.
+     */
     public static String joinParameters(String... params) {
         if (params == null) {
             return ""; // NOI18N
         }
         return joinParameters(Arrays.asList(params));
+    }
+    
+    private static boolean isQuoteChar(char c) {
+        return c == '\'' || c == '"';
     }
     
     public static String joinParameters(List<String> params) {
@@ -425,6 +476,14 @@ public final class MavenExecuteUtils {
             if (sb.length() > 0) {
                 sb.append(" ");
             }
+            if (s.length() > 1) {
+                char c = s.charAt(0);
+                if (isQuoteChar(c) && s.charAt(s.length() - 1) == c) {
+                    sb.append(s);
+                    continue;
+                }
+            }
+            // note: does not care about escaped spaces.
             if (!s.contains(" ")) {
                 sb.append(s.replace("'", "\\'").replace("\"", "\\\""));
             } else {
