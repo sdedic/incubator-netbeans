@@ -127,47 +127,52 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 combine(
                     injectParams
                 ).build();
-        } 
-        for (Map.Entry<? extends String, ? extends String> entry : config.getProperties().entrySet()) {
-            if (entry.getKey().equals("exec.args")) { // NOI18N
-                // split the 'exec.args' property to main and user arguments; userArgs will be null
-                // if no user arguments are present or the marker is not found
-                String[] argParts = MavenExecuteUtils.splitAll(entry.getValue(), false);
-                
-                String[] vmArgs = splitCommandLine(argParts[0]);
-                String[] mainClass = splitCommandLine(argParts[1]);
-                String[] userArgs = splitCommandLine(argParts[2]);
-                if (mainClass.length == 0) {
-                    // accept userargs, since we don't know where the division is, make it fixed in the processing.
-                    mainClass = userArgs;
-                    userArgs = null;
-                }
-                String[] fixed = null;
-                fixedArgs.addAll(Arrays.asList(mainClass));
-                
-                // TODO: would be better to get them from ExecutionContext.
-                ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
+            
+            List<String> vmArgs = new ArrayList<>(fixedArgs);
+            vmArgs.addAll(changedParams.getPriorityArguments());
+            config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS, 
+                    MavenExecuteUtils.joinParameters(vmArgs));
+            config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 
+                    MavenExecuteUtils.joinParameters(changedParams.getArguments()));
+        } else {
+            String val = props.get(MavenExecuteUtils.RUN_PARAMS);
+            // split the 'exec.args' property to main and user arguments; userArgs will be null
+            // if no user arguments are present or the marker is not found
+            String[] argParts = MavenExecuteUtils.splitAll(val, false);
 
-                if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
-                    changedParams = ExplicitProcessParameters.
-                        builder().
-                        // get extender input as a base
-                        priorityArgs(vmArgs).
-                        // include user arguments, if any
-                        args(userArgs).
-                        // allow to append or override from context injectors.
-                        combine(
-                            injectParams
-                        ).build();
-                    // the existing args is a series of VM parameters and the main class name
-                    
-                    String newParams = String.join(" ", changedParams.getAllArguments(fixedArgs));
-                    config.setProperty(entry.getKey(), newParams);
-                }
+            String[] vmArgs = splitCommandLine(argParts[0]);
+            String[] mainClass = splitCommandLine(argParts[1]);
+            String[] userArgs = splitCommandLine(argParts[2]);
+            if (mainClass.length == 0) {
+                // accept userargs, since we don't know where the division is, make it fixed in the processing.
+                mainClass = userArgs;
+                userArgs = null;
             }
-            if (entry.getKey().equals("exec.classpathScope") && "test".equals(entry.getValue())) {
-                isTestScope = true;
+            String[] fixed = null;
+            fixedArgs.addAll(Arrays.asList(mainClass));
+
+            // TODO: would be better to get them from ExecutionContext.
+            ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
+
+            if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
+                changedParams = ExplicitProcessParameters.
+                    builder().
+                    // get extender input as a base
+                    priorityArgs(vmArgs).
+                    // include user arguments, if any
+                    args(userArgs).
+                    // allow to append or override from context injectors.
+                    combine(
+                        injectParams
+                    ).build();
+                // the existing args is a series of VM parameters and the main class name
+
+                String newParams = String.join(" ", changedParams.getAllArguments(fixedArgs));
+                config.setProperty(MavenExecuteUtils.RUN_PARAMS, newParams);
             }
+        }
+        if ("test".equals(props.get("exec.classpathScope"))) {
+            isTestScope = true;
         }
         if (isTestScope) { //#230190
             String[] goals = config.getGoals().toArray(new String[0]);

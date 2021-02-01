@@ -440,6 +440,16 @@ public class ExecutionEnvHelperTest extends NbTestCase {
      * ModelRunConfig (which are passed as -D to the maven executor).
      */
     private List<String> substituteProperties(List<String> args, Project p, Map<? extends String, ? extends String> properties) {
+        Map<String, String> props = new HashMap<>(properties);
+        for (int i = 0; i < args.size(); i++) {
+            String a = args.get(i);
+            if (a.startsWith("-D")) {
+                int eq = a.indexOf('=');
+                String k = a.substring(2, eq);
+                String v = a.substring(eq + 1);
+                props.put(k, v);
+            }
+        }
         ExpressionEvaluator e = PluginPropertyUtils.createEvaluator(p);
         for (int i = 0; i < args.size(); i++) {
             String a = args.get(i);
@@ -448,7 +458,7 @@ public class ExecutionEnvHelperTest extends NbTestCase {
             for (pos = -1; (pos = a.indexOf("${", pos + 1)) > -1; ) {
                 end = a.indexOf("}", pos + 1);
                 String name = a.substring(pos + 2, end);
-                String v = properties.get(name);
+                String v = props.get(name);
                 if (v != null) {
                     a = a.substring(0, pos) + v + a.substring(end + 1);
                 } else {
