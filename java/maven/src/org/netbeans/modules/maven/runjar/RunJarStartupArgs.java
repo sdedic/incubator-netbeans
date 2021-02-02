@@ -36,6 +36,7 @@ import org.netbeans.modules.maven.api.execute.LateBoundPrerequisitesChecker;
 import org.netbeans.modules.maven.api.execute.RunConfig;
 import org.netbeans.modules.maven.execute.BeanRunConfig;
 import org.netbeans.modules.maven.execute.MavenExecuteUtils;
+import org.netbeans.modules.maven.execute.ModelRunConfig;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ProjectServiceProvider;
 import org.openide.util.Lookup;
@@ -111,29 +112,49 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
             }
         }
         ExplicitProcessParameters changedParams = null;
-        
         if (vmArgsPresent || appArgsPresent) {
-            ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
-            String[] vmArgsValue = splitCommandLine(props.get(MavenExecuteUtils.RUN_VM_PARAMS));
-            String[] appArgsValue = splitCommandLine(props.get(MavenExecuteUtils.RUN_APP_PARAMS));
-
-            changedParams = ExplicitProcessParameters.
-                builder().
-                // get extender input as a base
-                priorityArgs(vmArgsValue).
-                // include user arguments, if any
-                args(appArgsValue).
-                // allow to append or override from context injectors.
-                combine(
-                    injectParams
-                ).build();
+            List<String> vmArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_VM_PARAMS))));
+            List<String> appArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_APP_PARAMS))));
             
-            List<String> vmArgs = new ArrayList<>(fixedArgs);
-            vmArgs.addAll(changedParams.getPriorityArguments());
-            config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS, 
-                    MavenExecuteUtils.joinParameters(vmArgs));
-            config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 
-                    MavenExecuteUtils.joinParameters(changedParams.getArguments()));
+            ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
+            
+            if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
+                // RunConfig may have merged in POM VM args and command, but indicated that using "exec.args.merged" property
+                // there can be prefix (= vm args) and suffix (app args) that may need to be replaced.
+                if ("true".equals(config.getProperties().get(ModelRunConfig.EXEC_MERGED))) {
+                    String cmdLine = props.get(MavenExecuteUtils.RUN_PARAMS);
+                    if (cmdLine != null) {
+                        String template = MavenExecuteUtils.doesNotSpecifyCustomExecArgs(false, config.getProperties());
+                        int templateIndex = cmdLine.indexOf(template);
+                        if (templateIndex > 0) {
+                            String prefix = cmdLine.substring(0, templateIndex);
+                            String suffix = cmdLine.substring(templateIndex + template.length());
+
+                            vmArgsValue.addAll(0, Arrays.asList(splitCommandLine(prefix.trim())));
+                            appArgsValue.addAll(0, Arrays.asList(splitCommandLine(suffix.trim())));
+                            // replace back the template, since we handle the VM (prefix) and app (postfix)
+                            config.setProperty(MavenExecuteUtils.RUN_PARAMS, template);
+                        }
+                    }
+                }
+                changedParams = ExplicitProcessParameters.
+                    builder().
+                    // get extender input as a base
+                    priorityArgs(vmArgsValue).
+                    // include user arguments, if any
+                    args(appArgsValue).
+                    // allow to append or override from context injectors.
+                    combine(
+                        injectParams
+                    ).build();
+
+                List<String> vmArgs = new ArrayList<>(fixedArgs);
+                vmArgs.addAll(changedParams.getPriorityArguments());
+                config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS, 
+                        MavenExecuteUtils.joinParameters(vmArgs));
+                config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 
+                        MavenExecuteUtils.joinParameters(changedParams.getArguments()));
+            }
         } else {
             String val = props.get(MavenExecuteUtils.RUN_PARAMS);
             // split the 'exec.args' property to main and user arguments; userArgs will be null
@@ -148,8 +169,8 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 mainClass = userArgs;
                 userArgs = null;
             }
-            String[] fixed = null;
-            fixedArgs.addAll(Arrays.asList(mainClass));
+            List<String> joinedArgs = new ArrayList<>(fixedArgs);
+            joinedArgs.addAll(Arrays.asList(mainClass));
 
             // TODO: would be better to get them from ExecutionContext.
             ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
@@ -167,7 +188,8 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                     ).build();
                 // the existing args is a series of VM parameters and the main class name
 
-                String newParams = String.join(" ", changedParams.getAllArguments(fixedArgs));
+                // FIXME: define RUN_{VM,APP}_PARAMS
+                String newParams = String.join(" ", changedParams.getAllArguments(joinedArgs));
                 config.setProperty(MavenExecuteUtils.RUN_PARAMS, newParams);
             }
         }

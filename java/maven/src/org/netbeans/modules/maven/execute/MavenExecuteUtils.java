@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -71,7 +72,7 @@ public final class MavenExecuteUtils {
     private static final String RUN_VM_PARAMS_TOKEN = "${" + RUN_VM_PARAMS + "}"; //NOI18N
     private static final String RUN_APP_PARAMS_TOKEN = "${" + RUN_APP_PARAMS + "}"; //NOI18N
     private static final String RUN_MAIN_CLASS_TOKEN = "${" + RUN_MAIN_CLASS + "}"; //NOI18N
-    private static final String PACKAGE_CLASS_NAME_TOKEN = "${packageClassName}"; //NOI18N
+    static final String PACKAGE_CLASS_NAME_TOKEN = "${packageClassName}"; //NOI18N
     
     static final String DEFAULT_EXEC_ARGS_CLASSPATH = "-classpath %classpath ${packageClassName}"; // NOI18N
     static final String DEFAULT_DEBUG_PARAMS = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}"; //NOI18N
@@ -195,8 +196,12 @@ public final class MavenExecuteUtils {
             return oldWorkDir;
         }
 
+        public void setWorkDir(String workDir) {
+            this.workDir = workDir;
+        }
+
         public String getMainClass() {
-            return oldMainClass;
+            return mainClass;
         }
 
         public NetbeansActionMapping getRun() {
@@ -212,11 +217,11 @@ public final class MavenExecuteUtils {
         }
 
         public String getVmParams() {
-            return oldVmParams;
+            return vmParams;
         }
 
         public String getAppParams() {
-            return oldAppParams;
+            return appParams;
         }
         
         private NetbeansActionMapping getMapping(String a) {
@@ -367,13 +372,29 @@ public final class MavenExecuteUtils {
                 mapping.addProperty(RUN_MAIN_CLASS, newMainClass);
                 changed = true;
             }
-            String newVMParams = appendIfNotEmpty(vmParams, debuVMArgs);
+            if (!workDir.equals(oldWorkDir)) {
+                mapping.addProperty(RUN_WORKDIR, workDir);
+                changed = true;
+            }
+            String oneLineVMParams = vmParams.replace('\n', ' ');
+            String newVMParams = appendIfNotEmpty(oneLineVMParams, debuVMArgs);
             if (!oldVmParams.equals(newVMParams)) {
                 mapping.addProperty(RUN_VM_PARAMS, newVMParams);
                 changed = true;
             }
             
             if (changed) {
+                // define the properties, if not defined ...
+                Map<String, String> props = mapping.getProperties();
+                if (mapping.getProperties().get(RUN_VM_PARAMS) == null) {
+                    mapping.addProperty(RUN_VM_PARAMS, vmParams);
+                }
+                if (mapping.getProperties().get(RUN_APP_PARAMS) == null) {
+                    mapping.addProperty(RUN_APP_PARAMS, appParams);
+                }
+                if (mapping.getProperties().get(RUN_MAIN_CLASS) == null) {
+                    mapping.addProperty(RUN_MAIN_CLASS, newMainClass);
+                }
                 mapping.addProperty(RUN_PARAMS, 
                     "${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}"
                 );
@@ -408,19 +429,37 @@ public final class MavenExecuteUtils {
      * @return 
      */
     public static String doesNotSpecifyCustomExecArgs(NetbeansActionMapping  mapp) {
-        String execArgs = mapp.getProperties().get(RUN_PARAMS);
-        if (DEFAULT_EXEC_ARGS_CLASSPATH.equals(execArgs)) {
+        return doesNotSpecifyCustomExecArgs(true, mapp.getProperties());
+    }
+    
+    private static boolean equalsOrIncludes(boolean exact, String text, String toFind) {
+        if (exact) {
+            return text.equals(toFind);
+        } else {
+            return text.contains(toFind);
+        }
+    }
+    
+    /**
+     * The inexact match is used from RunJarStartupArgs
+     */
+    public static String doesNotSpecifyCustomExecArgs(boolean exact, Map<? extends String, ? extends String> props) {
+        String execArgs = props.get(RUN_PARAMS);
+        if (equalsOrIncludes(exact, execArgs, DEFAULT_EXEC_ARGS_CLASSPATH)) {
             return DEFAULT_EXEC_ARGS_CLASSPATH;
         }
-        if (!DEFAULT_EXEC_ARGS_CLASSPATH2.equals(execArgs)) {
+        if (!equalsOrIncludes(exact, execArgs, DEFAULT_EXEC_ARGS_CLASSPATH2)) {
             return null;
+        }
+        if (!exact) {
+            return DEFAULT_EXEC_ARGS_CLASSPATH2;
         }
         
         // none of the properties refrenced in DEFAULT_EXEC_ARGS_CLASSPATH2 is defined:
-        if (isNullOrEmpty(mapp.getProperties().get(RUN_APP_PARAMS)) && 
-            isNullOrEmpty(mapp.getProperties().get(RUN_VM_PARAMS))) {
+        if (isNullOrEmpty(props.get(RUN_APP_PARAMS)) && 
+            isNullOrEmpty(props.get(RUN_VM_PARAMS))) {
             
-            String mainClass = mapp.getProperties().get(RUN_MAIN_CLASS);
+            String mainClass = props.get(RUN_MAIN_CLASS);
             if (mainClass == null ||
                 "".equals(mainClass) ||
                 MavenExecuteUtils.PACKAGE_CLASS_NAME_TOKEN.equals(mainClass)) {
