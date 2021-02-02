@@ -112,13 +112,16 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
             }
         }
         ExplicitProcessParameters changedParams = null;
-        if (vmArgsPresent || appArgsPresent) {
-            List<String> vmArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_VM_PARAMS))));
-            List<String> appArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_APP_PARAMS))));
-            
-            ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
-            
-            if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
+        List<String> vmArgsValue;
+        List<String> appArgsValue;
+        
+        ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
+        
+        if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
+            if (vmArgsPresent || appArgsPresent) {
+                vmArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_VM_PARAMS))));
+                appArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_APP_PARAMS))));
+
                 // RunConfig may have merged in POM VM args and command, but indicated that using "exec.args.merged" property
                 // there can be prefix (= vm args) and suffix (app args) that may need to be replaced.
                 if ("true".equals(config.getProperties().get(ModelRunConfig.EXEC_MERGED))) {
@@ -154,34 +157,32 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                         MavenExecuteUtils.joinParameters(vmArgs));
                 config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 
                         MavenExecuteUtils.joinParameters(changedParams.getArguments()));
-            }
-        } else {
-            String val = props.get(MavenExecuteUtils.RUN_PARAMS);
-            // split the 'exec.args' property to main and user arguments; userArgs will be null
-            // if no user arguments are present or the marker is not found
-            String[] argParts = MavenExecuteUtils.splitAll(val, false);
+            } else {
+                String val = props.get(MavenExecuteUtils.RUN_PARAMS);
+                // split the 'exec.args' property to main and user arguments; userArgs will be null
+                // if no user arguments are present or the marker is not found
+                String[] argParts = MavenExecuteUtils.splitAll(val, false);
 
-            String[] vmArgs = splitCommandLine(argParts[0]);
-            String[] mainClass = splitCommandLine(argParts[1]);
-            String[] userArgs = splitCommandLine(argParts[2]);
-            if (mainClass.length == 0) {
-                // accept userargs, since we don't know where the division is, make it fixed in the processing.
-                mainClass = userArgs;
-                userArgs = null;
-            }
-            List<String> joinedArgs = new ArrayList<>(fixedArgs);
-            joinedArgs.addAll(Arrays.asList(mainClass));
+                vmArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(argParts[0])));
+                String[] mainClass = splitCommandLine(argParts[1]);
+                appArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(argParts[2])));
 
-            // TODO: would be better to get them from ExecutionContext.
-            ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
+                List<String> joinedArgs = new ArrayList<>(fixedArgs);
 
-            if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
+                if (mainClass.length == 0) {
+                    // accept userargs, since we don't know where the division is, make it fixed in the processing.
+                    joinedArgs.addAll(appArgsValue);
+                    appArgsValue = null;
+                } else {
+                    joinedArgs.addAll(Arrays.asList(mainClass));
+                }
+
                 changedParams = ExplicitProcessParameters.
                     builder().
                     // get extender input as a base
-                    priorityArgs(vmArgs).
+                    priorityArgs(vmArgsValue).
                     // include user arguments, if any
-                    args(userArgs).
+                    args(appArgsValue).
                     // allow to append or override from context injectors.
                     combine(
                         injectParams
