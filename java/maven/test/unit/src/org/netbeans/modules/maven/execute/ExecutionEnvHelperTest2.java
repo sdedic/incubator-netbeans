@@ -55,8 +55,8 @@ public abstract class ExecutionEnvHelperTest2 extends MavenExecutionTestBase {
 
     public static Test suite() {
         NbTestSuite suite = new NbTestSuite("ExecutionHelperTest");
-        suite.addTest(new NbTestSuite(NetBeansSplitConfig.class));
-//        suite.addTest(new NbTestSuite(NetBeans123Config.class));
+//        suite.addTest(new NbTestSuite(NetBeansSplitConfig.class));
+        suite.addTest(new NbTestSuite(NetBeans123Config.class));
         return suite;
     }
     
