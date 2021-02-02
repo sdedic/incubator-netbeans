@@ -55,7 +55,6 @@ import org.netbeans.modules.maven.execute.MavenExecuteUtils;
 import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.options.MavenSettings;
-import org.netbeans.modules.maven.runjar.RunJarStartupArgs;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ui.support.ProjectCustomizer;
 import org.openide.DialogDescriptor;
@@ -239,38 +238,13 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
         isCurrentRun = checkNewMapping(run);
         isCurrentDebug = checkNewMapping(debug);
         isCurrentProfile = checkNewMapping(profile);
-        if (isCurrentDebug && isCurrentRun && isCurrentProfile ) {
-            oldWorkDir = run.getProperties().get(RUN_WORKDIR);
-            if (oldWorkDir == null) {
-                oldWorkDir = debug.getProperties().get(RUN_WORKDIR);
-            }
-            if (oldWorkDir == null && profile != null) {
-                oldWorkDir = profile.getProperties().get(RUN_WORKDIR);
-            }
-            String params = run.getProperties().get(RUN_PARAMS);
-            if (params == null) {
-                params = debug.getProperties().get(RUN_PARAMS);
-            }
-            if (params == null && profile != null) {
-                params = profile.getProperties().get(RUN_PARAMS);
-            }
-            if (params != null) {
-                oldAllParams = params;
-                String oldSplitVMParams = splitJVMParams(params, true);
-                if (!oldSplitVMParams.isEmpty()) {
-                    if (oldSplitVMParams != null && oldSplitVMParams.contains("-classpath %classpath")) {
-                        oldSplitVMParams = oldSplitVMParams.replace("-classpath %classpath", "");
-                    }
-                    oldVMParams = appendIfNotEmpty(oldVMParams, oldSplitVMParams);
-                }
-                oldMainClass = splitMainClass(params);
-                if (oldMainClass != null && oldMainClass.equals("${packageClassName}")) {
-                    oldMainClass = "";
-                }
-                oldParams = appendIfNotEmpty(oldParams, splitParams(params));
-            } else {
-                oldAllParams = "";
-            }
+        if (execEnvHelper.isValid()) {
+            oldWorkDir = execEnvHelper.getWorkDir();
+            oldAllParams = execEnvHelper.getAllParams();
+            oldVMParams = execEnvHelper.getVmParams();
+            oldParams = execEnvHelper.getAppParams();
+            oldMainClass = execEnvHelper.getMainClass();
+            
             txtMainClass.setEnabled(true);
             txtArguments.setEnabled(true);
             txtVMOptions.setEnabled(true);
@@ -513,67 +487,14 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
         String newMainClass = txtMainClass.getText().trim();
         String newParams = txtArguments.getText().trim();
         String newVMParams = txtVMOptions.getText().trim();
-        newVMParams = newVMParams.replace('\n', ' ');
         String newWorkDir = txtWorkDir.getText().trim();
-        ActionToGoalMapping a2gm = handle.getActionMappings((ModelHandle2.Configuration) comConfiguration.getSelectedItem());
-        if (isCurrentRun || isCurrentDebug || isCurrentProfile) {
-            String newAllParams = newVMParams + " -classpath %classpath "; //NOI18N
-            if (newMainClass.trim().length() > 0) {
-                newAllParams = newAllParams + newMainClass + " "; //NOI18N
-            } else {
-                newAllParams = newAllParams + "${packageClassName} "; //NOI18N
-            }
-            if (!newParams.isEmpty()) {
-                // mark the extra parameters, so that ExplicitProcessParameters can eventually replace them
-                newAllParams = newAllParams + RunJarStartupArgs.USER_PROGRAM_ARGS_MARKER + " " + newParams;
-            }
-            newAllParams = newAllParams.trim();
-            if (isCurrentRun) {
-                boolean changed = false;
-                if (!oldAllParams.equals(newAllParams)) {
-                    run.addProperty(RUN_PARAMS, newAllParams);
-                    changed = true;
-                }
-                if (!oldWorkDir.equals(newWorkDir)) {
-                    run.addProperty(RUN_WORKDIR, newWorkDir);
-                    changed = true;
-                }
-                if (changed) {
-                    ModelHandle2.setUserActionMapping(run, a2gm);
-                    handle.markAsModified(a2gm);
-                }
-            }
-            if (isCurrentDebug) {
-                boolean changed = false;
-                if (!oldAllParams.equals(newAllParams)) {
-                    debug.addProperty(RUN_PARAMS, DEFAULT_DEBUG_PARAMS + " " + newAllParams);
-                    changed = true;
-                }
-                if (!oldWorkDir.equals(newWorkDir)) {
-                    debug.addProperty(RUN_WORKDIR, newWorkDir);
-                    changed = true;
-                }
-                if (changed) {
-                    ModelHandle2.setUserActionMapping(debug, a2gm);
-                    handle.markAsModified(a2gm);
-                }
-            }
-            if (isCurrentProfile) {
-                boolean changed = false;
-                if (!oldAllParams.equals(newAllParams)) {
-                    profile.addProperty(RUN_PARAMS, newAllParams);
-                    changed = true;
-                }
-                if (!oldWorkDir.equals(newWorkDir)) {
-                    profile.addProperty(RUN_WORKDIR, newWorkDir);
-                    changed = true;
-                }
-                if (changed) {
-                    ModelHandle2.setUserActionMapping(profile, a2gm);
-                    handle.markAsModified(a2gm);
-                }
-            }
-        }
+        
+        execEnvHelper.setMainClass(newMainClass);
+        execEnvHelper.setAppParams(newParams);
+        execEnvHelper.setWorkDir(newWorkDir);
+        execEnvHelper.setVmParams(newVMParams);
+        
+        execEnvHelper.applyToMappings();
     }
 
     private boolean checkNewMapping(NetbeansActionMapping map) {
