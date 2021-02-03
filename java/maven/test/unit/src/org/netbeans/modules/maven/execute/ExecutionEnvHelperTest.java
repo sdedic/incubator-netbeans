@@ -38,8 +38,8 @@ import org.openide.util.test.MockLookup;
  *
  * @author sdedic
  */
-public abstract class ExecutionEnvHelperTest2 extends MavenExecutionTestBase {
-    public ExecutionEnvHelperTest2(String name) {
+public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
+    public ExecutionEnvHelperTest(String name) {
         super(name);
     }
     
@@ -62,7 +62,7 @@ public abstract class ExecutionEnvHelperTest2 extends MavenExecutionTestBase {
     
     protected void assertActionCustomVMProperties(String vmArg, String mainClass, String appArg) throws Exception {}
 
-    public static class NetBeans123Config extends ExecutionEnvHelperTest2 {
+    public static class NetBeans123Config extends ExecutionEnvHelperTest {
 
         public NetBeans123Config(String name) {
             super(name);
@@ -105,7 +105,7 @@ public abstract class ExecutionEnvHelperTest2 extends MavenExecutionTestBase {
         }
     }
     
-    public static class NetBeansSplitConfig extends ExecutionEnvHelperTest2 {
+    public static class NetBeansSplitConfig extends ExecutionEnvHelperTest {
 
         public NetBeansSplitConfig(String name) {
             super(name);
