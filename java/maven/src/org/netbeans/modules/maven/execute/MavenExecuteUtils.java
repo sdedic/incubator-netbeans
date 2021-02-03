@@ -74,7 +74,8 @@ public final class MavenExecuteUtils {
     private static final String RUN_MAIN_CLASS_TOKEN = "${" + RUN_MAIN_CLASS + "}"; //NOI18N
     static final String PACKAGE_CLASS_NAME_TOKEN = "${packageClassName}"; //NOI18N
     
-    static final String DEFAULT_EXEC_ARGS_CLASSPATH = "-classpath %classpath ${packageClassName}"; // NOI18N
+    public static final String EXEC_ARGS_CLASSPATH_TOKEN = "-classpath %classpath"; // NOI18N
+    public static final String DEFAULT_EXEC_ARGS_CLASSPATH = EXEC_ARGS_CLASSPATH_TOKEN + " ${packageClassName}"; // NOI18N
     static final String DEFAULT_DEBUG_PARAMS = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}"; //NOI18N
     static final String DEFAULT_EXEC_ARGS_CLASSPATH2 =  "${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}"; // NOI18N
 
@@ -440,19 +441,46 @@ public final class MavenExecuteUtils {
         }
     }
     
+    private static String maybeReplaceTemplate(String template, String mainClassReplaced) {
+        if (mainClassReplaced != null) {
+            return template.replace(PACKAGE_CLASS_NAME_TOKEN, mainClassReplaced);
+        } else {
+            return template;
+        }
+    }
+    
     /**
      * The inexact match is used from RunJarStartupArgs
      */
     public static String doesNotSpecifyCustomExecArgs(boolean exact, Map<? extends String, ? extends String> props) {
         String execArgs = props.get(RUN_PARAMS);
-        if (equalsOrIncludes(exact, execArgs, DEFAULT_EXEC_ARGS_CLASSPATH)) {
-            return DEFAULT_EXEC_ARGS_CLASSPATH;
+        String replacedMainClass = props.get(RUN_MAIN_CLASS);
+        String template;
+        boolean secondTry = replacedMainClass != null && execArgs.contains(PACKAGE_CLASS_NAME_TOKEN);
+        
+        template = DEFAULT_EXEC_ARGS_CLASSPATH;
+        if (equalsOrIncludes(exact, execArgs, template)) {
+            return template;
         }
-        if (!equalsOrIncludes(exact, execArgs, DEFAULT_EXEC_ARGS_CLASSPATH2)) {
-            return null;
+        if (secondTry) {
+            template = template.replace(PACKAGE_CLASS_NAME_TOKEN, replacedMainClass);
+            if (equalsOrIncludes(exact, execArgs, template)) {
+                return template;
+            }
         }
+        template = DEFAULT_EXEC_ARGS_CLASSPATH2;
+        if (!equalsOrIncludes(exact, execArgs, template)) {
+            if (!secondTry) {
+                return null;
+            }
+            template = template.replace(PACKAGE_CLASS_NAME_TOKEN, replacedMainClass);
+            if (!equalsOrIncludes(exact, execArgs, template)) {
+                return null;
+            }
+        }
+
         if (!exact) {
-            return DEFAULT_EXEC_ARGS_CLASSPATH2;
+            return template;
         }
         
         // none of the properties refrenced in DEFAULT_EXEC_ARGS_CLASSPATH2 is defined:
@@ -463,7 +491,7 @@ public final class MavenExecuteUtils {
             if (mainClass == null ||
                 "".equals(mainClass) ||
                 MavenExecuteUtils.PACKAGE_CLASS_NAME_TOKEN.equals(mainClass)) {
-                return DEFAULT_EXEC_ARGS_CLASSPATH2;
+                return template;
             }
         }
         return null;

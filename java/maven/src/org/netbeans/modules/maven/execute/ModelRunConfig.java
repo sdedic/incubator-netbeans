@@ -32,7 +32,6 @@ import org.netbeans.modules.maven.NbMavenProjectImpl;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.modules.maven.api.PluginPropertyUtils;
-import org.netbeans.modules.maven.customizer.ActionMappings;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Lookup;
@@ -50,8 +49,7 @@ public final class ModelRunConfig extends BeanRunConfig {
     
     public static final String EXEC_MERGED = "exec.args.merged";
     private static final String CP_PLACEHOLDER = "___CP___";
-    private static final String EXEC_ARGS = "exec.args"; // NOI18N
-    private static final String DEFAULT_EXEC_ARGS_CLASSPATH = "-classpath %classpath ${packageClassName}"; // NOI18N
+    private static final String EXEC_ARGS = MavenExecuteUtils.RUN_PARAMS;
     
     public ModelRunConfig(Project proj, NetbeansActionMapping mod, String actionName, FileObject selectedFile, Lookup lookup, boolean fallback) {
         model = mod;
