@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.maven.execute;
+package org.netbeans.modules.maven.runjar;
 
+import org.netbeans.modules.maven.execute.MavenExecutionTestBase;
 import java.io.StringReader;
 import java.util.Map;
 import junit.framework.Test;
@@ -27,7 +28,8 @@ import org.netbeans.api.project.ProjectManager;
 import org.netbeans.junit.NbTestSuite;
 import org.netbeans.modules.maven.NbMavenProjectImpl;
 import org.netbeans.modules.maven.configurations.M2ConfigProvider;
-import org.netbeans.modules.maven.execute.MavenExecuteUtils.ExecutionEnvHelper;
+import org.netbeans.modules.maven.execute.ModelRunConfig;
+import org.netbeans.modules.maven.runjar.MavenExecuteUtils.ExecutionEnvHelper;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3Reader;
 import org.openide.filesystems.FileObject;

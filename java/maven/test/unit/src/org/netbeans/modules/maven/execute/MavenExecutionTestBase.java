@@ -46,6 +46,7 @@ import org.netbeans.modules.maven.embedder.EmbedderFactory;
 import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3Reader;
+import org.netbeans.modules.maven.runjar.MavenExecuteUtils;
 import org.netbeans.modules.maven.runjar.RunJarPrereqChecker;
 import org.netbeans.spi.extexecution.startup.StartupExtenderImplementation;
 import org.openide.execution.ExecutorTask;
@@ -292,11 +293,11 @@ public class MavenExecutionTestBase extends NbTestCase {
         // checks that 'split' arguments are defined / consistent with exec.args cmdline:
         if (vmArgs != null) {
             // FIXME !!!
-            mavenExecutorDefines.getOrDefault(MavenExecuteUtils.RUN_VM_PARAMS, "").contains(vmArgs);
+            assertTrue("VM args must contain " + vmArgs, mavenExecutorDefines.getOrDefault(MavenExecuteUtils.RUN_VM_PARAMS, "").contains(vmArgs));
         }
         if (args != null) {
             // FIXME !!!
-            mavenExecutorDefines.getOrDefault(MavenExecuteUtils.RUN_APP_PARAMS, "").contains(args);
+            assertTrue("App args must contain " + args, mavenExecutorDefines.getOrDefault(MavenExecuteUtils.RUN_APP_PARAMS, "").contains(args));
         }
     }
     
@@ -342,7 +343,7 @@ public class MavenExecutionTestBase extends NbTestCase {
     }
     
     protected static class TestExtender implements StartupExtenderImplementation {
-        static String vmArg;
+        public static String vmArg;
         
         @Override
         public List<String> getArguments(Lookup context, StartupExtender.StartMode mode) {

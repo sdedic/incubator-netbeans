@@ -43,7 +43,6 @@ import org.netbeans.modules.maven.api.execute.PrerequisitesChecker;
 import org.netbeans.modules.maven.api.execute.RunConfig;
 import org.netbeans.modules.maven.classpath.MavenSourcesImpl;
 import org.netbeans.modules.maven.configurations.M2ConfigProvider;
-import org.netbeans.modules.maven.execute.MavenExecuteUtils;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import static org.netbeans.modules.maven.runjar.Bundle.*;
 import org.netbeans.spi.project.ActionProvider;

@@ -19,6 +19,7 @@
 
 package org.netbeans.modules.maven.execute;
 
+import org.netbeans.modules.maven.runjar.MavenExecuteUtils;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;

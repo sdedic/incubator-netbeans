@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.maven.execute;
+package org.netbeans.modules.maven.runjar;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +31,7 @@ import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.modules.maven.NbMavenProjectImpl;
 import org.netbeans.modules.maven.api.customizer.ModelHandle2;
 import org.netbeans.modules.maven.customizer.RunJarPanel;
+import org.netbeans.modules.maven.execute.ActionToGoalUtils;
 import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.runjar.RunJarStartupArgs;
