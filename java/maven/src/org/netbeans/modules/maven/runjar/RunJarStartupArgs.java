@@ -111,6 +111,10 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 fixedArgs.addAll(group.getArguments());
             }
         }
+        
+        boolean splitParameters = vmArgsPresent || appArgsPresent;
+        List<String> joinedArgs = new ArrayList<>(fixedArgs);
+        
         ExplicitProcessParameters changedParams = null;
         List<String> vmArgsValue;
         List<String> appArgsValue;
@@ -118,45 +122,9 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
         ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
         
         if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
-            if (vmArgsPresent || appArgsPresent) {
+            if (splitParameters) {
                 vmArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_VM_PARAMS))));
                 appArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_APP_PARAMS))));
-
-                // RunConfig may have merged in POM VM args and command, but indicated that using "exec.args.merged" property
-                // there can be prefix (= vm args) and suffix (app args) that may need to be replaced.
-                if ("true".equals(config.getProperties().get(ModelRunConfig.EXEC_MERGED))) {
-                    String cmdLine = props.get(MavenExecuteUtils.RUN_PARAMS);
-                    if (cmdLine != null) {
-                        String template = MavenExecuteUtils.doesNotSpecifyCustomExecArgs(false, config.getProperties());
-                        int templateIndex = cmdLine.indexOf(template);
-                        if (templateIndex > 0) {
-                            String prefix = cmdLine.substring(0, templateIndex);
-                            String suffix = cmdLine.substring(templateIndex + template.length());
-
-                            vmArgsValue.addAll(0, Arrays.asList(splitCommandLine(prefix.trim())));
-                            appArgsValue.addAll(0, Arrays.asList(splitCommandLine(suffix.trim())));
-                            // replace back the template, since we handle the VM (prefix) and app (postfix)
-                            config.setProperty(MavenExecuteUtils.RUN_PARAMS, template);
-                        }
-                    }
-                }
-                changedParams = ExplicitProcessParameters.
-                    builder().
-                    // get extender input as a base
-                    priorityArgs(vmArgsValue).
-                    // include user arguments, if any
-                    args(appArgsValue).
-                    // allow to append or override from context injectors.
-                    combine(
-                        injectParams
-                    ).build();
-
-                List<String> vmArgs = new ArrayList<>(fixedArgs);
-                vmArgs.addAll(changedParams.getPriorityArguments());
-                config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS, 
-                        MavenExecuteUtils.joinParameters(vmArgs));
-                config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 
-                        MavenExecuteUtils.joinParameters(changedParams.getArguments()));
             } else {
                 String val = props.get(MavenExecuteUtils.RUN_PARAMS);
                 // split the 'exec.args' property to main and user arguments; userArgs will be null
@@ -167,8 +135,6 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 String[] mainClass = splitCommandLine(argParts[1]);
                 appArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(argParts[2])));
 
-                List<String> joinedArgs = new ArrayList<>(fixedArgs);
-
                 if (mainClass.length == 0) {
                     // accept userargs, since we don't know where the division is, make it fixed in the processing.
                     joinedArgs.addAll(appArgsValue);
@@ -177,22 +143,62 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                     joinedArgs.addAll(Arrays.asList(mainClass));
                 }
 
-                changedParams = ExplicitProcessParameters.
-                    builder().
-                    // get extender input as a base
-                    priorityArgs(vmArgsValue).
-                    // include user arguments, if any
-                    args(appArgsValue).
-                    // allow to append or override from context injectors.
-                    combine(
-                        injectParams
-                    ).build();
-                // the existing args is a series of VM parameters and the main class name
+                // patch: if there's -classpath %classpath in the vmArgsValue, move it at the end of fixedArgs
+                int at = vmArgsValue.indexOf("-classpath");
+                if (at >= 0 && vmArgsValue.size() > at + 1 && "%classpath".equals(vmArgsValue.get(at + 1))) {
+                    List<String> toMove = vmArgsValue.subList(at, at + 2);
+                    joinedArgs.subList(0, 0).addAll(toMove);
+                    toMove.clear();
+                }
+            }
 
+            // RunConfig may have merged in POM VM args and command, but indicated that using "exec.args.merged" property
+            // there can be prefix (= vm args) and suffix (app args) that may need to be replaced.
+            if ("true".equals(config.getProperties().get(ModelRunConfig.EXEC_MERGED))) {
+                String cmdLine = props.get(MavenExecuteUtils.RUN_PARAMS);
+                if (cmdLine != null) {
+                    String template = MavenExecuteUtils.doesNotSpecifyCustomExecArgs(false, config.getProperties());
+                    // the template should be never null, as EXEC_MERGED can be set only if doesNotSpecifyCustomExecArgs already returned true...
+                    int templateIndex = template == null ? -1 : cmdLine.indexOf(template);
+                    if (templateIndex > 0) {
+                        String prefix = cmdLine.substring(0, templateIndex);
+                        String suffix = cmdLine.substring(templateIndex + template.length());
+
+                        // for !splitParameters, vmArgs & args were populated above
+                        if (splitParameters) {
+                            vmArgsValue.addAll(0, Arrays.asList(splitCommandLine(prefix.trim())));
+                            appArgsValue.addAll(0, Arrays.asList(splitCommandLine(suffix.trim())));
+                        }
+                        // replace back the template, since we handle the VM (prefix) and app (postfix)
+                        config.setProperty(MavenExecuteUtils.RUN_PARAMS, template);
+                    }
+                }
+            }
+            
+            changedParams = ExplicitProcessParameters.
+                builder().
+                // get extender input as a base
+                priorityArgs(vmArgsValue).
+                // include user arguments, if any
+                args(appArgsValue).
+                // allow to append or override from context injectors.
+                combine(
+                    injectParams
+                ).build();
+            
+            if (!splitParameters) {
                 // FIXME: define RUN_{VM,APP}_PARAMS
                 String newParams = String.join(" ", changedParams.getAllArguments(joinedArgs));
                 config.setProperty(MavenExecuteUtils.RUN_PARAMS, newParams);
             }
+            
+            List<String> vmArgs = new ArrayList<>(fixedArgs);
+            vmArgs.addAll(changedParams.getPriorityArguments());
+            config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS, 
+                    MavenExecuteUtils.joinParameters(vmArgs));
+            config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 
+                    MavenExecuteUtils.joinParameters(changedParams.getArguments()));
+            
         }
         if ("test".equals(props.get("exec.classpathScope"))) {
             isTestScope = true;

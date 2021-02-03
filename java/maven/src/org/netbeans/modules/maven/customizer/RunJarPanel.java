@@ -73,14 +73,6 @@ import org.openide.util.NbBundle;
  */
 public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider {
     
-    private boolean isCurrentRun = true;
-    private boolean isCurrentDebug = true;
-    private boolean isCurrentProfile = true;
-    private static final String RUN_VM_PARAMS = "exec.vmArgs"; //NOI18N
-    private static final String RUN_APP_PARAMS = "exec.appArgs"; //NOI18N
-    private static final String RUN_PARAMS = "exec.args"; //NOI18N
-    private static final String RUN_WORKDIR = "exec.workingdir"; //NOI18N
-    private static final String DEFAULT_DEBUG_PARAMS = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}"; //NOI18N
     private static final String PROFILE_CMD = "profile"; // NOI18N
     
     private ModelHandle2 handle;
@@ -234,10 +226,7 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
             profile = ModelHandle2.getDefaultMapping(PROFILE_CMD, project);
         }
         execEnvHelper = MavenExecuteUtils.createExecutionEnvHelper(project, run, debug, profile, mapp);
-        
-        isCurrentRun = checkNewMapping(run);
-        isCurrentDebug = checkNewMapping(debug);
-        isCurrentProfile = checkNewMapping(profile);
+        execEnvHelper.loadFromProject();
         if (execEnvHelper.isValid()) {
             oldWorkDir = execEnvHelper.getWorkDir();
             oldAllParams = execEnvHelper.getAllParams();

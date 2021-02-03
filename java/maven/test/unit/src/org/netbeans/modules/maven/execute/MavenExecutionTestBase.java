@@ -288,6 +288,16 @@ public class MavenExecutionTestBase extends NbTestCase {
                 assertTrue("App args must followmain class", indexOfMainClass <  indexOfAppParams);
             }
         });
+        
+        // checks that 'split' arguments are defined / consistent with exec.args cmdline:
+        if (vmArgs != null) {
+            // FIXME !!!
+            mavenExecutorDefines.getOrDefault(MavenExecuteUtils.RUN_VM_PARAMS, "").contains(vmArgs);
+        }
+        if (args != null) {
+            // FIXME !!!
+            mavenExecutorDefines.getOrDefault(MavenExecuteUtils.RUN_APP_PARAMS, "").contains(args);
+        }
     }
     
     protected void assertMavenRunAction(Project project, NetbeansActionMapping mapping, String actionName, Consumer<List<String>> commandLineAcceptor) throws Exception {
