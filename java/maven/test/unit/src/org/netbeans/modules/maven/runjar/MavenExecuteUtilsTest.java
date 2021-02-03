@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.maven.execute;
+package org.netbeans.modules.maven.runjar;
 
 import java.util.ArrayList;
 import java.util.Arrays;

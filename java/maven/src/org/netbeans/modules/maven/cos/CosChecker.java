@@ -54,7 +54,7 @@ import org.netbeans.modules.maven.configurations.M2Configuration;
 import static org.netbeans.modules.maven.cos.Bundle.*;
 import org.netbeans.modules.maven.customizer.CustomizerProviderImpl;
 import org.netbeans.modules.maven.execute.BeanRunConfig;
-import org.netbeans.modules.maven.execute.MavenExecuteUtils;
+import org.netbeans.modules.maven.runjar.MavenExecuteUtils;
 import org.netbeans.modules.maven.spi.cos.CompileOnSaveSkipper;
 import org.netbeans.spi.java.classpath.support.ClassPathSupport;
 import org.netbeans.spi.project.ActionProvider;

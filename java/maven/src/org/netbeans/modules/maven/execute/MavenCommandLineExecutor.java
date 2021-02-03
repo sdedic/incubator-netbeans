@@ -131,6 +131,7 @@ import org.openide.windows.OutputListener;
  * {@link ExplicitProcessParameters.Builder#appendPriorityArgs}.
  * 
  * @author  Milos Kleint (mkleint@codehaus.org)
+ * @author  Svata Dedic (svatopluk.dedic@gmail.com)
  */
 public class MavenCommandLineExecutor extends AbstractMavenExecutor {
     static final String ENV_PREFIX = "Env."; //NOI18N

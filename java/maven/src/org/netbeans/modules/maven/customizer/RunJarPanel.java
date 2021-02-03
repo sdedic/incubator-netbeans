@@ -51,7 +51,7 @@ import org.netbeans.modules.java.api.common.project.ui.ProjectUISupport;
 import org.netbeans.modules.maven.NbMavenProjectImpl;
 import org.netbeans.modules.maven.api.customizer.ModelHandle2;
 import org.netbeans.modules.maven.classpath.MavenSourcesImpl;
-import org.netbeans.modules.maven.execute.MavenExecuteUtils;
+import org.netbeans.modules.maven.runjar.MavenExecuteUtils;
 import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.options.MavenSettings;
