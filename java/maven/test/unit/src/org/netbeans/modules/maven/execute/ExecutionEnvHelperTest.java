@@ -18,26 +18,19 @@
  */
 package org.netbeans.modules.maven.execute;
 
-import java.io.IOException;
 import java.io.StringReader;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
+import junit.framework.Test;
 import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
-import org.netbeans.api.extexecution.startup.StartupExtender;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectManager;
-import org.netbeans.modules.extexecution.startup.StartupExtenderRegistrationProcessor;
+import org.netbeans.junit.NbTestSuite;
 import org.netbeans.modules.maven.NbMavenProjectImpl;
 import org.netbeans.modules.maven.configurations.M2ConfigProvider;
 import org.netbeans.modules.maven.execute.MavenExecuteUtils.ExecutionEnvHelper;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3Reader;
-import org.netbeans.spi.extexecution.startup.StartupExtenderImplementation;
 import org.openide.filesystems.FileObject;
-import org.openide.filesystems.FileUtil;
-import org.openide.loaders.DataFolder;
-import org.openide.loaders.InstanceDataObject;
 import org.openide.util.Lookup;
 import org.openide.util.test.MockLookup;
 
@@ -45,9 +38,129 @@ import org.openide.util.test.MockLookup;
  *
  * @author sdedic
  */
-public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
-    public ExecutionEnvHelperTest(String name) {
+public abstract class ExecutionEnvHelperTest2 extends MavenExecutionTestBase {
+    public ExecutionEnvHelperTest2(String name) {
         super(name);
+    }
+    
+    protected abstract void initCustomizedProperties();
+    protected abstract void initDefaultProperties();
+    protected abstract String defaultCommandLineArgs();
+    
+
+    
+    public static void main(java.lang.String[] args) {
+        junit.textui.TestRunner.run(suite());
+    }
+
+    public static Test suite() {
+        NbTestSuite suite = new NbTestSuite("ExecutionHelperTest");
+//        suite.addTest(new NbTestSuite(NetBeansSplitConfig.class));
+        suite.addTest(new NbTestSuite(NetBeans123Config.class));
+        return suite;
+    }
+    
+    protected void assertActionCustomVMProperties(String vmArg, String mainClass, String appArg) throws Exception {}
+
+    public static class NetBeans123Config extends ExecutionEnvHelperTest2 {
+
+        public NetBeans123Config(String name) {
+            super(name);
+        }
+
+        /**
+         * Sets up properties for pre-12.3 maven projects, with some customizations
+         * <ul>
+         * <li>a system property
+         * <li>classpath
+         * <li>an application parameter
+         * </ul>
+         */
+        protected void initCustomizedProperties() {
+            initDefaultProperties();
+            runP.put("exec.args", "-Dprop=val -classpath %classpath test.mavenapp.App param1");
+            profileP.putAll(runP);
+            debugP.put("exec.args", "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address} -Dprop=val -classpath %classpath test.mavenapp.App param1");
+        }
+
+        /**
+         * Sets up DEFAULT pre-12.3 properties, no new properties will be defined at all. Use to test
+         * compatibility with pre-existing projects.
+         */
+        protected void initDefaultProperties() {
+            runP.remove("exec.vmArgs");
+            runP.remove("exec.appArgs");
+            runP.remove("exec.mainClass");
+            runP.put("exec.executable", "java");
+            runP.put("exec.args", MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH);
+            profileP.putAll(runP);
+
+            debugP.put("exec.args", MavenExecuteUtils.DEFAULT_DEBUG_PARAMS + " " + MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH);
+            debugP.put("exec.executable", "java");
+        }
+
+        @Override
+        protected String defaultCommandLineArgs() {
+            return MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH;
+        }
+    }
+    
+    public static class NetBeansSplitConfig extends ExecutionEnvHelperTest2 {
+
+        public NetBeansSplitConfig(String name) {
+            super(name);
+        }
+        
+        
+        /**
+         * Sets up project's split properties - individual parts split to separate
+         * properties (vm args, app args, main class).
+         */
+        protected void initDefaultProperties() {
+            runP.put("exec.executable", "java");
+            runP.put("exec.mainClass", "${packageClassName}");
+            runP.put("exec.vmArgs", "");
+            runP.put("exec.appArgs", "");
+            runP.put("exec.args", MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
+
+            profileP.putAll(runP);
+            debugP.putAll(runP);
+
+            debugP.put("exec.args", MavenExecuteUtils.DEFAULT_DEBUG_PARAMS + " " + MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
+            debugP.put("exec.executable", "java");
+        }
+
+        /**
+         * Sets up customized split properties. A VM arg, app arg and a defined main class are present.
+         */
+        protected void initCustomizedProperties() {
+            initDefaultProperties();
+            runP.put("exec.vmArgs", "-Dprop=val");
+            runP.put("exec.mainClass", "test.mavenapp.App");
+            runP.put("exec.appArgs", "param1");
+            profileP.putAll(runP);
+
+            debugP.put("exec.vmArgs", "-Dprop=val");
+            debugP.put("exec.mainClass", "test.mavenapp.App");
+            debugP.put("exec.appArgs", "param1");
+        }
+
+        @Override
+        protected void assertActionCustomVMProperties(String vmArg, String mainClass, String appArg) throws Exception {
+            super.assertActionOverridesArguments(vmArg, mainClass, appArg);
+            
+            // check that the split properties are populated
+            assertEquals(vmArg, mavenExecutorDefines.get(MavenExecuteUtils.RUN_VM_PARAMS));
+            assertEquals(appArg, mavenExecutorDefines.get(MavenExecuteUtils.RUN_APP_PARAMS));
+            if (mainClass != null) {
+                assertEquals(mainClass, mavenExecutorDefines.get(MavenExecuteUtils.RUN_MAIN_CLASS));
+            }
+        }
+
+        @Override
+        protected String defaultCommandLineArgs() {
+            return MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2;
+        }
     }
 
     /**
@@ -70,37 +183,6 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
         assertEquals("", helper.getMainClass());
     }
     
-    /**
-     * Sets up properties for pre-12.3 maven projects, with some customizations
-     * <ul>
-     * <li>a system property
-     * <li>classpath
-     * <li>an application parameter
-     * </ul>
-     */
-    private void initCustomizedOldProperties() {
-        initDefaultOldProperties();
-        runP.put("exec.args", "-Dprop=val -classpath %classpath test.mavenapp.App param1");
-        profileP.putAll(runP);
-        debugP.put("exec.args", "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address} -Dprop=val -classpath %classpath test.mavenapp.App param1");
-    }
-    
-    /**
-     * Sets up DEFAULT pre-12.3 properties, no new properties will be defined at all. Use to test
-     * compatibility with pre-existing projects.
-     */
-    private void initDefaultOldProperties() {
-        runP.remove("exec.vmArgs");
-        runP.remove("exec.appArgs");
-        runP.remove("exec.mainClass");
-        runP.put("exec.executable", "java");
-        runP.put("exec.args", MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH);
-        profileP.putAll(runP);
-
-        debugP.put("exec.args", MavenExecuteUtils.DEFAULT_DEBUG_PARAMS + " " + MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH);
-        debugP.put("exec.executable", "java");
-    }
-    
     private ExecutionEnvHelper createAndLoadHelper() throws Exception {
         createNbActions(runP, debugP, profileP);
         createPom("", "");
@@ -119,54 +201,9 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
      * Checks that exec.args are correctly split into vm, app and main class.
      */
     public void testLoadFromExecArgs() throws Exception {
-        initCustomizedOldProperties();
+        initCustomizedProperties();
         
         ExecutionEnvHelper helper = createAndLoadHelper();
-        assertEquals("-Dprop=val", helper.getVmParams());
-        assertEquals("param1", helper.getAppParams());
-        assertEquals("test.mavenapp.App", helper.getMainClass());
-    }
-    
-    /**
-     * Sets up project's split properties - individual parts split to separate
-     * properties (vm args, app args, main class).
-     */
-    private void initDefaultSplitProperties() {
-        runP.put("exec.executable", "java");
-        runP.put("exec.mainClass", "${packageClassName}");
-        runP.put("exec.vmArgs", "");
-        runP.put("exec.appArgs", "");
-        runP.put("exec.args", MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
-
-        profileP.putAll(runP);
-        debugP.putAll(runP);
-        
-        debugP.put("exec.args", MavenExecuteUtils.DEFAULT_DEBUG_PARAMS + " " + MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
-        debugP.put("exec.executable", "java");
-    }
-    
-    /**
-     * Sets up customized split properties. A VM arg, app arg and a defined main class are present.
-     */
-    private void initCustomizedSplitProperties() {
-        initDefaultSplitProperties();
-        runP.put("exec.vmArgs", "-Dprop=val");
-        runP.put("exec.mainClass", "test.mavenapp.App");
-        runP.put("exec.appArgs", "param1");
-        profileP.putAll(runP);
-        
-        debugP.put("exec.vmArgs", "-Dprop=val");
-        debugP.put("exec.mainClass", "test.mavenapp.App");
-        debugP.put("exec.appArgs", "param1");
-    }
-    
-    /**
-     * Loads action mapping split into multiple properties.
-     */
-    public void testLoadFromNewCustomizer() throws Exception {
-        initCustomizedSplitProperties();
-        ExecutionEnvHelper helper = createAndLoadHelper();
-        
         assertEquals("-Dprop=val", helper.getVmParams());
         assertEquals("param1", helper.getAppParams());
         assertEquals("test.mavenapp.App", helper.getMainClass());
@@ -178,7 +215,7 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
      * @throws Exception 
      */
     public void testChangeFromOldConfig() throws Exception {
-        initCustomizedOldProperties();
+        initCustomizedProperties();
         ExecutionEnvHelper helper = createAndLoadHelper();        
         
         helper.setAppParams("param2");
@@ -198,7 +235,7 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
      * previous function of the RunJarPanel.
      */
     public void testMixedConfigNotChanged() throws Exception {
-        initCustomizedOldProperties();
+        initCustomizedProperties();
         
         // remove the classpath
         runP.put("exec.args", "-Dprop=val test.mavenapp.App param1");
@@ -236,8 +273,8 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
         Project project = ProjectManager.getDefault().findProject(pom.getParent());        
         ModelRunConfig cfg = new ModelRunConfig(project, mapp, "run", null, Lookup.EMPTY, true);
 
-        assertTrue(cfg.getProperties().get(MavenExecuteUtils.RUN_PARAMS).contains("-DsomeProperty=blah"));
-        assertTrue(cfg.getProperties().get(MavenExecuteUtils.RUN_PARAMS).contains(actionsDefaultArgs));
+        assertTrue("Must contain POM vm arg", cfg.getProperties().get(MavenExecuteUtils.RUN_PARAMS).contains("-DsomeProperty=blah"));
+        assertTrue("Must contain arg " + actionsDefaultArgs, cfg.getProperties().get(MavenExecuteUtils.RUN_PARAMS).contains(actionsDefaultArgs));
     }
     
     /**
@@ -246,29 +283,13 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
      * @throws Exception 
      */
     public void testMergedMappingUsesPOMArguments() throws Exception {
-        initDefaultOldProperties();
+        initDefaultProperties();
         createNbActions(runP, debugP, profileP);
         createPomWithArguments();
         Project project = ProjectManager.getDefault().findProject(pom.getParent());        
         loadActionMappings(project);
 
-        assertPOMArguments(runMapping, MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH);
-    }
-    
-    /**
-     * Checks that default actions set up for post-12.3 will merge in maven
-     * settings.
-     * @throws Exception 
-     */
-    public void testSplitPropertyMappingUsesPOMArguments() throws Exception {
-        initDefaultSplitProperties();
-        createNbActions(runP, debugP, profileP);
-        createPomWithArguments();
-        
-        Project project = ProjectManager.getDefault().findProject(pom.getParent());        
-        loadActionMappings(project);
-
-        assertPOMArguments(runMapping, MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
+        assertPOMArguments(runMapping, defaultCommandLineArgs());
     }
     
     /**
@@ -282,19 +303,16 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
         Project project = ProjectManager.getDefault().findProject(pom.getParent());        
         loadActionMappings(project);
 
+        // there's NO action mapping generated -> the default mapping that uses split arguments should be used.
         assertPOMArguments(runMapping, MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH2);
     }
     
-    private void assertPOMArgumentsUsed() throws Exception {
-        createPomWithArguments();
-        if (runMapping == null) {
-            final Project project = ProjectManager.getDefault().findProject(pom.getParent());
-            loadActionMappings(project);
-        }
-        assertRunArguments(runMapping, "-DsomeProperty=blah", DEFAULT_MAIN_CLASS_TOKEN,  null);
+    void assertActionOverridesArgumentsPlusProperties(String vmArg, String mainClass, String appArg) throws Exception {
+        assertActionOverridesArguments(vmArg, mainClass, appArg);
+        assertActionCustomVMProperties(vmArg, mainClass, appArg);
     }
     
-    private void assertActionOverridesArguments(String vmArg, String mainClass, String appArg) throws Exception {
+    void assertActionOverridesArguments(String vmArg, String mainClass, String appArg) throws Exception {
         createNbActions(runP, debugP, profileP);
         createPomWithArguments();
         if (runMapping == null) {
@@ -305,73 +323,70 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
     }
     
     /**
+     * Checks that POM-provided arguments are used during execution.
+     */
+    private void assertPOMArgumentsUsed() throws Exception {
+        createPomWithArguments();
+        if (runMapping == null) {
+            final Project project = ProjectManager.getDefault().findProject(pom.getParent());
+            loadActionMappings(project);
+        }
+        assertRunArguments(runMapping, "-DsomeProperty=blah", DEFAULT_MAIN_CLASS_TOKEN,  null);
+    }
+    
+    /**
      * Checks that without mapping maven arguments are properly passed to exec.args, so
      * they are not overriden.
      */
     public void test123DefaultProjectPassesPOMArguments() throws Exception {
-        initDefaultOldProperties();
+        initDefaultProperties();
         assertPOMArgumentsUsed();
     }
     
     /**
-     * Checks that old mapping (just exec.args) properly passes POM arguments if
-     * exec.args does not define any
+     * Checks that a default, not customized mapping (just exec.args) properly passes POM arguments if
+     * exec.args does not define any (just the default)
      */
     public void test123WithActionsAndNoArgsPassesPOMArguments() throws Exception {
-        initDefaultOldProperties();
+        initDefaultProperties();
         createNbActions(runP, debugP, profileP);
         assertPOMArgumentsUsed();
     }
     
     /**
-     * Checks that new default mapping (no customizations) will pass POM arguments.
-     */
-    public void testNewDefaultActionPassesPOMArguments() throws Exception {
-        initDefaultSplitProperties();
-        assertPOMArgumentsUsed();
-    }
-
-    /**
      * Checks that argument in mapping's exec.args overrides POM arguments
      */
     public void test123WithActionsArgumentsOverridePOM() throws Exception {
-        initDefaultOldProperties();
+        initDefaultProperties();
         runP.put(MavenExecuteUtils.RUN_PARAMS, 
-                "-DdifferentProperty=blurb " + MavenExecuteUtils.DEFAULT_EXEC_ARGS_CLASSPATH + " ${pkgClassName} param2 prevParam");
+                "-DdifferentProperty=blurb " + defaultCommandLineArgs() + " param2 prevParam");
         assertActionOverridesArguments("-DdifferentProperty=blurb", DEFAULT_MAIN_CLASS_TOKEN, "param2 prevParam");
     }
     
-    
-    private void initDefaultSplitPropertiesWithArguments() throws Exception {
-        initDefaultSplitProperties();
-        createPomWithArguments();
-        runP.put(MavenExecuteUtils.RUN_APP_PARAMS, "firstParam nextParam");
-        runP.put(MavenExecuteUtils.RUN_VM_PARAMS, "-DvmArg=1");
-    }
     
     /**
      * Checks that if a mapping defines arguments, they are used in preference to the 
      * POM ones.
      */
-    public void testNewDefaultMappingPassesArguments() throws Exception {
-        initDefaultSplitPropertiesWithArguments();
-        assertActionOverridesArguments("-DvmArg=1", null, "firstParam nextParam");
+    public void testCustomMappingPassesArguments() throws Exception {
+        initCustomizedProperties();
+        assertActionOverridesArgumentsPlusProperties("-Dprop=val", "test.mavenapp.App", "param1");
     }
     
     /**
      * Checks that pre-12.3 default actions will inject VM arguments and arguments from Lookup.
      */
-    public void test123DefaultActionWithAddition() throws Exception {
-        initDefaultOldProperties();
+    public void test123DefaultActionWithVMAddition() throws Exception {
+        initDefaultProperties();
         createNbActions(runP, debugP, profileP);
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
                 priorityArg("-DvmArg2=2").
                 arg("paramY").build();
         MockLookup.setLayersAndInstances(explicit);
         createPomWithArguments();
-        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        assertActionOverridesArgumentsPlusProperties("-DsomeProperty=blah -DvmArg2=2", null, "paramY");
         // check that default pom arguments are ALSO present
-        assertTrue(mavenVmArgs.contains("-DsomeProperty="));
+//        assertTrue(mavenVmArgs.contains("-DsomeProperty="));
     }
     
     /**
@@ -380,7 +395,7 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
      * should be replaced.
      */
     public void test123DefaultActionWithVMReplacement() throws Exception {
-        initDefaultOldProperties();
+        initDefaultProperties();
         createNbActions(runP, debugP, profileP);
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
                 priorityArg("-DvmArg2=2").
@@ -398,66 +413,16 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
      * replaces args.
      */
     public void testNewActionWithVMAdditionAndArgReplacement() throws Exception {
-        initDefaultSplitPropertiesWithArguments();
+        initCustomizedProperties();
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
                 priorityArg("-DvmArg2=2").
                 arg("paramY").build();
         MockLookup.setLayersAndInstances(explicit);
-        createPomWithArguments();
-        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        assertActionOverridesArguments("-DvmArg2=2", "test.mavenapp.App", "paramY");
         // check that default pom arguments are not present
-        assertTrue(mavenVmArgs.contains("-DvmArg=1"));
+        assertTrue(mavenVmArgs.contains("-Dprop=val"));
         // by default arguments are replaced:
-        assertFalse(mavenAppArgs.contains("firstParam nextParam"));
-    }
-    
-    /**
-     * New actions: Checks that args can be appended, if necessary.
-     */
-    public void testNewActionWithArgAddition() throws Exception {
-        initDefaultSplitPropertiesWithArguments();
-        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
-                priorityArg("-DvmArg2=2").
-                arg("paramY").build();
-        MockLookup.setLayersAndInstances(explicit);
-        createPomWithArguments();
-        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
-        // check that default pom arguments are not present
-        assertFalse(mavenVmArgs.contains("-DsomeProperty="));
-    }
-
-    /**
-     * New actions: checks that VM args can be replaced.
-     */
-    public void testNewActionWithVMReplacement() throws Exception {
-        initDefaultSplitPropertiesWithArguments();
-        ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
-                appendPriorityArgs(false).
-                priorityArg("-DvmArg2=2").
-                arg("paramY").build();
-        MockLookup.setLayersAndInstances(explicit);
-        createPomWithArguments();
-        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
-        // check that default pom arguments are not present
-        assertFalse(mavenVmArgs.contains("-DvmArg=1"));
-    }
-    
-    static class TestExtender implements StartupExtenderImplementation {
-        static String vmArg;
-        
-        @Override
-        public List<String> getArguments(Lookup context, StartupExtender.StartMode mode) {
-            return vmArg == null ? Collections.emptyList() : Collections.singletonList(vmArg);
-        }
-    }
-    
-    private void registerExtender() throws IOException {
-        FileObject p = FileUtil.getConfigFile(StartupExtenderRegistrationProcessor.PATH);
-        if (p == null) {
-            p = FileUtil.getConfigRoot().createFolder(StartupExtenderRegistrationProcessor.PATH);
-        }
-        DataFolder fld = DataFolder.findFolder(p);
-        InstanceDataObject.create(fld, "test-extender", TestExtender.class);
+        assertFalse(mavenAppArgs.contains("param1"));
     }
     
     /**
@@ -465,18 +430,17 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
      * startup extender
      */
     public void testNewActionVMAppendMergesWithExtenders() throws Exception {
-        initDefaultSplitPropertiesWithArguments();
+        initCustomizedProperties();
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
-//                appendPriorityArgs(false).
                 priorityArg("-DvmArg2=2").
                 arg("paramY").build();
-        registerExtender();
+        registerExtender(null);
         TestExtender.vmArg = "-Dbar=foo";
         MockLookup.setLayersAndInstances(explicit);
         createPomWithArguments();
-        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
+        assertActionOverridesArguments("-DvmArg2=2", "test.mavenapp.App", "paramY");
         // check that default pom arguments are not present
-        assertTrue(mavenVmArgs.contains("-DvmArg=1"));
+        assertTrue(mavenVmArgs.contains("-Dprop=val"));
         assertTrue(mavenVmArgs.contains("-Dbar=foo"));
     }
     
@@ -484,36 +448,25 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
      * New actions: checks that appended VM args are merged with a
      * startup extender EVEN If config args are replaced.
      */
-    public void testNewActionVMReplaceSillMergesWithExtenders() throws Exception {
-        initDefaultSplitPropertiesWithArguments();
+    public void testNewActionVMReplaceStillMergesWithExtenders() throws Exception {
+        initCustomizedProperties();
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
                 appendPriorityArgs(false).
                 priorityArg("-DvmArg2=2").
                 arg("paramY").build();
-        registerExtender();
+        registerExtender(null);
         TestExtender.vmArg = "-Dbar=foo";
         MockLookup.setLayersAndInstances(explicit);
-        createPomWithArguments();
-        assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
-        // check that default pom arguments are not present
-        assertFalse(mavenVmArgs.contains("-DvmArg=1"));
+        assertActionOverridesArguments("-DvmArg2=2", "test.mavenapp.App", "paramY");
+        assertFalse(mavenVmArgs.contains("-Dprop=val"));
         assertTrue(mavenVmArgs.contains("-Dbar=foo"));
     }
 
-    private ExecutionEnvHelper loadPlusProjectExecutionHelper(boolean defaultProps) throws Exception {
-        if (defaultProps) {
-            initDefaultSplitProperties();
-        } else {
-            initDefaultSplitPropertiesWithArguments();
-        }
-        return loadExecutionHelper();
-    }
-    
     private ExecutionEnvHelper load123ProjectExecutionHelper(boolean defaultProps) throws Exception {
         if (defaultProps) {
-            initDefaultOldProperties();
+            initDefaultProperties();
         } else {
-            initCustomizedOldProperties();
+            initCustomizedProperties();
         }
         return loadExecutionHelper();
     }
@@ -602,8 +555,5 @@ public class ExecutionEnvHelperTest extends MavenExecutionTestBase {
         // could be treated as a bug.
         assertRunArguments(runMapping, "", "org.Maven.Test", null);
         assertEquals("", mavenAppArgs);
-    }
-    
-    public void testLoad123PlusConfigChangeAppParams() throws Exception {
     }
 }
