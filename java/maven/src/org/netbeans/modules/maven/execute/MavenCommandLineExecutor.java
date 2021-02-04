@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
@@ -54,7 +55,9 @@ import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.IOUtil;
 import org.codehaus.plexus.util.cli.CommandLineUtils;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
+import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 import org.netbeans.api.extexecution.base.Processes;
+import org.netbeans.api.extexecution.startup.StartupExtender;
 import org.netbeans.api.java.platform.JavaPlatform;
 import org.netbeans.api.progress.ProgressHandle;
 import org.netbeans.api.project.Project;
@@ -100,7 +103,35 @@ import org.openide.windows.OutputListener;
 
 /**
  * support for executing maven, externally on the command line.
+ * <b>Since 2/1.144</b>, the {@link LateBoundPrerequisitesChecker} registered in Maven projects by default supports 
+ * {@link ExplicitProcessParameters} API. The caller of the execute-type action can request to append or replace VM or user
+ * application parameters. The parameters recorded in the POM.xml or NetBeans action mappings are augmented according to that
+ * instructions:
+ * <ul>
+ * <li><b>priorityArgs</b> are mapped to VM arguments (precede main class name)
+ * <li><b>args</b> are mapped to user application arguments (after main class name)
+ * </ul>
+ * VM parameters injected by {@link StartupExtender} API are not affected by this feature. 
+ * <p>
+ * Example use:
+ * <code>
+ *   ActionProvider ap = ... ; // obtain ActionProvider from the project.
+ *   Lookup launchCtx = ... ;  // context for the launch
+ *   ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+ *           priorityArg("-DvmArg2=2").
+ *           arg("paramY").build();
+ *   Lookups.executeWith(new ProxyLookup(
+ *          Lookup.getDefault(),
+ *          Lookups.fixed(explicit)
+ *      ), ap.invokeAction("run", launchCtx)
+ *   );
+ * </code>
+ * The example will <b>append</b> <code>-DvmArg2=2</code> to VM arguments and <b>replaces</b> all user
+ * program arguments with <code>"paramY"</code>. Append mode can be controlled using {@link ExplicitProcessParameters.Builder#appendArgs} or
+ * {@link ExplicitProcessParameters.Builder#appendPriorityArgs}.
+ * 
  * @author  Milos Kleint (mkleint@codehaus.org)
+ * @author  Svata Dedic (svatopluk.dedic@gmail.com)
  */
 public class MavenCommandLineExecutor extends AbstractMavenExecutor {
     static final String ENV_PREFIX = "Env."; //NOI18N
@@ -262,12 +293,7 @@ public class MavenCommandLineExecutor extends AbstractMavenExecutor {
                 ProcessBuilder builder = constructBuilder(clonedConfig.getPreExecution(), ioput);
                 preProcessUUID = UUID.randomUUID().toString();
                 builder.environment().put(KEY_UUID, preProcessUUID);
-                preProcess = builder.start();
-                out.setStdOut(preProcess.getInputStream());
-                out.setStdIn(preProcess.getOutputStream());
-                executionresult = preProcess.waitFor();
-                out.waitFor();
-                if (executionresult != 0) {
+                if (executeProcess(out, builder, (p) -> preProcess = p) != 0) {
                     return;
                 }
             }
@@ -281,11 +307,7 @@ public class MavenCommandLineExecutor extends AbstractMavenExecutor {
             printCoSWarning(clonedConfig, ioput);
             processUUID = UUID.randomUUID().toString();
             builder.environment().put(KEY_UUID, processUUID);
-            process = builder.start();
-            out.setStdOut(process.getInputStream());
-            out.setStdIn(process.getOutputStream());
-            executionresult = process.waitFor();
-            out.waitFor();
+            executionresult = executeProcess(out, builder, (p) -> process = p);
         } catch (IOException x) {
             if (Utilities.isWindows()) { //#153101
                 processIssue153101(x, ioput);
@@ -337,6 +359,19 @@ public class MavenCommandLineExecutor extends AbstractMavenExecutor {
         } else {
             return true;
         }
+    }
+    
+    /**
+     * Overridable by tests.
+     */
+    int executeProcess(CommandLineOutputHandler out, ProcessBuilder builder, Consumer<Process> processSetter) throws IOException, InterruptedException {
+        Process p = builder.start();
+        processSetter.accept(p);
+        out.setStdOut(p.getInputStream());
+        out.setStdIn(p.getOutputStream());
+        int executionresult = p.waitFor();
+        out.waitFor();
+        return executionresult;
     }
 
     private void kill(Process prcs, String uuid) {
