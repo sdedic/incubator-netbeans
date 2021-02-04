@@ -141,7 +141,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 joinedArgs.addAll(Arrays.asList(mainClass));
             }
 
-            // patch: if there's -classpath %classpath in the vmArgsValue, move it at the end of fixedArgs
+            // patch: if there's -classpath %classpath in the vmArgsValue, move it at the start of fixedArgs
             int at = vmArgsValue.indexOf("-classpath");
             if (at >= 0 && vmArgsValue.size() > at + 1 && "%classpath".equals(vmArgsValue.get(at + 1))) {
                 List<String> toMove = vmArgsValue.subList(at, at + 2);
@@ -190,7 +190,8 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 ).build();
             
             if (!splitParameters) {
-                // FIXME: define RUN_{VM,APP}_PARAMS
+                // the original cmdline was split between vmArgsValue appArgsValue and joinedArgs, so
+                // any customizations shoudl remain preserved.
                 String newParams = String.join(" ", changedParams.getAllArguments(joinedArgs));
                 config.setProperty(MavenExecuteUtils.RUN_PARAMS, newParams);
             }
