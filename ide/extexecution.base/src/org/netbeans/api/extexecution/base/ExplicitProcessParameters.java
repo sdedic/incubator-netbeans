@@ -84,6 +84,17 @@ public final class ExplicitProcessParameters {
         this.appendPriorityArgs = appendPriorityArgs;
     }
     
+    private static final ExplicitProcessParameters EMPTY = new ExplicitProcessParameters(0, null, null, true, true);
+    
+    /**
+     * Returns an empty instance of parameters that has no effect. DO NOT check for emptiness by
+     * equality or reference using the instance; use {@link #isEmpty()}.
+     * @return empty instance.
+     */
+    public static ExplicitProcessParameters makeEmpty() {
+        return EMPTY;
+    }
+    
     /**
      * Returns true, if the instance has no effect when {@link Builder#combine}d onto base parameters.
      * @return true, if no effect is expected.
@@ -240,9 +251,11 @@ public final class ExplicitProcessParameters {
         private void initArgs() {
             if (arguments == null) {
                 arguments = new ArrayList<>();
+                /*
                 if (appendArgs == null) {
                     appendArgs = false;
                 }
+                */
             }
         }
         
@@ -292,9 +305,11 @@ public final class ExplicitProcessParameters {
         private void initPriorityArgs() {
             if (priorityArguments == null) {
                 priorityArguments = new ArrayList<>();
+                /*
                 if (appendPriorityArgs == null) {
                     appendPriorityArgs = true;
                 }
+                */
             }
         }
         
@@ -389,16 +404,24 @@ public final class ExplicitProcessParameters {
             }
             if (p.isPriorityArgReplacement()) {
                 priorityArguments = null;
+                if (p.getPriorityArguments() != null) {
+                    appendPriorityArgs = false;
+                } else {
+                    appendPriorityArgs = null;
+                }
             }
             if (p.isArgReplacement()) {
                 arguments = null;
+                if (p.getArguments() != null) {
+                    appendArgs = false;
+                } else {
+                    appendArgs = null;
+                }
             }
             if (p.getPriorityArguments() != null) {
-                appendPriorityArgs = !p.isPriorityArgReplacement();
                 priorityArgs(p.getPriorityArguments());
             }
             if (p.getArguments() != null) {
-                appendArgs = !p.isArgReplacement();
                 args(p.getArguments());
             }
             return this;
@@ -409,10 +432,13 @@ public final class ExplicitProcessParameters {
          * @return the {@link ExplicitProcessParameters} instance.
          */
         public ExplicitProcessParameters build() {
+            boolean aa = appendArgs != null ? appendArgs : arguments == null;
+            boolean apa = appendPriorityArgs != null ? appendPriorityArgs : true;
+            
             return new ExplicitProcessParameters(rank, priorityArguments, arguments, 
                     // if no args / priority args given and no explicit instruction on append,
                     // make the args appending.
-                    appendArgs != Boolean.FALSE, appendPriorityArgs != Boolean.FALSE);
+                    aa, apa);
         }
     }
 }
