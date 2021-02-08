@@ -43,28 +43,54 @@ import org.openide.util.Lookup;
  * Two groups of parameters are recognized: {@link #getPriorityArguments()}, which should be passed
  * first to the process (i.e. launcher parameters) and {@link #getArguments()} that represent the ordinary
  * process arguments.
+ * <div class="nonnormative">
+ * For <b>java applications</b> when {@code java} executable is used to launch the application, or even Maven project (see below), the <b>priorityArgs</b> should correspond to VM
+ * arguments, and <b>args</b> correspond to the main class' arguments (passed to the main class). Environment variables for the new process are not 
+ * supported at the moment.
+ * </div>
  * <p>
  * If the object is marked as {@link #isArgReplacement()}, the launcher implementor SHOULD replace all
  * default or configured parameters with contents of this instruction. Both arguments and priorityArguments can have value {@code null}, which means "undefined": 
  * in that case, the relevant group of configured parameters should not be affected.
  * <p>
- * Since these parameters are passed <b>externally<b>, there's an utility method, {@link #buildExplicitParameters(org.openide.util.Lookup)}
+ * Since these parameters are passed <b>externally</b>, there's an utility method, {@link #buildExplicitParameters(org.openide.util.Lookup)}
  * that builds the explicit parameter instruction based on {@link Lookup} contents. The parameters are
  * merged in the order of the {@link Builder#withRank configured rank} and appearance (in the sort priority order). 
  * The default rank is {@code 0}, which allows both append or prepend parameters. If an item's 
- * {@link ExplicitProcessParameters#isArgReplacement()} is true, all arguments collected so far are discarded.
+ * {@link ExplicitProcessParametersTest#isArgReplacement()} is true, all arguments collected so far are discarded.
  * <p>
+ * <div class="nonnormative">
  * If the combining algorithm is acceptable for the caller's purpose, the following pattern may be used to build the final
  * command line:
- * <code><pre>
- *      ExplicitProcessParameters contextParams = ExplicitProcessParameters.buildExplicitParameters(runContext);
- *      ExplicitProcessParameters combined = ExplicitProcessParameters.builder().
- *              priorityArgs(extraArgs).
- *              args(args).
- *              combine(contextParams).build();
- * </pre></code>
+ * {@codesnippet ExplicitProcessParametersTest#decorateWithExplicitParametersSample}
  * This example will combine some args and extra args from project, or configuration with arguments passed from the
  * {@code runContext} Lookup. 
+ * Supposing that a Maven project module supports {@code ExplicitProcessParameters} (it does from version 2.144), the caller may influence or override the
+ * parameters passed to the maven exec:exec task (for Run action) this way:
+ * <code><pre>
+ *   ActionProvider ap = ... ; // obtain ActionProvider from the project.
+ *   Lookup launchCtx = ... ;  // context for the launch
+ *   ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
+ *           priorityArg("-DvmArg2=2").
+ *           arg("paramY").
+ *      build();
+ * 
+ *   // pass the ExplicitProcessParameters in the action Lookup. As the Lookup.getDefault() is being redefined, do not forget
+ *   // to include the current one in the ProxyLookup !
+ *   Lookups.executeWith(new ProxyLookup(
+ *          Lookup.getDefault(),
+ *          Lookups.fixed(explicit)
+ *      ), ap.invokeAction("run", launchCtx)
+ *   );
+ * </pre></code>
+ * By default, <b>args</b> instruction(s) will discard the default parameters, so the above example will also <b>ignore</b> all application
+ * parameters provided in maven action mapping. The caller may, for example, want to just <b>append</b> parameters (i.e. list of files ?) and
+ * completely replace (default) VM parameters which may be unsuitable for the operation:
+ * {@codesnippet ExplicitProcessParametersTest#testDiscardDefaultVMParametersAppendAppParameters}
+ * <p>
+ * Note that multiple {@code ExplicitProcessParameters} instances may be added to the Lookup, acting as append or replacement
+ * for the parameters collected so far.
+ * </div>
  * @author sdedic
  * @since 1.16
  */
@@ -91,7 +117,7 @@ public final class ExplicitProcessParameters {
      * equality or reference using the instance; use {@link #isEmpty()}.
      * @return empty instance.
      */
-    public static ExplicitProcessParameters makeEmpty() {
+    public static ExplicitProcessParameters empty() {
         return EMPTY;
     }
     
@@ -109,7 +135,7 @@ public final class ExplicitProcessParameters {
 
     /**
      * Returns the arguments to be passed. Returns {@code null} if the object does not
-     * want to alter the argument list.
+     * want to alter the argument list. 
      * @return arguments to be passed or {@code null} if the argument list should not be altered.
      */
     public List<String> getArguments() {
@@ -117,29 +143,11 @@ public final class ExplicitProcessParameters {
     }
 
     /**
-     * Convenience method that returns an empty list, if no arguments are present. Useful to build
-     * the final argument list.
-     * @return arguments list to be passed, possibly empty (not null)
-     */
-    public @NonNull List<String> getArgumentsOrEmpty() {
-        return arguments == null ? Collections.emptyList() : getArguments();
-    }
-
-    /**
-     * Returns the priorityarguments to be passed. Returns {@code null} if the object does not
+     * Returns the priority arguments to be passed. Returns {@code null} if the object does not
      * want to alter the argument list.
      * @return arguments to be passed or {@code null} if the priority argument list should not be altered.
      */
     public List<String> getPriorityArguments() {
-        return priorityArguments;
-    }
-    
-    /**
-     * Convenience method that returns an empty list, if no priority arguments are present. Useful to build
-     * the final argument list.
-     * @return priority arguments list to be passed, possibly empty (not null)
-     */
-    public @NonNull List<String> getPriorityArgumentsOrEmpty() {
         return priorityArguments;
     }
     
@@ -159,6 +167,12 @@ public final class ExplicitProcessParameters {
         return !appendPriorityArgs;
     }
     
+    /**
+     * Returns the argument lists merged. Priority arguments (if any) are passed first, followed
+     * by {@code middle} (if any), then (normal) arguments. The method is a convenience to build
+     * a complete command line for the launcher + command + command arguments.
+     * @return combined arguments.
+     */
     public @NonNull List<String> getAllArguments(List<String> middle) {
         List<String> a = new ArrayList<>();
         if (priorityArguments != null) {
@@ -251,11 +265,6 @@ public final class ExplicitProcessParameters {
         private void initArgs() {
             if (arguments == null) {
                 arguments = new ArrayList<>();
-                /*
-                if (appendArgs == null) {
-                    appendArgs = false;
-                }
-                */
             }
         }
         
@@ -305,11 +314,6 @@ public final class ExplicitProcessParameters {
         private void initPriorityArgs() {
             if (priorityArguments == null) {
                 priorityArguments = new ArrayList<>();
-                /*
-                if (appendPriorityArgs == null) {
-                    appendPriorityArgs = true;
-                }
-                */
             }
         }
         

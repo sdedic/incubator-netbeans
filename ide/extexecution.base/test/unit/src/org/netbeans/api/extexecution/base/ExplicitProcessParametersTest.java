@@ -20,8 +20,10 @@ package org.netbeans.api.extexecution.base;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.netbeans.junit.NbTestCase;
+import org.openide.util.Lookup;
 
 /**
  *
@@ -59,7 +61,7 @@ public class ExplicitProcessParametersTest extends NbTestCase {
      * @throws Exception 
      */
     public void testEmptyExplicitParameters() throws Exception {
-        ExplicitProcessParameters empty = ExplicitProcessParameters.makeEmpty();
+        ExplicitProcessParameters empty = ExplicitProcessParameters.empty();
         assertTrue(empty.isEmpty());
         assertFalse(empty.isArgReplacement());
         assertFalse(empty.isPriorityArgReplacement());
@@ -318,5 +320,71 @@ public class ExplicitProcessParametersTest extends NbTestCase {
         
         assertEquals(Arrays.asList("-Xmx100m"), result.getPriorityArguments());
         assertEquals(Arrays.asList("File1"), result.getArguments());
+    }
+    
+    //
+    //================ samples =================
+    public void testDiscardDefaultVMParametersAppendAppParameters() throws Exception {
+        String[] projectVMArgs = new String[] { "-Dfile.encoding=UTF8" };
+        String[] projectAppArgs = new String[] { "processFiles" };
+        
+        String[] files = new String[] { "fileA", "fileB" };
+        
+        // BEGIN: ExplicitProcessParametersTest#testDiscardDefaultVMParametersAppendAppParameters
+        ExplicitProcessParameters override = ExplicitProcessParameters.builder().
+                // override the default: do not append to the base ones, but discard them
+                appendPriorityArgs(false).
+                // ... and insist on empty priority args
+                priorityArgs().
+                // ... or some other specific one(s)
+                priorityArgs("-Xmx1000m").
+                
+                // override the default: keep base application arguments
+                appendArgs(true).
+                
+                // and add file list
+                args(files).
+                build();
+        
+        // END: ExplicitProcessParametersTest#testDiscardDefaultVMParametersAppendAppParameters
+        
+        ExplicitProcessParameters result = ExplicitProcessParameters.builder().
+                priorityArgs(projectVMArgs).
+                args(projectAppArgs).
+                combine(override).
+                build();
+        
+        assertEquals(Arrays.asList("-Xmx1000m"), result.getPriorityArguments());
+        assertEquals(Arrays.asList("processFiles", "fileA", "fileB"), result.getArguments());
+    }
+
+    private static String[] getProjectVMParams() {
+        return null;
+    }
+    
+    private static String[] getProjectAppParams() {
+        return null;
+    }
+    
+    public static void decorateWithExplicitParametersSample() {
+        Lookup runContext = Lookup.getDefault();
+        // BEGIN: ExplicitProcessParametersTest#decorateWithExplicitParametersSample
+        // collect all instructions from the Lookup and build decorating parameters
+        ExplicitProcessParameters decorator = ExplicitProcessParameters.buildExplicitParameters(runContext);
+        
+        ExplicitProcessParameters params = ExplicitProcessParameters.builder().
+                // include project's (or pre-configured) application parameters
+                args(getProjectAppParams()).
+                // include project's (or pre-configured) VM parameters as priority ones
+                priorityArgs(getProjectVMParams()).
+                
+                // now combine with the decorating instructions: will append or reset args or priority args
+                combine(decorator).
+                build();
+        
+        // build a commandline for e.g. launcher or VM: include priority args first
+        // then the fixed "middle part" (e.g. the main class name), then application arguments.
+        List<String> commandLine = params.getAllArguments("theMainClass");
+        // END: ExplicitProcessParametersTest#decorateWithExplicitParametersSample
     }
 }
