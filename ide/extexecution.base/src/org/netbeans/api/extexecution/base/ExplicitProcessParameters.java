@@ -38,24 +38,24 @@ import org.openide.util.Lookup;
  * automation of the feature, enhancing the process launch for various environments, technologies etc.
  * <p>
  * <i>Note:</i> please refer also to {@code StartupExtender} API in the {@code extexecution} module, which contributes globally
- * to priority arguments.
+ * to launcher arguments.
  * <p>
- * Two groups of parameters are recognized: {@link #getPriorityArguments()}, which should be passed
+ * Two groups of parameters are recognized: {@link #getLauncherArguments()}, which should be passed
  * first to the process (i.e. launcher parameters) and {@link #getArguments()} that represent the ordinary
  * process arguments.
  * <div class="nonnormative">
- * For <b>java applications</b> when {@code java} executable is used to launch the application, or even Maven project (see below), the <b>priorityArgs</b> should correspond to VM
+ * For <b>java applications</b> when {@code java} executable is used to launch the application, or even Maven project (see below), the <b>launcherArgs</b> should correspond to VM
  * arguments, and <b>args</b> correspond to the main class' arguments (passed to the main class). Environment variables for the new process are not 
  * supported at the moment.
  * </div>
  * <p>
  * If the object is marked as {@link #isArgReplacement()}, the launcher implementor SHOULD replace all
- * default or configured parameters with contents of this instruction. Both arguments and priorityArguments can have value {@code null}, which means "undefined": 
+ * default or configured parameters with contents of this instruction. Both arguments and launcherArguments can have value {@code null}, which means "undefined": 
  * in that case, the relevant group of configured parameters should not be affected.
  * <p>
  * Since these parameters are passed <b>externally</b>, there's an utility method, {@link #buildExplicitParameters(org.openide.util.Lookup)}
  * that builds the explicit parameter instruction based on {@link Lookup} contents. The parameters are
- * merged in the order of the {@link Builder#withRank configured rank} and appearance (in the sort priority order). 
+ * merged in the order of the {@link Builder#position configured rank} and appearance (in the sort ascending order). 
  * The default rank is {@code 0}, which allows both append or prepend parameters. If an item's 
  * {@link ExplicitProcessParametersTest#isArgReplacement()} is true, all arguments collected so far are discarded.
  * <p>
@@ -71,7 +71,7 @@ import org.openide.util.Lookup;
  *   ActionProvider ap = ... ; // obtain ActionProvider from the project.
  *   Lookup launchCtx = ... ;  // context for the launch
  *   ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
- *           priorityArg("-DvmArg2=2").
+ *           launcherArg("-DvmArg2=2").
  *           arg("paramY").
  *      build();
  * 
@@ -95,22 +95,22 @@ import org.openide.util.Lookup;
  * @since 1.16
  */
 public final class ExplicitProcessParameters {
-    final int rank;
-    private final List<String>    priorityArguments;
+    final int position;
+    private final List<String>    launcherArguments;
     private final List<String>    arguments;
-    private final boolean  appendArgs;
-    private final boolean  appendPriorityArgs;
+    private final boolean  replaceArgs;
+    private final boolean  replaceLauncherArgs;
 
-    private ExplicitProcessParameters(int rank, List<String> priorityArguments, 
-            List<String> arguments, boolean appendArgs, boolean appendPriorityArgs) {
-        this.rank = rank;
-        this.priorityArguments = priorityArguments == null ? null : Collections.unmodifiableList(priorityArguments);
+    private ExplicitProcessParameters(int position, List<String> launcherArguments, 
+            List<String> arguments, boolean appendArgs, boolean appendLauncherArgs) {
+        this.position = position;
+        this.launcherArguments = launcherArguments == null ? null : Collections.unmodifiableList(launcherArguments);
         this.arguments = arguments == null ? null : Collections.unmodifiableList(arguments);
-        this.appendArgs = appendArgs;
-        this.appendPriorityArgs = appendPriorityArgs;
+        this.replaceArgs = appendArgs;
+        this.replaceLauncherArgs = appendLauncherArgs;
     }
     
-    private static final ExplicitProcessParameters EMPTY = new ExplicitProcessParameters(0, null, null, true, true);
+    private static final ExplicitProcessParameters EMPTY = new ExplicitProcessParameters(0, null, null, false, false);
     
     /**
      * Returns an empty instance of parameters that has no effect. DO NOT check for emptiness by
@@ -127,10 +127,10 @@ public final class ExplicitProcessParameters {
      */
     public boolean isEmpty() {
         boolean change = false;
-        if (isArgReplacement() || isPriorityArgReplacement()) {
+        if (isArgReplacement() || isLauncherArgReplacement()) {
             return false;
         }
-        return (((arguments == null) || arguments.isEmpty()) && (priorityArguments == null || priorityArguments.isEmpty()));
+        return (((arguments == null) || arguments.isEmpty()) && (launcherArguments == null || launcherArguments.isEmpty()));
     }
 
     /**
@@ -143,12 +143,12 @@ public final class ExplicitProcessParameters {
     }
 
     /**
-     * Returns the priority arguments to be passed. Returns {@code null} if the object does not
+     * Returns the launcher arguments to be passed. Returns {@code null} if the object does not
      * want to alter the argument list.
-     * @return arguments to be passed or {@code null} if the priority argument list should not be altered.
+     * @return arguments to be passed or {@code null} if the launcher argument list should not be altered.
      */
-    public List<String> getPriorityArguments() {
-        return priorityArguments;
+    public List<String> getLauncherArguments() {
+        return launcherArguments;
     }
     
     /**
@@ -156,27 +156,27 @@ public final class ExplicitProcessParameters {
      * @return true, if arguments collected should be discarded.
      */
     public boolean isArgReplacement() {
-        return !appendArgs;
+        return replaceArgs;
     }
 
     /**
-     * Instructs to replace priority arguments collected so far.
-     * @return true, if priority arguments collected should be discarded.
+     * Instructs to replace launcher arguments collected so far.
+     * @return true, if launcher arguments collected should be discarded.
      */
-    public boolean isPriorityArgReplacement() {
-        return !appendPriorityArgs;
+    public boolean isLauncherArgReplacement() {
+        return replaceLauncherArgs;
     }
     
     /**
-     * Returns the argument lists merged. Priority arguments (if any) are passed first, followed
+     * Returns the argument lists merged. Launcher arguments (if any) are passed first, followed
      * by {@code middle} (if any), then (normal) arguments. The method is a convenience to build
      * a complete command line for the launcher + command + command arguments.
      * @return combined arguments.
      */
     public @NonNull List<String> getAllArguments(List<String> middle) {
         List<String> a = new ArrayList<>();
-        if (priorityArguments != null) {
-            a.addAll(priorityArguments);
+        if (launcherArguments != null) {
+            a.addAll(launcherArguments);
         }
         if (middle != null && !middle.isEmpty()) {
             a.addAll(middle);
@@ -188,7 +188,7 @@ public final class ExplicitProcessParameters {
     }
     
     /**
-     * Returns the argument lists merged. Priority arguments (if any) are passed first, followed
+     * Returns the argument lists merged. Launcher arguments (if any) are passed first, followed
      * by {@code middle} (if any), then (normal) arguments. The method is a convenience to build
      * a complete command line for the launcher + command + command arguments.
      * @return combined arguments.
@@ -215,8 +215,8 @@ public final class ExplicitProcessParameters {
      * {@link ExplicitProcessParamters}. It is <b>strongly recommended</b> to support explicit parameters in order to allow for 
      * customizations and automation.
      * <p>
-     * Processes instructions in the order of {@link Builder#withRank(int)} and appearance. Whenever an item is flagged as
-     * a replacement, all arguments (priority arguments) collected to that point are discarded. Item's arguments (priority arguments)
+     * Processes instructions in the order of {@link Builder#position(int)} and appearance. Whenever an item is flagged as
+     * a replacement, all arguments (launcher arguments) collected to that point are discarded. Item's arguments (launcher arguments)
      * will become the only ones listed.
      * <p>
      * <i>Note:</i> if a replacement instruction and all the following (if any) have {@link #getArguments()} {@code null} (= no change), 
@@ -228,7 +228,7 @@ public final class ExplicitProcessParameters {
      */
     public static ExplicitProcessParameters buildExplicitParameters(Collection<? extends ExplicitProcessParameters> items) {
         List<? extends ExplicitProcessParameters> all = new ArrayList<>(items);
-        Collections.sort(all, (a, b) -> a.rank - b.rank);
+        Collections.sort(all, (a, b) -> a.position - b.position);
         Builder b = builder();;
         for (ExplicitProcessParameters item : all) {
             b.combine(item);
@@ -243,17 +243,17 @@ public final class ExplicitProcessParameters {
     /**
      * Builds the {@link ExplicitProcessParameters} instance. The builder initially:
      * <ul>
-     * <li><b>appends</b> priority arguments
+     * <li><b>appends</b> launcher arguments
      * <li><b>replaces</b> (normal) arguments
      * </ul>
      * and the mode can be overriden for each group.
      */
     public final static class Builder {
-        private int rank = 0;
-        private List<String> priorityArguments = null;
+        private int position = 0;
+        private List<String> launcherArguments = null;
         private List<String> arguments = null;
-        private Boolean  appendArgs;
-        private Boolean  appendPriorityArgs;
+        private Boolean  replaceArgs;
+        private Boolean  replaceLauncherArgs;
         
         private void initArgs() {
             if (arguments == null) {
@@ -304,23 +304,23 @@ public final class ExplicitProcessParameters {
             return args(Arrays.asList(args));
         }
         
-        private void initPriorityArgs() {
-            if (priorityArguments == null) {
-                priorityArguments = new ArrayList<>();
+        private void initLauncherArgs() {
+            if (launcherArguments == null) {
+                launcherArguments = new ArrayList<>();
             }
         }
         
         /**
-         * Appends a single priority argument. {@code null} is ignored.
-         * @param a priority argument
+         * Appends a single launcher argument. {@code null} is ignored.
+         * @param a launcher argument
          * @return the builder
          */
-        public Builder priorityArg(@NullAllowed String a) {
+        public Builder launcherArg(@NullAllowed String a) {
             if (a == null) {
                 return this;
             }
-            initPriorityArgs();
-            priorityArguments.add(a);
+            initLauncherArgs();
+            launcherArguments.add(a);
             return this;
         }
 
@@ -330,12 +330,12 @@ public final class ExplicitProcessParameters {
          * @param args argument list
          * @return the builder
          */
-        public Builder priorityArgs(@NullAllowed List<String> args) {
+        public Builder launcherArgs(@NullAllowed List<String> args) {
             if (args == null) {
                 return this;
             }
-            initPriorityArgs();
-            args.forEach(this::priorityArg);
+            initLauncherArgs();
+            args.forEach(this::launcherArg);
             return this;
         }
 
@@ -345,49 +345,49 @@ public final class ExplicitProcessParameters {
          * @param args argument list
          * @return the builder
          */
-        public Builder priorityArgs(@NullAllowed String... args) {
+        public Builder launcherArgs(@NullAllowed String... args) {
             if (args == null) {
                 return this;
             }
-            return priorityArgs(Arrays.asList(args));
+            return launcherArgs(Arrays.asList(args));
         }
         
         /**
-         * Changes the combining  mode for args. Setting to false instructs
+         * Changes the combining  mode for args. Setting to true instructs
          * that all arguments that may precede should be discarded and the
          * arguments provided by the built {@link ExplicitProcessParameters} are the only
          * ones passed to the process.
-         * @param append true to append, false to replace
+         * @param replace true to replace, false to append
          * @return the builder
          */
-        public Builder appendArgs(boolean append) {
-            this.appendArgs = append;
+        public Builder replaceArgs(boolean replace) {
+            this.replaceArgs = replace;
             return this;
         }
         
         /**
-         * Changes the combining mode for priority args. Setting to false instructs
+         * Changes the combining mode for launcher args. Setting to true instructs
          * that all arguments that may precede should be discarded and the
-         * priority arguments provided by the built {@link ExplicitProcessParameters} are the only
+         * launcher arguments provided by the built {@link ExplicitProcessParameters} are the only
          * ones passed to the process.
-         * @param append true to append, false to replace
+         * @param replace true to replace, false to append
          * @return the builder
          */
-        public Builder appendPriorityArgs(boolean append) {
-            this.appendPriorityArgs = append;
+        public Builder replaceLauncherArgs(boolean replace) {
+            this.replaceLauncherArgs = replace;
             return this;
         }
 
         /**
-         * Defines a rank (position) for combining. The default rank is {@code 0}. When used in a collection in
+         * Defines a position for combining. The default rank is {@code 0}. When used in a collection in
          * {@link ExplicitProcessParameters#buildExplicitParameters(java.util.Collection)}, instances are sorted
-         * by their rank, in ascending order (lowest first).
+         * by their position, in ascending order (lowest first).
          * 
-         * @param rank rank of the instruction
+         * @param position rank of the instruction
          * @return the builder
          */
-        public Builder withRank(int rank) {
-            this.rank = rank;
+        public Builder position(int position) {
+            this.position = position;
             return this;
         }
         
@@ -402,24 +402,24 @@ public final class ExplicitProcessParameters {
             if (p == null) {
                 return this;
             }
-            if (p.isPriorityArgReplacement()) {
-                priorityArguments = null;
-                if (p.getPriorityArguments() != null) {
-                    appendPriorityArgs = false;
+            if (p.isLauncherArgReplacement()) {
+                launcherArguments = null;
+                if (p.getLauncherArguments() != null) {
+                    replaceLauncherArgs = true;
                 } else {
-                    appendPriorityArgs = null;
+                    replaceLauncherArgs = null;
                 }
             }
             if (p.isArgReplacement()) {
                 arguments = null;
                 if (p.getArguments() != null) {
-                    appendArgs = false;
+                    replaceArgs = true;
                 } else {
-                    appendArgs = null;
+                    replaceArgs = null;
                 }
             }
-            if (p.getPriorityArguments() != null) {
-                priorityArgs(p.getPriorityArguments());
+            if (p.getLauncherArguments() != null) {
+                launcherArgs(p.getLauncherArguments());
             }
             if (p.getArguments() != null) {
                 args(p.getArguments());
@@ -432,11 +432,11 @@ public final class ExplicitProcessParameters {
          * @return the {@link ExplicitProcessParameters} instance.
          */
         public ExplicitProcessParameters build() {
-            boolean aa = appendArgs != null ? appendArgs : arguments == null;
-            boolean apa = appendPriorityArgs != null ? appendPriorityArgs : true;
+            boolean aa = replaceArgs != null ? replaceArgs : arguments != null;
+            boolean apa = replaceLauncherArgs != null ? replaceLauncherArgs : false;
             
-            return new ExplicitProcessParameters(rank, priorityArguments, arguments, 
-                    // if no args / priority args given and no explicit instruction on append,
+            return new ExplicitProcessParameters(position, launcherArguments, arguments, 
+                    // if no args / launcher args given and no explicit instruction on append,
                     // make the args appending.
                     aa, apa);
         }

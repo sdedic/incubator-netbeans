@@ -63,15 +63,15 @@ public class ExplicitProcessParametersTest extends NbTestCase {
         ExplicitProcessParameters empty = ExplicitProcessParameters.empty();
         assertTrue(empty.isEmpty());
         assertFalse(empty.isArgReplacement());
-        assertFalse(empty.isPriorityArgReplacement());
+        assertFalse(empty.isLauncherArgReplacement());
 
         ExplicitProcessParameters empty2 = ExplicitProcessParameters.builder().build();
         assertTrue(empty2.isEmpty());
         assertFalse(empty2.isArgReplacement());
-        assertFalse(empty2.isPriorityArgReplacement());
+        assertFalse(empty2.isLauncherArgReplacement());
         
         ExplicitProcessParameters base = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 build();
         
@@ -85,30 +85,30 @@ public class ExplicitProcessParametersTest extends NbTestCase {
                 combine(empty).
                 build();
         
-        assertEquals(existingVMArgs, p.getPriorityArguments());
+        assertEquals(existingVMArgs, p.getLauncherArguments());
         assertEquals(existingAppArgs, p.getArguments());
 
-        assertEquals(existingVMArgs, p2.getPriorityArguments());
+        assertEquals(existingVMArgs, p2.getLauncherArguments());
         assertEquals(existingAppArgs, p2.getArguments());
     }
     
     public void testSingleAddVMParams() throws Exception {
         ExplicitProcessParameters extra = ExplicitProcessParameters.builder().
-                priorityArg("-Dfoo=bar").
+                launcherArg("-Dfoo=bar").
                 build();
         
-        assertFalse("No override requested", extra.isPriorityArgReplacement());
+        assertFalse("No override requested", extra.isLauncherArgReplacement());
         assertFalse("No arguments given", extra.isArgReplacement());
         assertNull(extra.getArguments());
 
         ExplicitProcessParameters p = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(extra).
                 build();
         
         
-        assertContains(p.getPriorityArguments(), "-Xmx100m", "-Dfoo=bar");
+        assertContains(p.getLauncherArguments(), "-Xmx100m", "-Dfoo=bar");
     }
     
     public void testSingleReplaceAppParams() throws Exception {
@@ -117,14 +117,14 @@ public class ExplicitProcessParametersTest extends NbTestCase {
                 build();
         
         ExplicitProcessParameters p = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(extra).
                 build();
 
-        assertFalse("No override requested", extra.isPriorityArgReplacement());
+        assertFalse("No override requested", extra.isLauncherArgReplacement());
         assertTrue("Args must be replaced by default", extra.isArgReplacement());
-        assertNull(extra.getPriorityArguments());
+        assertNull(extra.getLauncherArguments());
 
         
         assertContains(p.getArguments(), "avalanche");
@@ -134,21 +134,21 @@ public class ExplicitProcessParametersTest extends NbTestCase {
     public void testSingleDefaultLaunchAugmentation() throws Exception {
         ExplicitProcessParameters extra = ExplicitProcessParameters.builder().
                 arg("avalanche").
-                priorityArg("-Dfoo=bar").
+                launcherArg("-Dfoo=bar").
                 build();
         
-        assertFalse("No prio override requested", extra.isPriorityArgReplacement());
+        assertFalse("No prio override requested", extra.isLauncherArgReplacement());
         assertTrue("Args must be replaced by default", extra.isArgReplacement());
-        assertNotNull(extra.getPriorityArguments());
+        assertNotNull(extra.getLauncherArguments());
         assertNotNull(extra.getArguments());
 
         ExplicitProcessParameters p = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(extra).
                 build();
         
-        assertContains(p.getPriorityArguments(), "-Xmx100m", "-Dfoo=bar");
+        assertContains(p.getLauncherArguments(), "-Xmx100m", "-Dfoo=bar");
         assertContains(p.getArguments(), "avalanche");
         assertNotContains(p.getArguments(), "File1");
     }
@@ -157,78 +157,78 @@ public class ExplicitProcessParametersTest extends NbTestCase {
      * Checks that VM parmeters can be replaced.
      * @throws Exception 
      */
-    public void testReplacePriorityArgs() throws Exception {
+    public void testReplaceLauncherArgs() throws Exception {
         ExplicitProcessParameters extra = ExplicitProcessParameters.builder().
-                priorityArg("-Dfoo=bar").
-                appendPriorityArgs(false).
+                launcherArg("-Dfoo=bar").
+                replaceLauncherArgs(true).
                 build();
         
         ExplicitProcessParameters extra2 = ExplicitProcessParameters.builder().
-                priorityArg("-Dsun=shines").
+                launcherArg("-Dsun=shines").
                 build();
 
-        assertTrue("Must replace priority args", extra.isPriorityArgReplacement());
+        assertTrue("Must replace launcher args", extra.isLauncherArgReplacement());
         assertFalse("No arguments were specified", extra.isArgReplacement());
         assertNull(extra.getArguments());
 
         
         ExplicitProcessParameters p = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(extra).
                 build();
         
-        assertContains(p.getPriorityArguments(), "-Dfoo=bar");
-        assertNotContains(p.getPriorityArguments(), "-Xmx100m");
+        assertContains(p.getLauncherArguments(), "-Dfoo=bar");
+        assertNotContains(p.getLauncherArguments(), "-Xmx100m");
         
         ExplicitProcessParameters p2 = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(
                     ExplicitProcessParameters.buildExplicitParameters(Arrays.asList(extra, extra2))
                 ).
                 build();
         
-        assertContains(p2.getPriorityArguments(), "-Dfoo=bar", "-Dsun=shines");
-        assertNotContains(p2.getPriorityArguments(), "-Xmx100m");
+        assertContains(p2.getLauncherArguments(), "-Dfoo=bar", "-Dsun=shines");
+        assertNotContains(p2.getLauncherArguments(), "-Xmx100m");
     }
     
     public void testAppendNormalArgs() throws Exception {
         ExplicitProcessParameters extra = ExplicitProcessParameters.builder().
-                appendArgs(true).
+                replaceArgs(false).
                 args("File2", "File3").
                 build();
         
         assertFalse("Must append args", extra.isArgReplacement());
-        assertFalse("No prio arguments were specified", extra.isPriorityArgReplacement());
-        assertNull(extra.getPriorityArguments());
+        assertFalse("No prio arguments were specified", extra.isLauncherArgReplacement());
+        assertNull(extra.getLauncherArguments());
 
         
         ExplicitProcessParameters p = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(extra).
                 build();
         
-        assertContains(p.getPriorityArguments(), "-Xmx100m");
+        assertContains(p.getLauncherArguments(), "-Xmx100m");
         assertEquals(Arrays.asList("File1", "File2", "File3"), p.getArguments());
     }
     
-    public void testAddMorePriorityArgs() throws Exception {
+    public void testAddMoreLauncherArgs() throws Exception {
         ExplicitProcessParameters extra = ExplicitProcessParameters.builder().
-                priorityArg("-Dfoo=bar").
-                priorityArg("-Xms=200m").
-                appendPriorityArgs(false).
+                launcherArg("-Dfoo=bar").
+                launcherArg("-Xms=200m").
+                replaceLauncherArgs(true).
                 build();
         
         ExplicitProcessParameters p = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(extra).
                 build();
         
-        assertContains(p.getPriorityArguments(), "-Dfoo=bar", "-Xms=200m");
-        assertNotContains(p.getPriorityArguments(), "-Xmx100m");
+        assertContains(p.getLauncherArguments(), "-Dfoo=bar", "-Xms=200m");
+        assertNotContains(p.getLauncherArguments(), "-Xmx100m");
     }
     
     public void testReplaceWithMoreArgs() throws Exception {
@@ -238,7 +238,7 @@ public class ExplicitProcessParametersTest extends NbTestCase {
                 build();
         
         ExplicitProcessParameters p = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(extra).
                 build();
@@ -249,39 +249,39 @@ public class ExplicitProcessParametersTest extends NbTestCase {
     
     public void testJustClearArguments() throws Exception {
         ExplicitProcessParameters extra = ExplicitProcessParameters.builder().
-                appendArgs(false).
-                appendPriorityArgs(false).
+                replaceArgs(true).
+                replaceLauncherArgs(true).
                 build();
         
         ExplicitProcessParameters p = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(extra).
                 build();
         
-        assertNull(p.getPriorityArguments());
+        assertNull(p.getLauncherArguments());
         assertNull(p.getArguments());
     }
     
     public void testReplaceDiscardAndAddMorePriortyArgs() throws Exception {
         ExplicitProcessParameters extra = ExplicitProcessParameters.builder().
-                priorityArg("-Dfoo=bar").
-                appendPriorityArgs(false).
+                launcherArg("-Dfoo=bar").
+                replaceLauncherArgs(true).
                 build();
         
         ExplicitProcessParameters extra2 = ExplicitProcessParameters.builder().
-                priorityArg("-Xms=200m").
+                launcherArg("-Xms=200m").
                 build();
      
         ExplicitProcessParameters check1 = ExplicitProcessParameters.buildExplicitParameters(Arrays.asList(extra, extra2));
         
         assertFalse(check1.isArgReplacement());
-        assertTrue(check1.isPriorityArgReplacement());
-        assertEquals(2, check1.getPriorityArguments().size());
+        assertTrue(check1.isLauncherArgReplacement());
+        assertEquals(2, check1.getLauncherArguments().size());
         assertNull(check1.getArguments());
         
         ExplicitProcessParameters base = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 build();
         
@@ -298,13 +298,13 @@ public class ExplicitProcessParametersTest extends NbTestCase {
     
     public void testDiscardAllEffects() throws Exception {
         ExplicitProcessParameters extra = ExplicitProcessParameters.builder().
-                priorityArg("-Dfoo=bar").
+                launcherArg("-Dfoo=bar").
                 arg("avalanche").
                 build();
         
         ExplicitProcessParameters discard = ExplicitProcessParameters.builder().
-                appendArgs(false).
-                appendPriorityArgs(false).
+                replaceArgs(true).
+                replaceLauncherArgs(true).
                 build();
         
         ExplicitProcessParameters override = ExplicitProcessParameters.buildExplicitParameters(Arrays.asList(extra, discard));
@@ -312,29 +312,29 @@ public class ExplicitProcessParametersTest extends NbTestCase {
         assertTrue(override.isEmpty());
         
         ExplicitProcessParameters result = ExplicitProcessParameters.builder().
-                priorityArgs(existingVMArgs).
+                launcherArgs(existingVMArgs).
                 args(existingAppArgs).
                 combine(override).
                 build();
         
-        assertEquals(Arrays.asList("-Xmx100m"), result.getPriorityArguments());
+        assertEquals(Arrays.asList("-Xmx100m"), result.getLauncherArguments());
         assertEquals(Arrays.asList("File1"), result.getArguments());
     }
     
     public void testRankOrdering() throws Exception {
         ExplicitProcessParameters p1 = ExplicitProcessParameters.builder().
-                appendArgs(true).
+                replaceArgs(false).
                 args("P1").build();
         ExplicitProcessParameters p2 = ExplicitProcessParameters.builder().
-                appendArgs(true).
-                withRank(-5).
+                replaceArgs(false).
+                position(-5).
                 args("P2").build();
         ExplicitProcessParameters p3 = ExplicitProcessParameters.builder().
-                appendArgs(true).
+                replaceArgs(false).
                 args("P3").build();
         ExplicitProcessParameters p4 = ExplicitProcessParameters.builder().
-                appendArgs(true).
-                withRank(2).
+                replaceArgs(false).
+                position(2).
                 args("P4").build();
         
         ExplicitProcessParameters r = ExplicitProcessParameters.buildExplicitParameters(Arrays.asList(
@@ -354,14 +354,14 @@ public class ExplicitProcessParametersTest extends NbTestCase {
         // BEGIN: ExplicitProcessParametersTest#testDiscardDefaultVMParametersAppendAppParameters
         ExplicitProcessParameters override = ExplicitProcessParameters.builder().
                 // override the default: do not append to the base ones, but discard them
-                appendPriorityArgs(false).
-                // ... and insist on empty priority args
-                priorityArgs().
+                replaceLauncherArgs(true).
+                // ... and insist on empty launcher args
+                launcherArgs().
                 // ... or some other specific one(s)
-                priorityArgs("-Xmx1000m").
+                launcherArgs("-Xmx1000m").
                 
                 // override the default: keep base application arguments
-                appendArgs(true).
+                replaceArgs(false).
                 
                 // and add file list
                 args(files).
@@ -370,12 +370,12 @@ public class ExplicitProcessParametersTest extends NbTestCase {
         // END: ExplicitProcessParametersTest#testDiscardDefaultVMParametersAppendAppParameters
         
         ExplicitProcessParameters result = ExplicitProcessParameters.builder().
-                priorityArgs(projectVMArgs).
+                launcherArgs(projectVMArgs).
                 args(projectAppArgs).
                 combine(override).
                 build();
         
-        assertEquals(Arrays.asList("-Xmx1000m"), result.getPriorityArguments());
+        assertEquals(Arrays.asList("-Xmx1000m"), result.getLauncherArguments());
         assertEquals(Arrays.asList("processFiles", "fileA", "fileB"), result.getArguments());
     }
 
@@ -396,14 +396,14 @@ public class ExplicitProcessParametersTest extends NbTestCase {
         ExplicitProcessParameters params = ExplicitProcessParameters.builder().
                 // include project's (or pre-configured) application parameters
                 args(getProjectAppParams()).
-                // include project's (or pre-configured) VM parameters as priority ones
-                priorityArgs(getProjectVMParams()).
+                // include project's (or pre-configured) VM parameters as launcher ones
+                launcherArgs(getProjectVMParams()).
                 
-                // now combine with the decorating instructions: will append or reset args or priority args
+                // now combine with the decorating instructions: will append or reset args or launcher args
                 combine(decorator).
                 build();
         
-        // build a commandline for e.g. launcher or VM: include priority args first
+        // build a commandline for e.g. launcher or VM: include launcher args first
         // then the fixed "middle part" (e.g. the main class name), then application arguments.
         List<String> commandLine = params.getAllArguments("theMainClass");
         // END: ExplicitProcessParametersTest#decorateWithExplicitParametersSample

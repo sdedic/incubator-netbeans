@@ -134,9 +134,9 @@ public abstract class NbLaunchDelegate {
             ));
             if (!(args.isEmpty() && vmArgs.isEmpty())) {
                 ExplicitProcessParameters.Builder bld = ExplicitProcessParameters.builder();
-                bld.priorityArgs(vmArgs);
+                bld.launcherArgs(vmArgs);
                 bld.args(args);
-                bld.appendArgs(false);
+                bld.replaceArgs(false);
                 fixedLookupContents.add(bld.build());
             }
             Lookup launchCtx = new ProxyLookup(

@@ -179,9 +179,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
         List<String> vmArgs = new ArrayList<>(fixedArgs);
         if (!(fixedArgs.isEmpty() && injectParams.isEmpty())) {
             changedParams = ExplicitProcessParameters.
-                builder().
-                // get extender input as a base
-                priorityArgs(vmArgsValue).
+                builder().launcherArgs(vmArgsValue).
                 // include user arguments, if any
                 args(appArgsValue).
                 // allow to append or override from context injectors.
@@ -196,7 +194,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 config.setProperty(MavenExecuteUtils.RUN_PARAMS, newParams);
             }
             
-            vmArgs.addAll(changedParams.getPriorityArguments());
+            vmArgs.addAll(changedParams.getLauncherArguments());
             config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS, 
                     MavenExecuteUtils.joinParameters(vmArgs));
             config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 

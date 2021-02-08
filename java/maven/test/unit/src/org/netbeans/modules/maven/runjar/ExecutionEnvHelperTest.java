@@ -382,7 +382,7 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
         initDefaultProperties();
         createNbActions(runP, debugP, profileP);
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
-                priorityArg("-DvmArg2=2").
+                launcherArg("-DvmArg2=2").
                 arg("paramY").build();
         MockLookup.setLayersAndInstances(explicit);
         createPomWithArguments();
@@ -400,8 +400,8 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
         initDefaultProperties();
         createNbActions(runP, debugP, profileP);
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
-                priorityArg("-DvmArg2=2").
-                appendPriorityArgs(false).
+                launcherArg("-DvmArg2=2").
+                replaceLauncherArgs(true).
                 arg("paramY").build();
         MockLookup.setLayersAndInstances(explicit);
         createPomWithArguments();
@@ -417,7 +417,7 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
     public void testNewActionWithVMAdditionAndArgReplacement() throws Exception {
         initCustomizedProperties();
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
-                priorityArg("-DvmArg2=2").
+                launcherArg("-DvmArg2=2").
                 arg("paramY").build();
         MockLookup.setLayersAndInstances(explicit);
         assertActionOverridesArguments("-DvmArg2=2", "test.mavenapp.App", "paramY");
@@ -434,7 +434,7 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
     public void testNewActionVMAppendMergesWithExtenders() throws Exception {
         initCustomizedProperties();
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
-                priorityArg("-DvmArg2=2").
+                launcherArg("-DvmArg2=2").
                 arg("paramY").build();
         registerExtender(null);
         TestExtender.vmArg = "-Dbar=foo";
@@ -453,8 +453,8 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
     public void testNewActionVMReplaceStillMergesWithExtenders() throws Exception {
         initCustomizedProperties();
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
-                appendPriorityArgs(false).
-                priorityArg("-DvmArg2=2").
+                replaceLauncherArgs(true).
+                launcherArg("-DvmArg2=2").
                 arg("paramY").build();
         registerExtender(null);
         TestExtender.vmArg = "-Dbar=foo";
