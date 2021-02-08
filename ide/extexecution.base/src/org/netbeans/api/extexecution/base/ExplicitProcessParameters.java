@@ -379,7 +379,10 @@ public final class ExplicitProcessParameters {
         }
 
         /**
-         * Defines a rank (position) for combining. The default rank is {@code 0}.
+         * Defines a rank (position) for combining. The default rank is {@code 0}. When used in a collection in
+         * {@link ExplicitProcessParameters#buildExplicitParameters(java.util.Collection)}, instances are sorted
+         * by their rank, in ascending order (lowest first).
+         * 
          * @param rank rank of the instruction
          * @return the builder
          */
