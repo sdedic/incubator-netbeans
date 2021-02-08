@@ -20,7 +20,6 @@ package org.netbeans.api.extexecution.base;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.netbeans.junit.NbTestCase;
 import org.openide.util.Lookup;
@@ -320,6 +319,28 @@ public class ExplicitProcessParametersTest extends NbTestCase {
         
         assertEquals(Arrays.asList("-Xmx100m"), result.getPriorityArguments());
         assertEquals(Arrays.asList("File1"), result.getArguments());
+    }
+    
+    public void testRankOrdering() throws Exception {
+        ExplicitProcessParameters p1 = ExplicitProcessParameters.builder().
+                appendArgs(true).
+                args("P1").build();
+        ExplicitProcessParameters p2 = ExplicitProcessParameters.builder().
+                appendArgs(true).
+                withRank(-5).
+                args("P2").build();
+        ExplicitProcessParameters p3 = ExplicitProcessParameters.builder().
+                appendArgs(true).
+                args("P3").build();
+        ExplicitProcessParameters p4 = ExplicitProcessParameters.builder().
+                appendArgs(true).
+                withRank(2).
+                args("P4").build();
+        
+        ExplicitProcessParameters r = ExplicitProcessParameters.buildExplicitParameters(Arrays.asList(
+                p4, p1, p2, p3
+        ));
+        assertEquals(Arrays.asList("P2", "P1", "P3", "P4"), r.getArguments());
     }
     
     //
