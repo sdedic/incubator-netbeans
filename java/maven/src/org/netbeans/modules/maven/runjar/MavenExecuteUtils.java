@@ -154,6 +154,10 @@ public final class MavenExecuteUtils {
             return a + " " + b;
         }
 
+        public ActionToGoalMapping getGoalMappings() {
+            return goalMappings;
+        }
+
         public boolean isModified() {
             return modified;
         }

@@ -484,6 +484,9 @@ public class RunJarPanel extends javax.swing.JPanel implements HelpCtx.Provider 
         execEnvHelper.setVmParams(newVMParams);
         
         execEnvHelper.applyToMappings();
+        if (execEnvHelper.isModified()) {
+            handle.markAsModified(execEnvHelper.getGoalMappings());
+        }
     }
 
     private boolean checkNewMapping(NetbeansActionMapping map) {
