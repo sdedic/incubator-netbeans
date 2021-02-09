@@ -117,6 +117,7 @@ public interface RunConfig {
      * Provides access to possible additional parameters from the action invoker. Must
      * not return {@code null}, use {@link Lookup#EMPTY} for empty instance.
      * @return action context Lookup
+     * @since 2.144
      */
     default Lookup getActionContext() { 
         return Lookup.EMPTY;
