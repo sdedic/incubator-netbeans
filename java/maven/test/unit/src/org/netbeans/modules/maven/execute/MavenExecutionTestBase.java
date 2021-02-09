@@ -33,6 +33,7 @@ import static junit.framework.TestCase.fail;
 import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluationException;
 import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluator;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 import org.netbeans.api.extexecution.startup.StartupExtender;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectManager;
@@ -49,6 +50,7 @@ import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3R
 import org.netbeans.modules.maven.runjar.MavenExecuteUtils;
 import org.netbeans.modules.maven.runjar.RunJarPrereqChecker;
 import org.netbeans.spi.extexecution.startup.StartupExtenderImplementation;
+import org.netbeans.spi.project.ActionProvider;
 import org.openide.execution.ExecutorTask;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
@@ -57,6 +59,9 @@ import org.openide.loaders.DataFolder;
 import org.openide.loaders.InstanceDataObject;
 import org.openide.util.Lookup;
 import org.openide.util.NbPreferences;
+import org.openide.util.lookup.AbstractLookup;
+import org.openide.util.lookup.InstanceContent;
+import org.openide.util.lookup.Lookups;
 import org.openide.util.test.MockLookup;
 import org.openide.windows.InputOutput;
 
@@ -86,6 +91,9 @@ public class MavenExecutionTestBase extends NbTestCase {
     protected Map<String, String> mavenExecutorDefines = new HashMap<>();
     protected Map<String, String> mavenExecutorRawDefines = new HashMap<>();
     
+    protected final InstanceContent actionData = new InstanceContent();
+    protected final Lookup actionLookup = new AbstractLookup(actionData);
+
     public MavenExecutionTestBase(String name) {
         super(name);
     }
@@ -303,7 +311,7 @@ public class MavenExecutionTestBase extends NbTestCase {
     
     protected void assertMavenRunAction(Project project, NetbeansActionMapping mapping, String actionName, Consumer<List<String>> commandLineAcceptor) throws Exception {
         NbPreferences.root().node("org/netbeans/modules/maven").put(EmbedderFactory.PROP_COMMANDLINE_PATH, "mvn");
-        ModelRunConfig cfg = new ModelRunConfig(project, mapping, actionName, null, Lookup.EMPTY, true);
+        ModelRunConfig cfg = new ModelRunConfig(project, mapping, actionName, null, actionLookup, true);
         // prevent displaying dialogs.
         RunJarPrereqChecker.setMainClass(DEFAULT_MAIN_CLASS_TOKEN);
         for (PrerequisitesChecker elem : cfg.getProject().getLookup().lookupAll(PrerequisitesChecker.class)) {
@@ -363,4 +371,21 @@ public class MavenExecutionTestBase extends NbTestCase {
         InstanceDataObject.create(fld, "test-extender", c);
     }
     
+    //
+    //====================== samples =====================
+    public static void samplePassAdditionalVMargs() {
+        Project prj = null;
+        // BEGIN: MavenExecutionTestBase#samplePassAdditionalVMargs
+        // get action provider:
+        ActionProvider projectActionProvider = prj.getLookup().lookup(ActionProvider.class);
+        
+        // create explicit additional parameters instruction:
+        ExplicitProcessParameters params = ExplicitProcessParameters.builder().
+                launcherArg("-DvmArg2=2").
+                arg("paramY").
+                build();
+        // pass explicit parameters to the Run action:
+        projectActionProvider.invokeAction(ActionProvider.COMMAND_RUN, Lookups.fixed(params));
+        // END: MavenExecutionTestBase#samplePassAdditionalVMargs
+    }
 }

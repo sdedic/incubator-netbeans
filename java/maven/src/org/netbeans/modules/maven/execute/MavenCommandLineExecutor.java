@@ -103,29 +103,18 @@ import org.openide.windows.OutputListener;
 
 /**
  * support for executing maven, externally on the command line.
- * <b>Since 2/1.144</b>, the {@link LateBoundPrerequisitesChecker} registered in Maven projects by default supports 
+ * <b>Since 2/1.144</b>, the {@link LateBoundPrerequisitesChecker} registered in Maven projects for JAR packaging by default supports 
  * {@link ExplicitProcessParameters} API. The caller of the execute-type action can request to append or replace VM or user
  * application parameters. The parameters recorded in the POM.xml or NetBeans action mappings are augmented according to that
  * instructions:
  * <ul>
- * <li><b>priorityArgs</b> are mapped to VM arguments (precede main class name)
+ * <li><b>launcherArgs</b> are mapped to VM arguments (precede main class name)
  * <li><b>args</b> are mapped to user application arguments (after main class name)
  * </ul>
  * VM parameters injected by {@link StartupExtender} API are not affected by this feature. 
  * <p>
  * Example use:
- * <code>
- *   ActionProvider ap = ... ; // obtain ActionProvider from the project.
- *   Lookup launchCtx = ... ;  // context for the launch
- *   ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
- *           priorityArg("-DvmArg2=2").
- *           arg("paramY").build();
- *   Lookups.executeWith(new ProxyLookup(
- *          Lookup.getDefault(),
- *          Lookups.fixed(explicit)
- *      ), ap.invokeAction("run", launchCtx)
- *   );
- * </code>
+ * {@codesnippet MavenExecutionTestBase#samplePassAdditionalVMargs}
  * The example will <b>append</b> <code>-DvmArg2=2</code> to VM arguments and <b>replaces</b> all user
  * program arguments with <code>"paramY"</code>. Append mode can be controlled using {@link ExplicitProcessParameters.Builder#appendArgs} or
  * {@link ExplicitProcessParameters.Builder#appendPriorityArgs}.

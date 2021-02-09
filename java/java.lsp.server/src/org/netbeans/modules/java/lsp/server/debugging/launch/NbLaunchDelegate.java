@@ -126,23 +126,22 @@ public abstract class NbLaunchDelegate {
                     notifyFinished(context, success);
                 }
             };
+            Lookup launchCtx = new ProxyLookup(
+                    Lookups.fixed(
+                            toRun, ioContext, progress
+                    ), Lookup.getDefault()
+            );
+
             List<String> args = argsToStringList(launchArguments.get("args"));
             List<String> vmArgs = argsToStringList(launchArguments.get("vmArgs"));
-            
-            List<Object> fixedLookupContents = new ArrayList<>(Arrays.asList(
-                toRun, ioContext, progress
-            ));
+            ExplicitProcessParameters params = ExplicitProcessParameters.empty();
             if (!(args.isEmpty() && vmArgs.isEmpty())) {
                 ExplicitProcessParameters.Builder bld = ExplicitProcessParameters.builder();
                 bld.launcherArgs(vmArgs);
                 bld.args(args);
                 bld.replaceArgs(false);
-                fixedLookupContents.add(bld.build());
+                params = bld.build();
             }
-            Lookup launchCtx = new ProxyLookup(
-                    Lookups.fixed(fixedLookupContents.toArray(new Object[fixedLookupContents.size()])),
-                    Lookup.getDefault()
-            );
             OperationContext ctx = OperationContext.find(Lookup.getDefault());
             ctx.addProgressOperationListener(null, new ProgressOperationListener() {
                 @Override
@@ -153,12 +152,13 @@ public abstract class NbLaunchDelegate {
 
             Lookup lookup;
             if (singleMethod != null) {
-                lookup = Lookups.fixed(toRun, singleMethod, ioContext, progress);
+                lookup = Lookups.fixed(toRun, singleMethod, params, ioContext, progress);
             } else {
-                lookup = Lookups.fixed(toRun, ioContext, progress);
+                lookup = Lookups.fixed(toRun, ioContext, params, progress);
             }
             Lookups.executeWith(launchCtx, () -> {
                 providerAndCommand.first().invokeAction(providerAndCommand.second(), lookup);
+
             });
         }).exceptionally((t) -> {
             launchFuture.completeExceptionally(t);

@@ -65,23 +65,15 @@ import org.openide.util.Lookup;
  * {@codesnippet ExplicitProcessParametersTest#decorateWithExplicitParametersSample}
  * This example will combine some args and extra args from project, or configuration with arguments passed from the
  * {@code runContext} Lookup. 
- * Supposing that a Maven project module supports {@code ExplicitProcessParameters} (it does from version 2.144), the caller may influence or override the
+ * Supposing that a Maven project module supports {@code ExplicitProcessParameters} (it does from version 2/2.144), the caller may influence or override the
  * parameters passed to the maven exec:exec task (for Run action) this way:
  * <code><pre>
  *   ActionProvider ap = ... ; // obtain ActionProvider from the project.
- *   Lookup launchCtx = ... ;  // context for the launch
  *   ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
  *           launcherArg("-DvmArg2=2").
  *           arg("paramY").
  *      build();
- * 
- *   // pass the ExplicitProcessParameters in the action Lookup. As the Lookup.getDefault() is being redefined, do not forget
- *   // to include the current one in the ProxyLookup !
- *   Lookups.executeWith(new ProxyLookup(
- *          Lookup.getDefault(),
- *          Lookups.fixed(explicit)
- *      ), ap.invokeAction("run", launchCtx)
- *   );
+ *   ap.invokeAction(ActionProvider.COMMAND_RUN, Lookups.fixed(explicit));
  * </pre></code>
  * By default, <b>args</b> instruction(s) will discard the default parameters, so the above example will also <b>ignore</b> all application
  * parameters provided in maven action mapping. The caller may, for example, want to just <b>append</b> parameters (i.e. list of files ?) and

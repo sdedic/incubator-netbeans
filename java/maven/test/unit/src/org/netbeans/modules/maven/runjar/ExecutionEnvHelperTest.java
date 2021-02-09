@@ -34,7 +34,6 @@ import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3Reader;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Lookup;
-import org.openide.util.test.MockLookup;
 
 /**
  *
@@ -384,7 +383,7 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
                 launcherArg("-DvmArg2=2").
                 arg("paramY").build();
-        MockLookup.setLayersAndInstances(explicit);
+        actionData.add(explicit);
         createPomWithArguments();
         assertActionOverridesArgumentsPlusProperties("-DsomeProperty=blah -DvmArg2=2", null, "paramY");
         // check that default pom arguments are ALSO present
@@ -403,7 +402,7 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
                 launcherArg("-DvmArg2=2").
                 replaceLauncherArgs(true).
                 arg("paramY").build();
-        MockLookup.setLayersAndInstances(explicit);
+        actionData.add(explicit);
         createPomWithArguments();
         assertActionOverridesArguments("-DvmArg2=2", null, "paramY");
         // check that default pom arguments are not present
@@ -419,7 +418,7 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
         ExplicitProcessParameters explicit = ExplicitProcessParameters.builder().
                 launcherArg("-DvmArg2=2").
                 arg("paramY").build();
-        MockLookup.setLayersAndInstances(explicit);
+        actionData.add(explicit);
         assertActionOverridesArguments("-DvmArg2=2", "test.mavenapp.App", "paramY");
         // check that default pom arguments are not present
         assertTrue(mavenVmArgs.contains("-Dprop=val"));
@@ -438,7 +437,7 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
                 arg("paramY").build();
         registerExtender(null);
         TestExtender.vmArg = "-Dbar=foo";
-        MockLookup.setLayersAndInstances(explicit);
+        actionData.add(explicit);
         createPomWithArguments();
         assertActionOverridesArguments("-DvmArg2=2", "test.mavenapp.App", "paramY");
         // check that default pom arguments are not present
@@ -458,7 +457,7 @@ public abstract class ExecutionEnvHelperTest extends MavenExecutionTestBase {
                 arg("paramY").build();
         registerExtender(null);
         TestExtender.vmArg = "-Dbar=foo";
-        MockLookup.setLayersAndInstances(explicit);
+        actionData.add(explicit);
         assertActionOverridesArguments("-DvmArg2=2", "test.mavenapp.App", "paramY");
         assertFalse(mavenVmArgs.contains("-Dprop=val"));
         assertTrue(mavenVmArgs.contains("-Dbar=foo"));

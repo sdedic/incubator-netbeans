@@ -118,7 +118,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
         List<String> vmArgsValue;
         List<String> appArgsValue;
         
-        ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(Lookup.getDefault());
+        ExplicitProcessParameters injectParams = ExplicitProcessParameters.buildExplicitParameters(config.getActionContext());
 
         if (splitParameters) {
             vmArgsValue = new ArrayList<>(Arrays.asList(splitCommandLine(props.get(MavenExecuteUtils.RUN_VM_PARAMS))));

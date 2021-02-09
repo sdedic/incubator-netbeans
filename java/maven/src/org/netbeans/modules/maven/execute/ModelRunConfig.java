@@ -85,6 +85,7 @@ public final class ModelRunConfig extends BeanRunConfig {
         setActivatedProfiles(mod.getActivatedProfiles());
         setActionName(actionName);
         setFileObject(selectedFile);
+        setActionContext(lookup);
         if (mod.getPreAction() != null) {
             setPreExecution(ActionToGoalUtils.createRunConfig(mod.getPreAction(), nbprj, lookup));
         }
