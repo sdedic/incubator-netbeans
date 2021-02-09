@@ -115,6 +115,13 @@
        will be merged into a single instance in the project's lookup.
      </p>
     </api>
+    <api group="layer" name="MavenPackagingLookup" type="export" category="devel">
+        <p>
+            <code>Projects/org-netbeans-modules-maven/&lt;packaging-type>/Lookup</code> is added to the project's additional Lookup. The content is expected
+            to contain packaing-specific services and processors, for example, <a href="@TOP@/org/netbans/modules/maven/api/execute/PrerequisitesChecker.html">PrerequisitesCheckers</a>.
+            In addition, <code>Projects/org-netbeans-modules-maven/_last/Lookup</code> defines services that act after the packaging-specific ones.
+        </p>
+    </api>
     <api group="layer" name="MavenActions" type="export" category="official">
      <p>
        "Projects/org-netbeans-modules-maven/ProjectActions", 

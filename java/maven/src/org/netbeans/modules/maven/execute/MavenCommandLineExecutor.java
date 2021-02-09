@@ -124,6 +124,7 @@ import org.openide.windows.OutputListener;
  */
 public class MavenCommandLineExecutor extends AbstractMavenExecutor {
     static final String ENV_PREFIX = "Env."; //NOI18N
+    static final String INTERNAL_PREFIX = "NbIde."; //NOI18N
     static final String ENV_JAVAHOME = "Env.JAVA_HOME"; //NOI18N
 
     private static final String KEY_UUID = "NB_EXEC_MAVEN_PROCESS_UUID"; //NOI18N
@@ -414,17 +415,20 @@ public class MavenCommandLineExecutor extends AbstractMavenExecutor {
         // correctly to the java runtime on windows
         String escaped = "\\" + quote;        
         for (Map.Entry<? extends String,? extends String> entry : config.getProperties().entrySet()) {
-            if (!entry.getKey().startsWith(ENV_PREFIX)) {
-                //skip envs, these get filled in later.
-                //#228901 since u21 we need to use cmd /c to execute on windows, quotes get escaped and when there is space in value, the value gets wrapped in quotes.
-                String value = (Utilities.isWindows() ? entry.getValue().replace(quote, escaped) : entry.getValue().replace(quote, "'"));
-                if (Utilities.isWindows() && value.endsWith("\"")) {
-                    //#201132 property cannot end with 2 double quotes, add a space to the end after our quote to prevent the state
-                    value = value + " ";
-                }
-                String s = "-D" + entry.getKey() + "=" + (Utilities.isWindows() && value.contains(" ") ? quote + value + quote : value);            
-                toRet.add(s);
+            String k = entry.getKey();
+            // filter out env vars AND internal properties.
+            if (k.startsWith(ENV_PREFIX) || k.startsWith(INTERNAL_PREFIX)) {
+                continue;
             }
+            //skip envs, these get filled in later.
+            //#228901 since u21 we need to use cmd /c to execute on windows, quotes get escaped and when there is space in value, the value gets wrapped in quotes.
+            String value = (Utilities.isWindows() ? entry.getValue().replace(quote, escaped) : entry.getValue().replace(quote, "'"));
+            if (Utilities.isWindows() && value.endsWith("\"")) {
+                //#201132 property cannot end with 2 double quotes, add a space to the end after our quote to prevent the state
+                value = value + " ";
+            }
+            String s = "-D" + entry.getKey() + "=" + (Utilities.isWindows() && value.contains(" ") ? quote + value + quote : value);            
+            toRet.add(s);
         }
         
         //TODO based on a property? or UI option? can this backfire?

@@ -219,6 +219,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
             }
             ((BeanRunConfig)config).setGoals(new ArrayList<String>(Arrays.asList(goals)));
         }
+        config.setProperty(MavenExecuteUtils.RUN_EXPLICIT_PROCESSED, "true");
         return true;
     }
 

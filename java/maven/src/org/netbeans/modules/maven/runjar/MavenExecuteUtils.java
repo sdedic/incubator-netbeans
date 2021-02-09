@@ -43,6 +43,12 @@ import org.netbeans.spi.project.ActionProvider;
  */
 public final class MavenExecuteUtils {
     /**
+     * Hint for the default PrereqqCheckeers that explicit parameters have been already processed.
+     * Will not be propagated to maven process.
+     */
+    public static final String RUN_EXPLICIT_PROCESSED = "NbIde.ExplicitParametersApplied"; // NOI18N
+    
+    /**
      * Name of the property for VM arguments.
      * @since 2.144
      */
@@ -413,6 +419,26 @@ public final class MavenExecuteUtils {
         }
     }
     
+    /**
+     * Splits a command line, pays respect to quoting and newlines.
+     * @param line original line
+     * @return line split into individual arguments.
+     */
+    public static String[] splitCommandLine(String line) {
+        if (line == null) {
+            return new String[0];
+        }
+        String l = line.trim();
+        if (l.isEmpty()) {
+            return new String[0];
+        }
+        List<String> result = new ArrayList<>();
+        for (String part : propertySplitter(l, true)) {
+            result.add(part);
+        }
+        return result.toArray(new String[result.size()]);
+    }
+
     private static boolean isNullOrEmpty(String s) {
         return s == null || s.trim().isEmpty();
     }
