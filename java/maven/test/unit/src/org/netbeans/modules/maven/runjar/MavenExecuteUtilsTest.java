@@ -88,6 +88,53 @@ public class MavenExecuteUtilsTest {
     }
 
     /**
+     * Test of split* method, of class MavenExecuteUtils.
+     */
+    @Test
+    public void testParams() {
+        String line = "-Xmx256m org.milos.Main arg1";
+        assertEquals("-Xmx256m", MavenExecuteUtils.splitJVMParams(line));
+        assertEquals("org.milos.Main", MavenExecuteUtils.splitMainClass(line));
+        assertEquals("arg1", MavenExecuteUtils.splitParams(line));
+        
+        line = "-Xdebug -Djava.compiler=none -Xnoagent -Xrunjdwp:transport=dt_socket,server=n,address=${jpda.address} -classpath %classpath ${packageClassName}";
+        assertEquals("-Xdebug -Djava.compiler=none -Xnoagent -Xrunjdwp:transport=dt_socket,server=n,address=${jpda.address} -classpath %classpath", MavenExecuteUtils.splitJVMParams(line));
+        assertEquals("${packageClassName}", MavenExecuteUtils.splitMainClass(line));
+        assertEquals("", MavenExecuteUtils.splitParams(line));
+        
+        line = "-classpath %classpath ${packageClassName} %classpath ${packageClassName}";
+        assertEquals("-classpath %classpath", MavenExecuteUtils.splitJVMParams(line));
+        assertEquals("${packageClassName}", MavenExecuteUtils.splitMainClass(line));
+        assertEquals("%classpath ${packageClassName}", MavenExecuteUtils.splitParams(line));
+        
+        line = "Main arg1 arg2.xsjs.xjsj.MainParam";
+        assertEquals("", MavenExecuteUtils.splitJVMParams(line));
+        assertEquals("Main", MavenExecuteUtils.splitMainClass(line));
+        assertEquals("arg1 arg2.xsjs.xjsj.MainParam", MavenExecuteUtils.splitParams(line));
+        
+        //non trimmed line
+        line = " -classpath %classpath ${packageClassName} %classpath ${packageClassName} ";
+        assertEquals("-classpath %classpath", MavenExecuteUtils.splitJVMParams(line));
+        assertEquals("${packageClassName}", MavenExecuteUtils.splitMainClass(line));
+        assertEquals("%classpath ${packageClassName}", MavenExecuteUtils.splitParams(line));
+
+        //param with quotes and spaces..
+        line = "-Dparam1=\"one two three\" -classpath %classpath ${packageClassName} %classpath ${packageClassName} ";
+        assertEquals("-Dparam1=\"one two three\" -classpath %classpath", MavenExecuteUtils.splitJVMParams(line));
+        assertEquals("${packageClassName}", MavenExecuteUtils.splitMainClass(line));
+        assertEquals("%classpath ${packageClassName}", MavenExecuteUtils.splitParams(line));
+        line = "-D\"foo bar=baz quux\" -classpath %classpath my.App";
+        assertEquals("-D\"foo bar=baz quux\" -classpath %classpath", MavenExecuteUtils.splitJVMParams(line));
+        assertEquals("my.App", MavenExecuteUtils.splitMainClass(line));
+        assertEquals("", MavenExecuteUtils.splitParams(line));
+        line = "\"-Dfoo bar=baz quux\" -classpath %classpath my.App"; // #199411
+        assertEquals("\"-Dfoo bar=baz quux\" -classpath %classpath", MavenExecuteUtils.splitJVMParams(line));
+        assertEquals("my.App", MavenExecuteUtils.splitMainClass(line));
+        assertEquals("", MavenExecuteUtils.splitParams(line));
+    }
+
+
+    /**
      * Test of splitAll method, of class MavenExecuteUtils.
      */
     @Test

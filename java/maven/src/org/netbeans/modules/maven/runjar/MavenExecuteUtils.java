@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-import org.codehaus.plexus.util.cli.CommandLineUtils;
 import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.modules.maven.NbMavenProjectImpl;
 import org.netbeans.modules.maven.api.customizer.ModelHandle2;
@@ -34,7 +33,6 @@ import org.netbeans.modules.maven.customizer.RunJarPanel;
 import org.netbeans.modules.maven.execute.ActionToGoalUtils;
 import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
-import org.netbeans.modules.maven.runjar.RunJarStartupArgs;
 import org.netbeans.spi.project.ActionProvider;
 
 /**
@@ -61,7 +59,7 @@ public final class MavenExecuteUtils {
     public static final String RUN_MAIN_CLASS = "exec.mainClass"; //NOI18N
 
     /**
-     * Name of the property for applicaiton arguments.
+     * Name of the property for application arguments.
      * @since 2.144
      */
     public static final String RUN_APP_PARAMS = "exec.appArgs"; //NOI18N
@@ -110,7 +108,6 @@ public final class MavenExecuteUtils {
         private boolean currentDebug;
         private boolean currentProfile;
         
-        private String execParams;
         private String vmParams;
         private String appParams;
         private String workDir;
@@ -186,10 +183,6 @@ public final class MavenExecuteUtils {
         
         public void setMainClass(String mainClass) {
             this.mainClass = mainClass;
-        }
-
-        public void setExecParams(String execParams) {
-            this.execParams = execParams;
         }
 
         public void setVmParams(String vmParams) {
@@ -472,14 +465,6 @@ public final class MavenExecuteUtils {
         }
     }
     
-    private static String maybeReplaceTemplate(String template, String mainClassReplaced) {
-        if (mainClassReplaced != null) {
-            return template.replace(PACKAGE_CLASS_NAME_TOKEN, mainClassReplaced);
-        } else {
-            return template;
-        }
-    }
-    
     /**
      * The inexact match is used from RunJarStartupArgs
      */
@@ -646,6 +631,10 @@ public final class MavenExecuteUtils {
         };
     }
     
+    public static String splitJVMParams(String line) {    
+        return splitJVMParams(line, false);
+    }
+    
     @NonNull
     public static String splitJVMParams(String line, boolean newLines) {
         PropertySplitter ps = new PropertySplitter(line);
@@ -752,108 +741,5 @@ public final class MavenExecuteUtils {
                 return new SplitIt();
             }
         };
-    }
-    
-    /**
-     *
-     * @author mkleint
-     */
-    static class PropertySplitter {
-
-        private String line;
-        private char[] quotes;
-        private char separator;
-        private char newline;
-        private boolean trim = true;
-        private char escape;
-        private boolean outputQuotes = true;
-
-        private int location = 0;
-        private char quoteChar = 0;
-        private boolean inQuote = false;
-        private boolean escapeNext = false;
-        private boolean preserveWhitespace = true;
-
-        public PropertySplitter(String line) {
-            this(line, new char[]{'"', '\''}, '\\', '\n', '\n'); //NOI18N
-        }
-
-        private PropertySplitter(String line, char[] quotes, char escape, char separator, char nl) {
-            this.line = line;
-            this.quotes = quotes;
-            this.separator = separator;
-            this.escape = escape;
-            newline = nl;
-        }
-
-        void setSeparator(char sep) {
-            separator = sep;
-        }
-
-        public void setOutputQuotes(boolean outputQuotes) {
-            this.outputQuotes = outputQuotes;
-        }
-
-        public String nextPair() {
-            StringBuilder buffer = new StringBuilder();
-            if (location >= line.length()) {
-                return null;
-            }
-            //TODO should probably also handle (ignore) spaces before or after the = char somehow
-            while (location < line.length()) {
-                if (!(inQuote || escapeNext)) {
-                    if (line.charAt(location) == separator || line.charAt(location) == newline) {
-                        if (preserveWhitespace || buffer.length() > 0) {
-                            break;
-                        } else {
-                            location++;
-                            continue;
-                        }
-                    }
-                }
-                char c = line.charAt(location);
-                X: if (escapeNext) {
-                    if (c == newline) {
-                        //just continue.. equals to \ + newline
-                    } else {
-                        buffer.append(escape).append(c);
-                    }
-                    escapeNext = false;
-                } else if (!inQuote && c == escape) {
-                    escapeNext = true;
-                } else if (inQuote) {
-                    if (c == quoteChar) {
-                        inQuote = false;
-                        if (!outputQuotes) {
-                            break X;
-                        }
-                    }
-                    buffer.append(c);
-                } else {
-                    if (isQuoteChar(c)) {
-                        inQuote = true;
-                        quoteChar = c;
-                        if (!outputQuotes) {
-                            break X;
-                        }
-                    }
-                    buffer.append(c);
-                }
-                location++;
-            }
-            location++;
-            return trim ? buffer.toString().trim() : buffer.toString();
-        }
-
-        private boolean isQuoteChar(char c) {
-            for (int i = 0; i < quotes.length; i++) {
-                char quote = quotes[i];
-                if (c == quote) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
     }
 }
