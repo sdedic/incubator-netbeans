@@ -93,7 +93,8 @@ is the proper place.
             <description>
                 <p>
                     Project lookup consists of base services, plus services for the project's packaging type. This change allows for
-                    generic post-processing after packaging-specific service.
+                    generic post-processing after packaging-specific service. See <a href="@TOP@/architecture-summary.html#layer-MavenPackagingLookup">MavenPackagingLookup</a>
+                    for more details.
                 </p>
             </description>
         </change>
