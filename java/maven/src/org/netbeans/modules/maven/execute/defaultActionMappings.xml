@@ -275,7 +275,7 @@
             <test>${packageClassName}</test>
             <forkMode>once</forkMode>
             <maven.surefire.debug>${exec.vmArgs}</maven.surefire.debug>
-            <!-- need to declare exec.args property to engage the StartupExtender infrastructure -->
+            <!-- need to declare exec.args or exec.vmArgs property to engage the StartupExtender infrastructure -->
             <exec.vmArgs/>
             <exec.args/>
         </properties>
