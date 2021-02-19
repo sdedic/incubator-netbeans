@@ -860,7 +860,7 @@ public final class NbMavenProjectImpl implements Project {
                 packaging = newPackaging;
                 Lookup pack = Lookups.forPath("Projects/org-netbeans-modules-maven/" + packaging + "/Lookup");
                 // Include fallback providers for anything
-                Lookup fallback = Lookups.forPath("Projects/org-netbeans-modules-maven/_last/Lookup");
+                Lookup fallback = Lookups.forPath("Projects/org-netbeans-modules-maven/_any/Lookup");
                 setLookups(general, pack, fallback);
             }
         }

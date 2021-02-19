@@ -43,7 +43,7 @@ import org.openide.util.lookup.InstanceContent;
  * 
  * @author sdedic
  */
-@ProjectServiceProvider(service=LateBoundPrerequisitesChecker.class, projectType="org-netbeans-modules-maven/_last")
+@ProjectServiceProvider(service=LateBoundPrerequisitesChecker.class, projectType="org-netbeans-modules-maven/_any")
 public class LaunchArgPrereqsChecker implements LateBoundPrerequisitesChecker {
 
     @Override
