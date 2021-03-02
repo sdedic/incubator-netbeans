@@ -34,6 +34,7 @@ import org.netbeans.spi.project.ui.ProjectProblemResolver;
 import org.netbeans.spi.project.ui.ProjectProblemsProvider;
 
 import static org.netbeans.modules.gradle.api.NbGradleProject.Quality.*;
+import org.netbeans.modules.gradle.api.execute.GradleCommandLine;
 import org.openide.util.NbBundle;
 import org.openide.util.RequestProcessor;
 
@@ -50,6 +51,7 @@ public class GradleProjectProblemProvider implements ProjectProblemsProvider {
     private final Project project;
     private final PropertyChangeListener listener;
     private final ProjectProblemResolver resolver = new GradleProjectProblemResolver();
+    private final ProjectProblemResolver primingResolver = new PrimingBuildResolver();
 
     public GradleProjectProblemProvider(Project project) {
         this.project = project;
@@ -84,13 +86,31 @@ public class GradleProjectProblemProvider implements ProjectProblemsProvider {
         List<ProjectProblem> ret = new ArrayList<>();
         GradleProject gp = project.getLookup().lookup(NbGradleProjectImpl.class).getGradleProject();
         if (gp.getQuality().notBetterThan(EVALUATED)) {
-            ret.add(ProjectProblem.createError(Bundle.LBL_PrimingRequired(), Bundle.TXT_PrimingRequired(), resolver));
+            boolean trust = 
+                Boolean.TRUE.toString().equals(
+                    NbBundle.getMessage(GradleCommandLine.class, "org.netbeans.modules.gradle.api.execute.TrustPrimingBuildResolver"). // NOI18N
+                    toLowerCase()
+                );
+            ret.add(ProjectProblem.createError(Bundle.LBL_PrimingRequired(), Bundle.TXT_PrimingRequired(), 
+                    trust ? primingResolver : resolver));
         }
         for (String problem : gp.getProblems()) {
             String[] lines = problem.split("\\n"); //NOI18N
             ret.add(ProjectProblem.createWarning(lines[0], problem.replaceAll("\\n", "<br/>"), resolver)); //NOI18N
         }
         return ret;
+    }
+    
+    /**
+     * A special variant of Resolver for priming build. The user has already accepted that
+     * the project will be built and can execute code. Trust this project.
+     */
+    private class PrimingBuildResolver extends GradleProjectProblemResolver {
+        @Override
+        public Result call() throws Exception {
+            ProjectTrust.getDefault().trustProject(project);
+            return super.call();
+        }
     }
 
     private class GradleProjectProblemResolver implements ProjectProblemResolver, Callable<Result> {

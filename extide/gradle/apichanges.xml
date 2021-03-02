@@ -83,6 +83,16 @@ is the proper place.
     <!-- ACTUAL CHANGES BEGIN HERE: -->
 
     <changes>
+        <change id="trust-primin-build-branding">
+            <api name="general"/>
+            <summary>Distribution may opt to treat priming build as trusted</summary>
+            <date day="3" month="3" year="2021"/>
+            <author login="sdeidc"/>
+            <compatibility semantic="compatible" addition="yes"/>
+            <description>
+                The distribution may modify trust policy using <i>branding</i>. The priming build 
+            </description>
+        </change>
         <change id="deprecate-experimental-settings">
             <api name="general"/>
             <summary>Make ProjectActionMappingProvider available for other modules.</summary>
