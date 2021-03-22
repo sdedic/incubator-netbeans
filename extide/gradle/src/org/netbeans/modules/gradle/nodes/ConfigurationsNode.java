@@ -45,12 +45,14 @@ import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import org.netbeans.api.actions.Openable;
 import org.netbeans.api.annotations.common.StaticResource;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectManager;
 import org.netbeans.modules.gradle.api.NbGradleProject.Quality;
 import org.netbeans.spi.project.ui.LogicalViewProvider;
 import org.openide.awt.HtmlBrowser;
+import org.openide.cookies.OpenCookie;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.loaders.DataObject;
@@ -61,8 +63,12 @@ import org.openide.nodes.Children;
 import org.openide.nodes.FilterNode;
 import org.openide.nodes.Node;
 import org.openide.util.ImageUtilities;
+import org.openide.util.Lookup;
 import org.openide.util.NbBundle;
+import org.openide.util.lookup.AbstractLookup;
+import org.openide.util.lookup.InstanceContent;
 import org.openide.util.lookup.Lookups;
+import org.openide.util.lookup.ProxyLookup;
 
 /**
  *
@@ -322,6 +328,50 @@ public class ConfigurationsNode extends AbstractNode {
         }
 
     }
+    
+    private static class ModuleChildNode extends FilterNode {
+        private final NbGradleProjectImpl project;
+        private final GradleDependency.ModuleDependency module;
+
+        public ModuleChildNode(Node original, NbGradleProjectImpl project, GradleDependency.ModuleDependency module) {
+            this(original, project, module, new InstanceContent());
+        }
+
+        private ModuleChildNode(Node original, NbGradleProjectImpl project, GradleDependency.ModuleDependency module, InstanceContent ic) {
+            super(original, new ModuleFilterChildren(project, module, original), 
+                    new ProxyLookup(new AbstractLookup(ic), Lookups.exclude(original.getLookup(), Openable.class))
+            );
+            this.project = project;
+            this.module = module;
+            
+            ic.add(new OpenCookie() {
+                @Override
+                public void open() {
+                    final Openable oc = original.getLookup().lookup(Openable.class);
+                    if (oc == null) {
+                        return;
+                    }
+                    Lookups.executeWith(new ProxyLookup(Lookups.singleton(project), Lookup.getDefault()), () -> oc.open());
+                }
+            });
+        }
+    }
+    
+    private static class ModuleFilterChildren extends FilterNode.Children {
+        private final NbGradleProjectImpl project;
+        private final GradleDependency.ModuleDependency module;
+
+        public ModuleFilterChildren(NbGradleProjectImpl project, GradleDependency.ModuleDependency module, Node or) {
+            super(or);
+            this.project = project;
+            this.module = module;
+        }
+
+        @Override
+        protected Node copyNode(Node node) {
+            return new ModuleChildNode(node, project, module);
+        }
+    }
 
     private static class ModuleFilterNode extends FilterNode implements ChangeListener {
 
@@ -330,11 +380,26 @@ public class ConfigurationsNode extends AbstractNode {
         private final DataObject mainJar;
 
         public ModuleFilterNode(NbGradleProjectImpl project, GradleDependency.ModuleDependency module, DataObject mainJar) {
-            super(mainJar.getNodeDelegate().cloneNode());
+            this(mainJar.getNodeDelegate().cloneNode(), project, module, mainJar, new InstanceContent());
+        }
+        
+        private ModuleFilterNode(Node n, NbGradleProjectImpl project, GradleDependency.ModuleDependency module, DataObject mainJar, InstanceContent ic) {
+            super(n, new ModuleFilterChildren(project, module, n), 
+                    new ProxyLookup(new AbstractLookup(ic), n.getLookup())
+            );
             this.project = project;
             this.module = module;
             this.mainJar = mainJar;
             GradleArtifactStore.getDefault().addChangeListener(this);
+            final Openable oc = mainJar.getLookup().lookup(Openable.class);
+            if (oc != null) {
+                ic.add(new OpenCookie() {
+                    @Override
+                    public void open() {
+                        Lookups.executeWith(Lookups.singleton(project), () -> oc.open());
+                    }
+                });
+            }
         }
 
         @Override

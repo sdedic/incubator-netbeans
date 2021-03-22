@@ -41,6 +41,8 @@ import org.netbeans.api.java.source.ElementHandle;
 import org.netbeans.api.java.source.JavaSource.Phase;
 import org.netbeans.api.java.source.UiUtils;
 import org.netbeans.api.progress.BaseProgressUtils;
+import org.netbeans.api.project.FileOwnerQuery;
+import org.netbeans.api.project.Project;
 import org.netbeans.modules.parsing.api.ParserManager;
 import org.netbeans.modules.parsing.api.ResultIterator;
 import org.netbeans.modules.parsing.api.Source;
@@ -65,17 +67,20 @@ public class AttachSourcePanel extends javax.swing.JPanel {
     private final URL root;
     private final URL file;
     private final String binaryName;
+    private final Project owner;
 
     public AttachSourcePanel(
             @NonNull final URL root,
             @NonNull final URL file,
-            @NonNull final String binaryName) {
+            @NonNull final String binaryName,
+            @NonNull final Project owner) {
         assert root != null;
         assert file != null;
         assert binaryName != null;
         this.root = root;
         this.file = file;
         this.binaryName = binaryName;
+        this.owner = owner;
         initComponents();
     }
 
@@ -121,17 +126,18 @@ public class AttachSourcePanel extends javax.swing.JPanel {
 
 private void attachSources(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_attachSources
         jButton1.setEnabled(false);
+        final FileObject rootFo = URLMapper.findFileObject(root);
+        final FileObject fileFo = URLMapper.findFileObject(file);
+        
         RP.execute(new Runnable() {
             @Override
             public void run() {
                 SourceJavadocAttacher.attachSources(
-                    root,
+                    root, owner == null ? null : owner.getLookup(), 
                     new SourceJavadocAttacher.AttachmentListener() {
                         @Override
                         public void attachmentSucceeded() {
                             boolean success = false;
-                            final FileObject rootFo = URLMapper.findFileObject(root);
-                            final FileObject fileFo = URLMapper.findFileObject(file);
                             if (rootFo != null && fileFo != null) {
                                 final FileObject[] fos = SourceForBinaryQuery.findSourceRoots(root).getRoots();
                                 if (fos.length > 0) {
