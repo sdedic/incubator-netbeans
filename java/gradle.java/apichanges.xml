@@ -76,13 +76,27 @@ is the proper place.
 
     <!-- First, a list of API names you may use: -->
     <apidefs>
-        <apidef name="general">Gradle Java Project API</apidef>
+        <apidef name="gradle.java.api">Gradle Java Project API</apidef>
         <!-- etc. -->
     </apidefs>
 
     <!-- ACTUAL CHANGES BEGIN HERE: -->
 
     <changes>
+        <change id="run.argument.properties">
+            <api name="gradle.java.api"/>
+            <summary>Support for explicit commandline arguments</summary>
+            <version major="1" minor="9"/>
+            <date day="27" month="3" year="2021"/>
+            <author login="sdedic"/>
+            <compatibility semantic="compatible" addition="yes"/>
+            <description>
+                Gradle Java interpolate properties that can be used to pass explicit JVM and application
+                parameters to user process started by Gradle build.
+            </description>
+            <class package="org.netbeans.modules.gradle.java.api.execute" name="ProjectActions"/>
+            <issue number="NETBEANS-5482"/>
+        </change>
         <change>
             <api name="gradle.java.api"/>
             <summary>Support Generated Source Directories</summary>

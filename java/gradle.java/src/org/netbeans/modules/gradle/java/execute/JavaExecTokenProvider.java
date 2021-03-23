@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.gradle.java;
+package org.netbeans.modules.gradle.java.execute;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +31,7 @@ import org.netbeans.api.extexecution.startup.StartupExtender;
 import org.netbeans.api.project.Project;
 import org.netbeans.modules.gradle.api.GradleBaseProject;
 import org.netbeans.modules.gradle.api.NbGradleProject;
+import org.netbeans.modules.gradle.java.api.execute.ProjectActions;
 import org.netbeans.modules.gradle.spi.actions.ReplaceTokenProvider;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ProjectServiceProvider;
@@ -48,9 +49,29 @@ import org.openide.util.lookup.InstanceContent;
         projectType = NbGradleProject.GRADLE_PROJECT_TYPE
 )
 public class JavaExecTokenProvider implements ReplaceTokenProvider {
-    public static String TOKEN_JAVAEXEC_JVMARGS = "javaExec.jvmArgs";
-    public static String TOKEN_JAVAEXEC_ARGS = "javaExec.args";
+    /**
+     * Replaceable token for JVM arguments project property. Generates project property for NB Tooling Gradle plugin, if the extra JVM arguments are present, otherwise
+     * generates an empty String.
+     * @see #TOKEN_JAVA_JVMARGS
+     */
+    public static String TOKEN_JAVAEXEC_JVMARGS = ProjectActions.TOKEN_JAVAEXEC_JVMARGS;
+
+    /**
+     * Replaceable token for program parameters as a commandline option. Generates --args <i>&lt;parameter-list></i>, if the extra parameters are present, otherwise
+     * generates an empty String.
+     * @see #TOKEN_JAVA_ARGS
+     */
+    public static String TOKEN_JAVAEXEC_ARGS = ProjectActions.TOKEN_JAVAEXEC_ARGS;
+
+    /**
+     * Replaceable token for JVM arguments. Generates escaped / quoted arguments as a single String.
+     */
     public static String TOKEN_JAVA_ARGS = "java.args";
+
+    /**
+     * Replaceable token for program parameters. Parameters will be escaped and quoted and collected to 
+     * a space-delimited String.
+     */
     public static String TOKEN_JAVA_JVMARGS = "java.jvmArgs";
     
     private static final Set<String> TOKENS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
@@ -108,7 +129,6 @@ public class JavaExecTokenProvider implements ReplaceTokenProvider {
                 mode = null;
         }
         InstanceContent ic = new InstanceContent();
-        ic.add(project);
         if (project != null) {
             ic.add(project);
         }
@@ -125,7 +145,7 @@ public class JavaExecTokenProvider implements ReplaceTokenProvider {
         result.put(TOKEN_JAVAEXEC_ARGS, ""); // NOI18N
         result.put(TOKEN_JAVAEXEC_JVMARGS, ""); // NOI18N
         result.put(TOKEN_JAVA_ARGS, ""); // NOI18N
-        result.put(TOKEN_JAVA_ARGS, ""); // NOI18N
+        result.put(TOKEN_JAVA_JVMARGS, ""); // NOI18N
         if (extraArgs.isEmpty() && contextParams.isEmpty()) {
             return result;
         }
@@ -138,18 +158,25 @@ public class JavaExecTokenProvider implements ReplaceTokenProvider {
 
         // need to pass JVM args and program args separately
         if (changedParams.getLauncherArguments() != null) {
-            String jvmArgs = Utilities.escapeParameters(new String[] {
-                String.join(" ", changedParams.getLauncherArguments())
+            List<String> params = changedParams.getLauncherArguments();
+            String jvmArgs = Utilities.escapeParameters(params.toArray(new String[params.size()]));
+            result.put(TOKEN_JAVA_JVMARGS, jvmArgs);
+
+            String prop = Utilities.escapeParameters(new String[] {
+                "-PrunJvmArgs=" + jvmArgs
+                
             });
-            result.put(TOKEN_JAVA_ARGS, jvmArgs);
-            result.put(TOKEN_JAVAEXEC_JVMARGS, "-PrunJvmArgs=" + jvmArgs);
+            result.put(TOKEN_JAVAEXEC_JVMARGS,  prop);
         }
         if (changedParams.getArguments() != null && !changedParams.getArguments().isEmpty()) {
-            String args = Utilities.escapeParameters(new String[] {
-                String.join(" ", changedParams.getArguments())
+            List<String> params = changedParams.getArguments();
+            String args = Utilities.escapeParameters(params.toArray(new String[params.size()]));
+
+            String prop = Utilities.escapeParameters(new String[] {
+                args
             });
             result.put(TOKEN_JAVA_ARGS, args);
-            result.put(TOKEN_JAVAEXEC_ARGS, "--args " + args);
+            result.put(TOKEN_JAVAEXEC_ARGS, "--args " + prop);
         }
         return result;
     }
