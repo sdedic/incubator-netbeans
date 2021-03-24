@@ -361,6 +361,7 @@
             </test-dependencies>
             <public-packages>
                 <package>org.netbeans.modules.gradle.java.api</package>
+                <package>org.netbeans.modules.gradle.java.api.execute</package>
                 <package>org.netbeans.modules.gradle.java.api.output</package>
                 <package>org.netbeans.modules.gradle.java.spi.debug</package>
             </public-packages>

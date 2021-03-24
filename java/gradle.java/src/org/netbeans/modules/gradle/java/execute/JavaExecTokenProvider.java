@@ -31,7 +31,7 @@ import org.netbeans.api.extexecution.startup.StartupExtender;
 import org.netbeans.api.project.Project;
 import org.netbeans.modules.gradle.api.GradleBaseProject;
 import org.netbeans.modules.gradle.api.NbGradleProject;
-import org.netbeans.modules.gradle.java.api.execute.ProjectActions;
+import org.netbeans.modules.gradle.java.api.ProjectActions;
 import org.netbeans.modules.gradle.spi.actions.ReplaceTokenProvider;
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ProjectServiceProvider;

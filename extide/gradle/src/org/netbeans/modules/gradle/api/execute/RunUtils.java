@@ -111,7 +111,7 @@ public final class RunUtils {
         }
         return files.toArray(new FileObject[files.size()]);
     }
-
+    
     /**
      * Executes a Gradle build with the given configuration. It can also take an
      * initial message, which is printed to the output tab before the actual
@@ -124,7 +124,7 @@ public final class RunUtils {
      */
     public static ExecutorTask executeGradle(RunConfig config, String initialOutput) {
         LifecycleManager.getDefault().saveAll();
-
+        
         GradleDaemonExecutor exec = new GradleDaemonExecutor(config);
         ExecutorTask task = executeGradleImpl(config.getTaskDisplayName(), exec, initialOutput);
         GRADLE_TASKS.put(config, exec);

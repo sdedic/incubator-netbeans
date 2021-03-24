@@ -21,15 +21,27 @@ package org.netbeans.modules.gradle.java.execute;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectManager;
 import org.netbeans.junit.NbTestCase;
+import org.netbeans.modules.gradle.actions.ActionToTaskUtils;
+import org.netbeans.modules.gradle.api.GradleBaseProject;
+import org.netbeans.modules.gradle.api.GradleBaseProjectTrampoline;
+import org.netbeans.modules.gradle.api.execute.ActionMapping;
+import org.netbeans.modules.gradle.api.execute.GradleCommandLine;
+import org.netbeans.modules.gradle.api.execute.RunConfig;
+import org.netbeans.modules.gradle.api.execute.RunUtils;
 import org.netbeans.spi.project.ActionProvider;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.util.BaseUtilities;
+import org.openide.util.Lookup;
 import org.openide.util.lookup.Lookups;
 
 /**
@@ -160,5 +172,77 @@ public class JavaExecTokenProviderTest extends NbTestCase {
 
         assertArgs(map.get("javaExec.args"), THREE_PROPS);
         assertParamList(map.get("java.args"), THREE_PROPS);
+    }
+    
+    
+    /**
+     * Note: this code is not actually run, as it would require an entire
+     * ProjectConnection to be mocked so that the Gradle process is captured
+     * directly at execution. But the configuration code is actually tested in
+     * {@link #testExamplePassJVmAndArguments} below. This method just gives
+     * an example for javadoc, keep it synchronized with the real test !
+     *
+     */
+    public void xtestExamplePassJVmAndArguments() throws Exception {
+        Project project = createSimpleJavaProject();
+        // BEGIN: JavaExecTokenProviderTest#testExamplePassJvmAndArguments
+        ExplicitProcessParameters params = ExplicitProcessParameters.builder().
+                args("Frodo").
+                launcherArg("-verbose").
+                build();
+        ExplicitProcessParameters params2 = ExplicitProcessParameters.builder().
+                args("Baggins").replaceArgs(false).
+                launcherArg("-Dcompanion=Sam").
+                build();
+        
+        ActionProvider actions = project.getLookup().lookup(ActionProvider.class);
+        if (actions == null) {
+            // fail, no action available
+        }
+        // Invoke the project action, with two explicit params
+        actions.invokeAction(ActionProvider.COMMAND_RUN, Lookups.fixed(
+                params, params2
+        ));
+        // END: JavaExecTokenProviderTest#testExamplePassJvmAndArguments
+    }
+    
+    public void testExamplePassJVmAndArguments() throws Exception {
+        Project project = createSimpleJavaProject();
+        ExplicitProcessParameters params = ExplicitProcessParameters.builder().
+                args("Frodo").
+                launcherArg("-verbose").
+                build();
+        ExplicitProcessParameters params2 = ExplicitProcessParameters.builder().
+                args("Baggins").replaceArgs(false).
+                launcherArg("-Dcompanion=Sam").
+                build();
+        Lookup ctx = Lookups.fixed(params, params2);
+        
+        GradleBaseProject gbp = GradleBaseProject.get(project);
+        // hack into GBP, and add 'application' plugin in there, the project can't be really primed 
+        // without running gradle.
+        Set<String> plugins = new HashSet<>(gbp.getPlugins());
+        plugins.add("application");
+        GradleBaseProjectTrampoline.setPlugins(gbp, plugins);
+        
+        ActionMapping mapping = ActionToTaskUtils.getActiveMapping(ActionProvider.COMMAND_RUN, project);
+        String argLine = mapping.getArgs();
+        final String[] args = RunUtils.evaluateActionArgs(project, ActionProvider.COMMAND_RUN, argLine, ctx);
+        List<String> full = Arrays.asList(args);
+        int argsIndex = full.indexOf("--args");
+        assertTrue(argsIndex >= 0);
+        assertTrue(argsIndex < full.size() - 1);
+        String appParamsString = full.get(argsIndex + 1);
+        
+        String[] split = BaseUtilities.parseParameters(appParamsString);
+        assertEquals(Arrays.asList("Frodo", "Baggins"), Arrays.asList(split));
+        
+        Optional<String> optArg = full.stream().filter(s -> s.startsWith("-PrunJvmArgs=")).findAny();
+        assertTrue(optArg.isPresent());
+        String vmParam = optArg.get().replace("-PrunJvmArgs=", "");
+        split = BaseUtilities.parseParameters(vmParam);
+        
+        assertEquals(2, split.length);
+        assertEquals(Arrays.asList("-verbose", "-Dcompanion=Sam"), Arrays.asList(split));
     }
 }

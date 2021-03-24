@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.gradle.java.api.execute;
+package org.netbeans.modules.gradle.java.api;
 
 import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 
 /**
- * Application execution - related utilities and constants.
+ * Utilities and constants related to Gradle/Java project actions.
  * @author sdedic
  * @since 1.9
  */
@@ -30,15 +30,16 @@ public class ProjectActions {
      * Replaceable token for JVM arguments project property. Generates project property for NB Tooling Gradle plugin, if the extra JVM arguments are present, otherwise
      * generates an empty String. The token is interpolated in <code>action-mapping.xml</code> that can be customized by the user. This feature cooperates with
      * NetBeans Tooling Gradle plugin provided by org.netbeans.gradle module.
-     * <div id="nonnormative">
+     * <div class="nonnormative">
      * The token can be used in <code>action-mapping.xml</code> as followes:
+     * {@codesnippet JavaExecTokenProviderTest.exampleActionMapping}
      * </div>
-     * 
      * The Gradle Java project support consumes {@link ExplicitProcessParameters} from the action's context Lookup, and populates the replaceable token mapping.
-     * <div id="nonnormative">
-     * The following code injects a specific system property to the VM configuration, and passes "hello Dolly" parameters to the application as main class' parameters:
+     * <div class="nonnormative">
+     * The following code injects a specific system property to the VM configuration, and passes "hello Dolly" parameters to the application as main class' parameters. Project
+     * actions can be invoked with custom parameters as in the following example:
+     * {@codesnippet JavaExecTokenProviderTest#testExamplePassJvmAndArguments}
      * </div>
-     * 
      */
     public static String TOKEN_JAVAEXEC_JVMARGS = "javaExec.jvmArgs";
 
