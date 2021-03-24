@@ -23,7 +23,7 @@ import org.netbeans.api.extexecution.base.ExplicitProcessParameters;
 /**
  * Utilities and constants related to Gradle/Java project actions.
  * @author sdedic
- * @since 1.9
+ * @since 1.12
  */
 public class ProjectActions {
     /**

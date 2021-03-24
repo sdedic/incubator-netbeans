@@ -91,7 +91,7 @@ is the proper place.
             <author login="sdedic"/>
             <compatibility semantic="compatible" addition="yes"/>
             <description>
-                Introduced <code>runJvmArgs</code> property that can be passed to NetBeans Tooling plugin in order to inject user JVM parameters
+                Introduced <code>runJvmArgs</code> project property that can be passed to NetBeans Tooling plugin in order to inject user JVM parameters
                 into gradle JavaExec task configurations. The property value shall contain whitespace-separated JVM arguments.
             </description>
         </change>

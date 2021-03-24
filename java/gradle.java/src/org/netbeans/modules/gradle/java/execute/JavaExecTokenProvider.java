@@ -66,13 +66,13 @@ public class JavaExecTokenProvider implements ReplaceTokenProvider {
     /**
      * Replaceable token for JVM arguments. Generates escaped / quoted arguments as a single String.
      */
-    public static String TOKEN_JAVA_ARGS = "java.args";
+    public static String TOKEN_JAVA_ARGS = "java.args"; // NOI18N
 
     /**
      * Replaceable token for program parameters. Parameters will be escaped and quoted and collected to 
      * a space-delimited String.
      */
-    public static String TOKEN_JAVA_JVMARGS = "java.jvmArgs";
+    public static String TOKEN_JAVA_JVMARGS = "java.jvmArgs"; // NOI18N
     
     private static final Set<String> TOKENS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             TOKEN_JAVAEXEC_ARGS, TOKEN_JAVAEXEC_JVMARGS,
@@ -163,7 +163,7 @@ public class JavaExecTokenProvider implements ReplaceTokenProvider {
             result.put(TOKEN_JAVA_JVMARGS, jvmArgs);
 
             String prop = Utilities.escapeParameters(new String[] {
-                "-PrunJvmArgs=" + jvmArgs
+                "-PrunJvmArgs=" + jvmArgs  // NOI18N
                 
             });
             result.put(TOKEN_JAVAEXEC_JVMARGS,  prop);
@@ -176,7 +176,7 @@ public class JavaExecTokenProvider implements ReplaceTokenProvider {
                 args
             });
             result.put(TOKEN_JAVA_ARGS, args);
-            result.put(TOKEN_JAVAEXEC_ARGS, "--args " + prop);
+            result.put(TOKEN_JAVAEXEC_ARGS, "--args " + prop);  // NOI18N
         }
         return result;
     }
