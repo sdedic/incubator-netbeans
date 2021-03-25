@@ -884,3 +884,17 @@ matrix:
             - ant $OPTS build
           script:
             - hide-logs.sh ant $OPTS commit-validation
+            
+        - name: commit-validation on JDK16
+          jdk: openjdk8
+          env:
+          env:
+            - BUILD_OPTS="-Dmetabuild.jsonurl=https://raw.githubusercontent.com/apache/netbeans-jenkins-lib/master/meta/netbeansrelease.json -quiet -Dcluster.config=platform -Djavac.compilerargs=-nowarn -Dbuild.compiler.deprecation=false -Dtest-unit-sys-prop.ignore.random.failures=true -Dvanilla.javac.exists=true"
+          before_script:
+            - wget https://raw.githubusercontent.com/sormuras/bach/master/install-jdk.sh
+            - export TEST_JDK=`bash install-jdk.sh --feature 16 --license GPL --emit-java-home --silent | tail -1`
+            - export TEST_OPTS="-Dmetabuild.jsonurl=https://raw.githubusercontent.com/apache/netbeans-jenkins-lib/master/meta/netbeansrelease.json $OPTS -Dtest.nbjdk.home=$TEST_JDK \"-Dtest.run.args=--limit-modules=java.base,java.logging,java.xml,java.prefs,java.desktop,java.management,java.instrument,jdk.zipfs,java.scripting,java.naming --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED\" -Dtest.bootclasspath.prepend.args=-Dno.netbeans.bootclasspath.prepend.needed=true"
+            - ant $BUILD_OPTS clean
+            - ant $BUILD_OPTS build
+          script:
+            - hide-logs.sh ant $TEST_OPTS commit-validation
