@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.netbeans.api.java.queries.SourceForBinaryQuery;
 import org.netbeans.api.java.queries.SourceJavadocAttacher.AttachmentListener;
@@ -37,6 +38,7 @@ import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.modules.gradle.api.GradleBaseProject;
 import org.netbeans.modules.gradle.api.GradleDependency.ModuleDependency;
+import org.netbeans.modules.gradle.api.GradleDependency.ProjectDependency;
 import org.netbeans.modules.gradle.api.GradleProjects;
 import org.netbeans.modules.gradle.api.execute.RunUtils;
 import org.netbeans.spi.java.queries.SourceJavadocAttacherImplementation;
@@ -191,6 +193,17 @@ public class GradleSourceAttacherImpl implements SourceJavadocAttacherImplementa
         File absF = f.getAbsoluteFile();
         Stream<ModuleDependency> mods = gbp.getConfigurations().values().stream().
                     flatMap(cfg -> cfg.getModules().stream());
+        
+        
+        List<ModuleDependency> deps = gbp.getConfigurations().values().stream().
+                    flatMap(cfg -> cfg.getModules().stream()).collect(Collectors.toList());
+        for (ModuleDependency d : deps) {
+            if (d.getName().contains("micronaut-htt")) {
+                System.err.println("AHOJ");
+            }
+            System.err.println(d);
+        }
+        
         return mods.filter(m -> m.getArtifacts().contains(absF)).findFirst().orElse(null);
     }
 
