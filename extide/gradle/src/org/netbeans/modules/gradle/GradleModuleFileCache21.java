@@ -242,17 +242,34 @@ public final class GradleModuleFileCache21 {
     public static GradleModuleFileCache21 getGradleFileCache() {
         return getGradleFileCache(GradleSettings.getDefault().getGradleUserHome().toPath());
     }
+    
+    /**
+     * Suffix that indicate changing versions, see "Declaring a changing version" in Gradle docs.
+     */
+    private static final String CHANGING_VERSION_SUFFIX = "-SNAPSHOT"; // NOI18N
 
     public static String[] gavSplit(String gav) {
         int firstColon = gav.indexOf(':');
         int lastColon = gav.lastIndexOf(':');
+        int end = gav.length();
+        
+        // check for SNAPSHOT, which uses four colons:
+        int snapStart = lastColon - CHANGING_VERSION_SUFFIX.length();
+        if (gav.regionMatches(snapStart, CHANGING_VERSION_SUFFIX, 0, CHANGING_VERSION_SUFFIX.length())) {
+            int l = gav.lastIndexOf(':', snapStart); // NOI18N
+            // do accept -SNAPSHOT as a version, if GAV does not actually contain 4 components
+            if (l > firstColon) {
+                end = lastColon;
+                lastColon = l;
+            }
+        }
         if (firstColon == -1 || firstColon == lastColon) {
             throw new IllegalArgumentException("Invalid GAV format: " + gav); //NOI18N
         }
         return new String[] {
             gav.substring(0, firstColon),
             gav.substring(firstColon + 1, lastColon),
-            gav.substring(lastColon + 1)
+            gav.substring(lastColon + 1, end)
         };
     }
 }
