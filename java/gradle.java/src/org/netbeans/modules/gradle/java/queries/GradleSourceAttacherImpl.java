@@ -193,17 +193,6 @@ public class GradleSourceAttacherImpl implements SourceJavadocAttacherImplementa
         File absF = f.getAbsoluteFile();
         Stream<ModuleDependency> mods = gbp.getConfigurations().values().stream().
                     flatMap(cfg -> cfg.getModules().stream());
-        
-        
-        List<ModuleDependency> deps = gbp.getConfigurations().values().stream().
-                    flatMap(cfg -> cfg.getModules().stream()).collect(Collectors.toList());
-        for (ModuleDependency d : deps) {
-            if (d.getName().contains("micronaut-htt")) {
-                System.err.println("AHOJ");
-            }
-            System.err.println(d);
-        }
-        
         return mods.filter(m -> m.getArtifacts().contains(absF)).findFirst().orElse(null);
     }
 
