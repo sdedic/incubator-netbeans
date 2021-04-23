@@ -213,7 +213,11 @@ class ModuleData {
         this.agentClass = attr.getValue("Agent-Class");
     }
     
-    ModuleData(Manifest mf, NetigsoModule m) throws InvalidException {
+    static ModuleData forNetigsoModule(Manifest mf, Module m) throws InvalidException {
+        return new ModuleData(mf, m, true);
+    }
+    
+    private ModuleData(Manifest mf, Module m, boolean x) throws InvalidException {
         final String symbName = getMainAttribute(mf, "Bundle-SymbolicName"); // NOI18N
         if (symbName == null) {
             throw new InvalidException("Not an OSGi bundle: " + m);

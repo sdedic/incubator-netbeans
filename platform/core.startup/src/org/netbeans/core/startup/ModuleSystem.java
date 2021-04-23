@@ -264,7 +264,7 @@ public final class ModuleSystem {
                 } else if (bundleName != null) {
                     File f = new File(jarURL.toURI());
                     if (f != null) {
-                        bootModules.add(mgr.createBundle(f, null, false, false, true, 0));
+                        bootModules.add(mgr.createFixed(mani, jarURL, loader));
                     }
                 }
                 if (modName == null && bundleName == null) { // NOI18N

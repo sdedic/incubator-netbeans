@@ -21,7 +21,10 @@ package org.netbeans;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.jar.Manifest;
+import org.openide.util.Exceptions;
 
 /**
  * Allows creation of custom modules. The factories are searched in
@@ -79,7 +82,28 @@ public class ModuleFactory {
      */
     public Module createFixed(Manifest mani, Object history, ClassLoader loader, boolean autoload, boolean eager,
             ModuleManager mgr, Events ev) throws InvalidException {
-        Module m = new FixedModule(mgr, ev, mani, history, loader, autoload, eager);
+        Module m;
+        try {
+            m = new FixedModule(mgr, ev, mani, history, loader, autoload, eager);
+        } catch (InvalidException ex) {
+            String name = mani.getMainAttributes().getValue("Bundle-SymbolicName"); // NOI18N
+            if (name == null) {
+                throw ex;
+            }
+
+            File jarf;
+            if (!(history instanceof URL)) {
+                throw ex;
+            }
+            // HACK: what is the `history` ? ModuleSystem sends manifestUrl (or jarUrl) here.
+            // should be documented ?
+            try {
+                jarf = new File(((URL)history).toURI());
+            } catch (URISyntaxException ex1) {
+                throw ex;
+            }
+            m = new NetigsoFixedModule(mani, jarf, mgr, ev, history, loader, autoload, eager);
+        }
         return m;
     }
     /**

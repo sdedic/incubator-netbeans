@@ -55,7 +55,7 @@ final class NetigsoModule extends Module {
         if (in != null) {
             return new ModuleData(in);
         } else {
-            return new ModuleData(mf, this);
+            return ModuleData.forNetigsoModule(mf, this);
         }
     }
 

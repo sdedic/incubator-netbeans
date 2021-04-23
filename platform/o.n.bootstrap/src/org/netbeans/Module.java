@@ -381,7 +381,7 @@ public abstract class Module extends ModuleInfo {
      * some kind of description of the problem.
      */
     protected void parseManifest() throws InvalidException {
-        data();
+        dataWithCheck();
     }
 
 
