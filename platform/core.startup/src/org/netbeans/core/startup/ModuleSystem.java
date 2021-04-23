@@ -257,11 +257,22 @@ public final class ModuleSystem {
             try {
                 Manifest mani = new Manifest(is);
                 Attributes attr = mani.getMainAttributes();
-                if (attr.getValue("OpenIDE-Module") == null) { // NOI18N
+                String modName = attr.getValue("OpenIDE-Module"); // NOI18N
+                String bundleName = attr.getValue("Bundle-SymbolicName"); // NOI18N
+                if (modName != null) {
+                    bootModules.add(mgr.createFixed(mani, manifestUrl, loader));
+                } else if (bundleName != null) {
+                    File f = new File(jarURL.toURI());
+                    if (f != null) {
+                        bootModules.add(mgr.createBundle(f, null, false, false, true, 0));
+                    }
+                }
+                if (modName == null && bundleName == null) { // NOI18N
                     // Not a module.
                     continue;
                 }
-                bootModules.add(mgr.createFixed(mani, manifestUrl, loader));
+            } catch (URISyntaxException ex) {
+                Exceptions.printStackTrace(ex);
             } finally {
                 is.close();
             }

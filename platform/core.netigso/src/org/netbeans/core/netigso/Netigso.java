@@ -472,8 +472,20 @@ implements Cloneable, Stamps.Updater {
         registered.put(cnb, EMPTY);
         Bundle b;
         try {
-            String symbolicName = (String) m.getAttribute("Bundle-SymbolicName");
-            if ("org.netbeans.core.osgi".equals(symbolicName)) { // NOI18N
+            String symbolicName = (String) m.getAttribute("Bundle-SymbolicName"); // NOI18N
+            String sn;
+            if (symbolicName == null) {
+                sn = null;
+            } else {
+                // sometimes there's ";singleton=true" suffix in the symbolic name.
+                int semi = symbolicName.indexOf(';');
+                if (semi < 0) {
+                    sn = symbolicName;
+                } else {
+                    sn = symbolicName.substring(0, semi);
+                }
+            }
+            if ("org.netbeans.core.osgi".equals(sn) || "org.eclipse.osgi".equals(sn)) { // NOI18N
                 // Always ignore.
             } else if (symbolicName != null) { // NOI18N
                 if (original != null) {

@@ -416,6 +416,26 @@ final class ModuleListParser {
                 continue;
             }
             Element binaryOrigin = ParseProjectXml.findNBMElement(ext, "binary-origin");
+            Element runtimeRelativePath = ParseProjectXml.findNBMElement(ext, "runtime-relative-path");
+            if (runtimeRelativePath != null && binaryOrigin != null) {
+                // Avoid duplicate OSGi bundles from *different* JARs (cannot be handled at runtime in ModuleManager). If the main module's
+                // binary in modules is the external OSGi binary itself, then include just the 
+                // exception: content placed directly to `modules' dir is likely to be bundles / modules themselves. Ignore such extension.
+                String reltext = XMLUtil.findText(runtimeRelativePath);
+                String binText = XMLUtil.findText(binaryOrigin);
+                if (reltext != null && !reltext.contains("/")) {
+                    String target = fakeproj.getProperty("release." + binText);
+                    if (target != null && target.startsWith("modules/")) {
+                        project.log("Ignoring classpath extension " + binText + ":" + reltext + ", it's the module JAR itself.", Project.MSG_INFO);
+                        continue;
+                    }
+                    // Special case: ASM libraries are included from platform/core/asm*, are referenced relatively from org.netbeans.libs.asm
+                    if (reltext.startsWith("asm-") && binText.startsWith("external/asm-")) {
+                        project.log("Ignoring binary origin " + binText + ", including " + reltext , Project.MSG_INFO);
+                        binaryOrigin = null;
+                    }
+                }
+            }
             File origBin = null;
             if (binaryOrigin != null) {
                 String reltext = XMLUtil.findText(binaryOrigin);
@@ -431,7 +451,6 @@ final class ModuleListParser {
 
             File resultBin = null;
             if (origBin == null || !origBin.exists()) {
-                Element runtimeRelativePath = ParseProjectXml.findNBMElement(ext, "runtime-relative-path");
                 if (runtimeRelativePath == null) {
                     throw new IOException("Have malformed <class-path-extension> in " + projectxml);
                 }
