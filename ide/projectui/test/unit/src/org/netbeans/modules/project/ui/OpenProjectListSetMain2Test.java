@@ -26,9 +26,6 @@ import java.util.ArrayList;
 import java.util.EventObject;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectManager;
 import org.netbeans.api.project.ui.OpenProjects;
@@ -45,7 +42,6 @@ import org.openide.nodes.NodeEvent;
 import org.openide.nodes.NodeListener;
 import org.openide.nodes.NodeMemberEvent;
 import org.openide.nodes.NodeReorderEvent;
-import org.openide.util.RequestProcessor;
 import org.openide.util.lookup.Lookups;
 
 /** 
@@ -225,9 +221,10 @@ public class OpenProjectListSetMain2Test extends NbTestCase {
 
 
                 opened++;
-                toOpen.countDown();
             } catch (Throwable t) {
                 error = t;
+            } finally {
+                toOpen.countDown();
             }
         }
         
