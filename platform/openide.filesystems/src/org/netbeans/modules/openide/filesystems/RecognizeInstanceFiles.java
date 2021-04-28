@@ -73,10 +73,15 @@ public final class RecognizeInstanceFiles extends NamedServicesProvider {
         return null;
     }        
     
+    public static Lookup forFolder(FileObject folder) {
+        AbstractLookup.Content cnt = new AbstractLookup.Content();
+        return new OverFiles(folder, folder.getPath(), null, new ArrayList<FOItem>(), new AbstractLookup(cnt), cnt);
+    }
     
     private static final class OverFiles extends ProxyLookup 
     implements FileChangeListener {
         private final String path;
+        private final FileObject root;
         private final FileChangeListener weakL;
         private final AbstractLookup.Content content;
         private final AbstractLookup lkp;
@@ -88,10 +93,15 @@ public final class RecognizeInstanceFiles extends NamedServicesProvider {
         private OverFiles(String path, List<FOItem> items, AbstractLookup.Content cnt) {
             this(path, items, new AbstractLookup(cnt), cnt);
         }
-        
+
         private OverFiles(String path, List<FOItem> items, AbstractLookup lkp, AbstractLookup.Content cnt) {
-            super(computeDelegates(path, items, lkp));
-            this.path = path;
+            this(FileUtil.getConfigFile(path), path, path, items, lkp, cnt);
+        }
+        
+        private OverFiles(FileObject root, String fsPath, String namedPath, List<FOItem> items, AbstractLookup lkp, AbstractLookup.Content cnt) {
+            super(computeDelegates(root, namedPath, items, lkp));
+            this.path = namedPath;
+            this.root = root;
             this.lkp = lkp;
             this.content = cnt;
             this.content.setPairs(order(items));
@@ -119,17 +129,16 @@ public final class RecognizeInstanceFiles extends NamedServicesProvider {
         }
         
         private void refresh(FileEvent ev) {
-            if (!(ev.getFile().getPath() + "/").startsWith(path)) {
+            if (!(ev.getFile().getPath() + "/").startsWith(root.getPath())) {
                 return;
             }
             List<FOItem> items = new ArrayList<FOItem>();
-            Lookup[] delegates = computeDelegates(path, items, lkp);
+            Lookup[] delegates = computeDelegates(root, path, items, lkp);
             this.content.setPairs(order(items));
             this.setLookups(delegates);
         }
         
-        private static Lookup[] computeDelegates(String p, List<FOItem> items, Lookup lkp) {
-            FileObject fo = FileUtil.getConfigFile(p);
+        private static Lookup[] computeDelegates(FileObject fo, String p, List<FOItem> items, Lookup lkp) {
             List<Lookup> delegates = new LinkedList<Lookup>();
             delegates.add(lkp);
             if (fo != null) {
@@ -157,10 +166,12 @@ public final class RecognizeInstanceFiles extends NamedServicesProvider {
             if (l == null) {
                 l = RecognizeInstanceFiles.class.getClassLoader();
             }
-            delegates.add(
-                Lookups.metaInfServices(l, "META-INF/namedservices/" + p) // NOI18N
-            );
-            return delegates.toArray(new Lookup[0]);
+            if (p != null) {
+                delegates.add(
+                    Lookups.metaInfServices(l, "META-INF/namedservices/" + p) // NOI18N
+                );
+            }
+            return delegates.toArray(new Lookup[delegates.size()]);
         }
     
         public void fileFolderCreated(FileEvent fe) {

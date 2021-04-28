@@ -56,6 +56,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.netbeans.modules.openide.filesystems.RecognizeInstanceFiles;
 import org.netbeans.modules.openide.filesystems.declmime.MIMEResolverImpl;
 import org.openide.filesystems.FileSystem.AtomicAction;
 import org.openide.filesystems.spi.ArchiveRootProvider;
@@ -2224,6 +2225,13 @@ public final class FileUtil extends Object {
      */
     public static FileObject getSystemConfigRoot() {
         return getSystemConfigFile("");
+    }
+    
+    public static Lookup folder2Lookup(FileObject folder) {
+        if (folder == null || !folder.isFolder()) {
+            throw new IllegalArgumentException("Not a folder: " + folder);
+        }
+        return RecognizeInstanceFiles.forFolder(folder);
     }
 
     private static File wrapFileNoCanonicalize(File f) {

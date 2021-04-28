@@ -28,12 +28,17 @@ import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import org.netbeans.api.project.Project;
@@ -53,6 +58,7 @@ import static java.util.logging.Level.*;
 
 import java.util.logging.Logger;
 import org.gradle.tooling.ProjectConnection;
+import org.gradle.util.GradleVersion;
 import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.api.annotations.common.SuppressWarnings;
 import org.netbeans.api.project.ui.ProjectProblems;
@@ -62,6 +68,9 @@ import org.netbeans.spi.project.CacheDirectoryProvider;
 import org.netbeans.spi.project.support.LookupProviderSupport;
 import org.netbeans.spi.project.ui.ProjectOpenedHook;
 import org.netbeans.spi.project.ui.support.UILookupMergerSupport;
+import org.openide.filesystems.FileChangeAdapter;
+import org.openide.filesystems.FileSystem;
+import org.openide.filesystems.MultiFileSystem;
 import org.openide.util.lookup.ProxyLookup;
 
 /**
@@ -407,55 +416,160 @@ public final class NbGradleProjectImpl implements Project {
             return FileUtil.createFolder(getCacheDir(gradleFiles));
         }
     }
+    
+    private static class PluginFS extends MultiFileSystem {
+        final String prefix;
+        
+        PluginFS(FileSystem[] original, String prefix) {
+            super(original);
+            this.prefix = prefix;
+        }
+        
+        @Override
+        protected FileObject findResourceOn(FileSystem fs, String res) {
+            return fs.findResource(prefix + res);
+        }
+    }
 
     private static class PluginDependentLookup extends ProxyLookup implements PropertyChangeListener {
-
-        private static final String NB_GENERAL = "<nb-general>"; //NOI18N
         private static final String NB_ROOT_PLUGIN = "root"; //NOI18N
+        private static final String PREFIIX_GENERAL = "Projects/" + NbGradleProject.GRADLE_PROJECT_TYPE + "/Lookup"; // NOI18N
+        private static final String PREFIIX_ANY = "Projects/" + NbGradleProject.GRADLE_PLUGIN_TYPE + "/_any/Lookup"; // NOI18N
+
         private final WeakReference<NbGradleProject> watcherRef;
         private final Map<String, Lookup> pluginLookups = new HashMap<>();
+        
+        private final FileChangeListener fileAdapter = new FileChangeAdapter() {
+            @Override
+            public void fileAttributeChanged(FileAttributeEvent fe) {
+                if (FileUtil.affectsOrder(fe)) {
+                    check();
+                }
+            }
+
+            @Override
+            public void fileRenamed(FileRenameEvent fe) {
+                check();
+            }
+
+            @Override
+            public void fileDeleted(FileEvent fe) {
+                check();
+            }
+
+            @Override
+            public void fileChanged(FileEvent fe) {
+                check();
+            }
+            
+        };
+        
+        private final FileChangeListener parentAdapter = new FileChangeAdapter() {
+            @Override
+            public void fileDeleted(FileEvent fe) {
+                check();
+            }
+
+            @Override
+            public void fileDataCreated(FileEvent fe) {
+                check();
+            }
+
+            @Override
+            public void fileFolderCreated(FileEvent fe) {
+                check();
+            }
+        };
+        
+        // @GuardedBy(this)
+        private List<FileObject> pluginRoots = Collections.emptyList();
+        // @GuardedBy(this)
+        private Collection<FileObject> watchedFiles = Collections.emptyList();
+        // @GuardedBy(this)
+        private Collection<FileObject> watchedParents = Collections.emptyList();
 
         @java.lang.SuppressWarnings("LeakingThisInConstructor")
         public PluginDependentLookup(NbGradleProject watcher) {
             watcherRef = new WeakReference<>(watcher);
-            Lookup general = Lookups.forPath("Projects/" + NbGradleProject.GRADLE_PROJECT_TYPE + "/Lookup"); //NOI18N
-            pluginLookups.put(NB_GENERAL, general); //NOI18N
-            setLookups(general);
+            check();
             watcher.addPropertyChangeListener(WeakListeners.propertyChange(this, watcher));
         }
-
+        
         private void check() {
-            boolean lookupsChanged = false;
             NbGradleProject watcher = watcherRef.get();
-            if (watcher != null) {
-                lookupsChanged = !watcher.isGradleProjectLoaded();
-                if (watcher.isGradleProjectLoaded()) {
-                    GradleBaseProject prj = watcher.projectLookup(GradleBaseProject.class);
-                    Set<String> currentPlugins = new HashSet<>(prj.getPlugins());
-                    if (prj.isRoot()) {
-                        currentPlugins.add(NB_ROOT_PLUGIN);
-                    }
-                    for (String cp : currentPlugins) {
-                        //Add Lookups for new plugins
-                        if (!pluginLookups.containsKey(cp)) {
-                            Lookup pluginLookup = Lookups.forPath("Projects/" + NbGradleProject.GRADLE_PLUGIN_TYPE + "/" + cp + "/Lookup"); //NOI18N
-                            pluginLookups.put(cp, pluginLookup);
-                            lookupsChanged = true;
-                        }
-                    }
-                    Iterator<String> it = pluginLookups.keySet().iterator();
-                    while (it.hasNext()) {
-                        String oldPlugin = it.next();
-                        if (!currentPlugins.contains(oldPlugin) && !NB_GENERAL.equals(oldPlugin)) {
-                            it.remove();
-                            lookupsChanged = true;
-                        }
-                    }
+            if (watcher == null) {
+                return;
+            }
+            List<FileObject> ordered = new ArrayList<>();
+            Set<FileObject> filePaths = new TreeSet<>();
+            Set<FileObject> parentPaths = new TreeSet<>();
+            Set<String> plugins = new HashSet<>();
+            
+            if (watcher.isGradleProjectLoaded()) {
+                GradleBaseProject prj = watcher.projectLookup(GradleBaseProject.class);
+                plugins.addAll(prj.getPlugins());
+                if (prj.isRoot()) {
+                    // root plugin is the last one
+                    plugins.add(NB_ROOT_PLUGIN);
+                }
+            } else {
+                plugins.add("_any"); // NOI18N
+            }
+            
+            List<FileObject> folders = new ArrayList<>(plugins.size());
+            FileObject pluginRoot = FileUtil.getConfigFile("Projects/" + NbGradleProject.GRADLE_PLUGIN_TYPE);
+            // iterate in the file-system order to get at least SOME defined default order (according to module dependencies)
+            for (FileObject pl : pluginRoot.getChildren()) {
+                if (plugins.remove(pl.getName())) {
+                    folders.add(pl);
+                    filePaths.add(pl);
                 }
             }
-            if (lookupsChanged) {
-                setLookups(pluginLookups.values().toArray(new Lookup[pluginLookups.size()]));
+            // process the remaining plugins, not found in the pluginRoot.
+            for (String id : plugins) {
+                String prefix = "Projects/" + NbGradleProject.GRADLE_PLUGIN_TYPE + "/" + id + "/Lookup";
+                FileObject prev = FileUtil.getConfigRoot();
+                for (String s : prefix.split("/")) {
+                    FileObject cur = prev.getFileObject(s);
+                    if (cur != null) {
+                        prev = cur;
+                    }
+                }
+                parentPaths.add(prev);
             }
+            // the default order is defined by 'plugin folder' order on SFS
+            ordered = FileUtil.getOrder(folders, false);
+            
+            // add the general Lookup first:
+            ordered.add(0, FileUtil.getConfigFile(PREFIIX_GENERAL));
+            ordered.add(FileUtil.getConfigFile(PREFIIX_ANY));
+
+            FileSystem cfgSys;
+            try {
+                cfgSys = FileUtil.getConfigRoot().getFileSystem();
+            } catch (IOException ex) {
+                Exceptions.printStackTrace(ex);
+                return;
+            }
+            FileSystem[] cfg = new FileSystem[] { cfgSys };
+            synchronized (this) {
+                reattachListeners(parentPaths, watchedParents, parentAdapter);
+                reattachListeners(filePaths, watchedFiles, fileAdapter);
+                watchedParents = parentPaths;
+                watchedFiles = filePaths;
+
+                if (ordered.equals(pluginRoots)) {
+                    return;
+                }
+                pluginRoots = ordered;
+            }
+            List<MultiFileSystem> fsList = new ArrayList<>(ordered.size());
+            for (FileObject f : ordered) {
+                String prefix = FileUtil.getRelativePath(FileUtil.getConfigRoot(), f);
+                fsList.add(new PluginFS(cfg, prefix));
+            }
+            MultiFileSystem mfs = new MultiFileSystem(fsList.toArray(new FileSystem[fsList.size()]));
+            setLookups(FileUtil.folder2Lookup(mfs.getRoot()));
         }
 
         @Override
@@ -464,9 +578,22 @@ public final class NbGradleProjectImpl implements Project {
                 check();
             }
         }
-
+        
+        private void reattachListeners(Collection<FileObject> current, Collection<FileObject> prev, FileChangeListener l) {
+            if (prev.equals(current)) {
+                return;
+            }
+            Set<FileObject> rem = new HashSet<>(prev);
+            rem.removeAll(current);
+            
+            Set<FileObject> add = new HashSet<>(current);
+            rem.removeAll(prev);
+            
+            rem.forEach(f -> f.removeFileChangeListener(l));
+            add.forEach(f -> f.addFileChangeListener(l));
+        }
     }
-
+    
     private class Updater implements FileChangeListener {
 
         final FileProvider fileProvider;
