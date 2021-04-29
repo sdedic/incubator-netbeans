@@ -20,7 +20,6 @@ package org.netbeans.modules.gradle.loaders;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.logging.Logger;
 import org.netbeans.api.project.Project;
 import org.netbeans.modules.gradle.GradleProject;
 import org.netbeans.modules.gradle.GradleProjectLoader;
@@ -37,8 +36,6 @@ import org.netbeans.modules.gradle.options.GradleExperimentalSettings;
 public class GradleProjectLoaderImpl implements GradleProjectLoader {
 
     final Project project;
-    private String actionDescription;
-    private static final Logger LOGGER = Logger.getLogger(GradleProjectLoaderImpl.class.getName());
 
     public GradleProjectLoaderImpl(Project project) {
         this.project = project;
@@ -46,7 +43,6 @@ public class GradleProjectLoaderImpl implements GradleProjectLoader {
 
     @Override
     public GradleProject loadProject(NbGradleProject.Quality aim, String descriptionOpt, boolean ignoreCache, boolean interactive, String... args) {
-        LOGGER.info("Load aiming " +aim + " for "+ project);
         GradleCommandLine cmd = new GradleCommandLine(args);
         AbstractProjectLoader.ReloadContext ctx = new AbstractProjectLoader.ReloadContext((NbGradleProjectImpl) project, aim, cmd, descriptionOpt);
         List<AbstractProjectLoader> loaders = new LinkedList<>();
