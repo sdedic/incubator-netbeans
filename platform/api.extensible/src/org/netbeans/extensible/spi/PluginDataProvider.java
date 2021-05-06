@@ -20,6 +20,7 @@
 package org.netbeans.extensible.spi;
 
 import java.util.List;
+import org.netbeans.extensible.api.Composition;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Lookup;
 
@@ -51,7 +52,7 @@ public interface PluginDataProvider {
      * @return The <code>Lookup</code> for the given <code>MimePath</code> or
      * <code>null</code> if there is no lookup available for this mime path.
      */
-    public Lookup getLookup(Lookup context, List<String> pluginIds);
+    public Lookup getLookup(Composition composition);
 
-    public FileObject[] getContent(Lookup context, List<String> pluginIds);
+    public FileObject[] getContent(Composition composition);
 }

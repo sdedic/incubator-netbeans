@@ -25,25 +25,28 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**Should be used for services that are to be registered to the MimeLookup and that
- * need a specific subfolder to be used for the registration (optional, mime-type root
- * will be searched if this annotation is missing)
- *
- * @author Jan Lahoda
- * @since 1.19
- * @see MimeRegistration
+/**
+ * Should be used for services that are to be registered to the and that
+ * need a specific subfolder to be used for the registration. The annotation is optional:
+ * base folder will be searched if the annotation is missing. 
+ * <p/>
+ * Separating different services into individual subfolders works as compartments, allows
+ * to reuse interface 
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface MimeLocation {
+public @interface PluginLocation {
 
     /**
      * Folder under which the services should be registered in the system filesystem.
-     * The full path for registering the services will then be <code>Editors/&lt;mime-type&gt;/&lt;subfolderName&gt;</code>
+     * The full path for registering the services will then be <code>&lt;component-id&gt;/&lt;subfolderName&gt;</code>
      */
     public String subfolderName();
 
+    /**
+     * Conversion 
+     */
     @SuppressWarnings("rawtypes")
     public Class<? extends InstanceProvider> instanceProviderClass() default InstanceProvider.class;
     

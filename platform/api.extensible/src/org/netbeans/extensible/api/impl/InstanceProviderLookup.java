@@ -23,8 +23,9 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.Collections;
 import java.util.List;
-import org.netbeans.spi.editor.mimelookup.InstanceProvider;
+import org.netbeans.extensible.spi.InstanceProvider;
 import org.openide.filesystems.FileObject;
+import org.openide.util.Lookup;
 import org.openide.util.lookup.AbstractLookup;
 import org.openide.util.lookup.InstanceContent;
 
@@ -33,21 +34,23 @@ import org.openide.util.lookup.InstanceContent;
  * @author vita
  */
 public final class InstanceProviderLookup extends AbstractLookup {
-
+    private final Lookup context;
+    
     private InstanceContent content;
-    private InstanceProvider<?> instanceProvider;
+    private final InstanceProvider<?> instanceProvider;
     
     private CompoundFolderChildren children;
     private PCL listener = new PCL();
 
     /** Creates a new instance of InstanceProviderLookup */
-    public InstanceProviderLookup(String [] paths, InstanceProvider instanceProvider) {
-        this(paths, instanceProvider, new InstanceContent());
+    public InstanceProviderLookup(Lookup context, String [] paths, InstanceProvider instanceProvider) {
+        this(context, paths, instanceProvider, new InstanceContent());
     }
     
-    private InstanceProviderLookup(String [] paths, InstanceProvider instanceProvider, InstanceContent content) {
+    private InstanceProviderLookup(Lookup context, String [] paths, InstanceProvider instanceProvider, InstanceContent content) {
         super(content);
         
+        this.context = context;
         this.content = content;
         this.instanceProvider = instanceProvider;
         
@@ -62,7 +65,7 @@ public final class InstanceProviderLookup extends AbstractLookup {
     
     private void rebuild() {
         List<FileObject> files = children.getChildren();
-        Object instance = instanceProvider.createInstance(files);
+        Object instance = instanceProvider.createInstance(context, files);
         content.set(Collections.singleton(instance), null);
     }
     

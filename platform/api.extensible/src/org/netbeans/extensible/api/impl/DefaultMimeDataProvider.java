@@ -19,7 +19,9 @@
 
 package org.netbeans.extensible.api.impl;
 
-import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
+import org.netbeans.extensible.api.Composition;
 import org.netbeans.extensible.spi.PluginDataProvider;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Lookup;
@@ -30,23 +32,21 @@ import org.openide.util.Lookup;
  */
 @org.openide.util.lookup.ServiceProvider(service=org.netbeans.extensible.spi.PluginDataProvider.class, position=0)
 public class DefaultMimeDataProvider implements PluginDataProvider  {
+    
+    private Map<Composition, SwitchLookup>  lookupCache = new WeakHashMap<>();
 
     /** Creates a new instance of DefaultMimeDataProvider */
     public DefaultMimeDataProvider() {
         // no-op
     }
 
-    public Lookup getLookup(List<String> pluginIds) {
-        return new SwitchLookup(mimePath);
+    @Override
+    public Lookup getLookup(Composition composition) {
+        return new SwitchLookup(composition);
     }
 
     @Override
-    public Lookup getLookup(Lookup context, List<String> pluginIds) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public FileObject[] getContent(Lookup context, List<String> pluginIds) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public FileObject[] getContent(Composition composition) {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 }

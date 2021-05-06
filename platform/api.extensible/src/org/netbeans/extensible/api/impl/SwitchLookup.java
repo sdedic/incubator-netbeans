@@ -27,9 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.netbeans.api.editor.mimelookup.MimePath;
-import org.netbeans.spi.editor.mimelookup.InstanceProvider;
-import org.netbeans.spi.editor.mimelookup.MimeLocation;
+import java.util.stream.Collectors;
+import org.netbeans.extensible.api.Composition;
+import org.netbeans.extensible.spi.InstanceProvider;
+import org.netbeans.extensible.spi.PluginLocation;
 import org.openide.util.Exceptions;
 import org.openide.util.Lookup;
 
@@ -43,16 +44,15 @@ public class SwitchLookup extends Lookup {
     
     /* package */ static final String ROOT_FOLDER = "Editors"; //NOI18N
 
-    private MimePath mimePath;
+    private final Composition mimePath;
 
     private final String LOCK = new String("SwitchLookup.LOCK"); //NOI18N
     
     private Map<Class<?>,Lookup> classLookups = new HashMap<Class<?>, Lookup>();
     private Map<List<String>,Lookup> pathsLookups = new HashMap<List<String>,Lookup>();
 
-    public SwitchLookup(MimePath mimePath) {
+    public SwitchLookup(Composition mimePath) {
         super();
-        
         this.mimePath = mimePath;
     }
 
@@ -77,10 +77,10 @@ public class SwitchLookup extends Lookup {
     }
 
     private Lookup createLookup(Class<?> forClass) {
-        MimeLocation loc = forClass.getAnnotation(MimeLocation.class);
+        PluginLocation loc = forClass.getAnnotation(PluginLocation.class);
 
         if (loc == null) {
-            loc = new MimeLocation() {
+            loc = new PluginLocation() {
                 @Override
                 public String subfolderName() {
                     return null;
@@ -92,11 +92,11 @@ public class SwitchLookup extends Lookup {
 
                 @Override
                 public Class<? extends Annotation> annotationType() {
-                    return MimeLocation.class;
+                    return PluginLocation.class;
                 }
             };
         }
-        List<String> paths = computePaths(mimePath, ROOT_FOLDER, loc.subfolderName());
+        List<String> paths = computePaths(mimePath, loc.subfolderName());
         Lookup lookup;
         
         if (loc.instanceProviderClass() != null && loc.instanceProviderClass() != InstanceProvider.class) {
@@ -129,38 +129,15 @@ public class SwitchLookup extends Lookup {
     }
 
     private Lookup getLookupForProvider(List<String> paths, InstanceProvider instanceProvider) {
-        return new InstanceProviderLookup(paths.toArray(new String[paths.size()]), instanceProvider);
+        return new InstanceProviderLookup(mimePath.getBaseContext(), paths.toArray(new String[paths.size()]), instanceProvider);
     }
     
-    private static List<String> computePaths(MimePath mimePath, String prefixPath, String suffixPath) {
-        try {
-            Method m = MimePath.class.getDeclaredMethod("getInheritedPaths", String.class, String.class); //NOI18N
-            m.setAccessible(true);
-            @SuppressWarnings("unchecked")
-            List<String> paths = (List<String>) m.invoke(mimePath, prefixPath, suffixPath);
-            return paths;
-        } catch (Exception e) {
-            LOG.log(Level.WARNING, "Can't call org.netbeans.api.editor.mimelookup.MimePath.getInheritedPaths method.", e); //NOI18N
+    private static List<String> computePaths(Composition mimePath, String suffixPath) {
+        if (suffixPath == null) {
+            return mimePath.getComponents();
+        } else {
+            return mimePath.getComponents().stream().map(c -> c + "/" + suffixPath).collect(Collectors.toList());
         }
-        
-        // No inherited mimepaths, provide at least something
-        StringBuilder sb = new StringBuilder();
-        if (prefixPath != null && prefixPath.length() > 0) {
-            sb.append(prefixPath);
-        }
-        if (mimePath.size() > 0) {
-            if (sb.length() > 0) {
-                sb.append('/'); //NOI18N
-            }
-            sb.append(mimePath.getPath());
-        }
-        if (suffixPath != null && suffixPath.length() > 0) {
-            if (sb.length() > 0) {
-                sb.append('/'); //NOI18N
-            }
-            sb.append(suffixPath);
-        }
-        return Collections.singletonList(sb.toString());
     }
     
 }
