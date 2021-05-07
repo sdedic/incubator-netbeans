@@ -76,6 +76,7 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
     
     private final AtomicBoolean resetCache = new AtomicBoolean(false);
     private FileChangeListener listener = null;
+    private String displayName;
     
     public M2Configuration(String id, FileObject projectDirectory) {
         assert id != null;
@@ -83,7 +84,6 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
         this.projectDirectory = projectDirectory;
         profiles = Collections.<String>emptyList();
     }
-
     
      @Override       
      @Messages("TXT_DefaultConfig=<default config>")
@@ -91,7 +91,11 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
         if (DEFAULT.equals(id)) {
             return TXT_DefaultConfig();
         }
-        return id;
+        return displayName != null ? displayName : id;
+    }
+     
+    void setDisplayName(String displayName) {
+        this.displayName = displayName;
     }
     
     public @NonNull String getId() {
@@ -146,7 +150,7 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
     public @Override InputStream getActionDefinitionStream() {
         return getActionDefinitionStream(id);
     }
-    
+
     final InputStream getActionDefinitionStream(String forId) {
         checkListener();
         FileObject fo = projectDirectory.getFileObject(getFileNameExt(forId));
@@ -249,15 +253,25 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
                         rdr = new InputStreamReader(in);
                         ActionToGoalMapping def = reader.read(rdr);
                         for (NetbeansActionProfile p : def.getProfiles()) {
-                            if (id.equals(p.getId())) {
-                                ActionToGoalMapping m = new ActionToGoalMapping();
-                                m.setActions(m.getActions());
-                                m.setModelEncoding(m.getModelEncoding());
-                                originalMappings = m;
+                            if (id.equals(p.getId()) && p.getActions() != null) {
+                                Map<String, Integer> posMap = new HashMap<>();
+                                for (int i = 0; i < def.getActions().size(); i++) {
+                                    posMap.put(def.getActions().get(i).getActionName(), i);
+                                }
+                                // merge in or override global actions:
+                                for (NetbeansActionMapping am : p.getActions()) {
+                                    String n = am.getActionName();
+                                    Integer i = posMap.get(n);
+                                    if (null == i) {
+                                        def.getActions().add(am);
+                                    } else {
+                                        def.getActions().set(i, am);
+                                    }
+                                }
                                 break;
                             }
                         }
-
+                        originalMappings = def;
                     } else {
                         originalMappings = new ActionToGoalMapping();
                     }

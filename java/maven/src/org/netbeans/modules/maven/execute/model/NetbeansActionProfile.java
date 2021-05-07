@@ -28,7 +28,7 @@ public class NetbeansActionProfile {
      */
     private java.util.List<NetbeansActionMapping> actions;
     private String id;
-
+    private String displayName;
 
       //-----------/
      //- Methods -/
@@ -86,5 +86,12 @@ public class NetbeansActionProfile {
     {
         this.actions = actions;
     } //-- void setActions(java.util.List) 
-    
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
 }

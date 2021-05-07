@@ -26,6 +26,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -40,6 +41,8 @@ import java.util.logging.Logger;
 import org.netbeans.modules.maven.api.NbMavenProject;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.netbeans.api.project.Project;
+import org.netbeans.modules.maven.NbMavenProjectImpl;
+import org.netbeans.modules.maven.configurations.M2ConfigProvider;
 import org.netbeans.modules.maven.configurations.M2Configuration;
 import org.netbeans.modules.maven.execute.DefaultReplaceTokenProvider;
 import org.netbeans.modules.maven.execute.ModelRunConfig;
@@ -245,6 +248,10 @@ public abstract class AbstractMavenActionsProvider implements MavenActionsProvid
      * @return 
      */
     protected abstract InputStream getActionDefinitionStream();
+    
+    protected Iterable<InputStream> getActionDefinitionStreams() {
+        return Collections.singletonList(getActionDefinitionStream());
+    }
 
     private RunConfig mapGoalsToAction(Project project, String actionName, Map<String, String> replaceMap, FileObject selectedFile, Lookup lookup) {
         try {
@@ -319,5 +326,44 @@ public abstract class AbstractMavenActionsProvider implements MavenActionsProvid
             }
         }
         return buf.toString();
+    }
+    
+    public static MavenActionsProvider fromResource(Project mavenProject, URL resourceURL) {
+        NbMavenProjectImpl mvn = mavenProject.getLookup().lookup(NbMavenProjectImpl.class);
+        if (mvn == null) {
+            throw new IllegalArgumentException("Not a maven proejct: " + mavenProject);
+        }
+    }
+    
+    static final class ResourceActionProvider extends AbstractMavenActionsProvider {
+        private final URL resource;
+        private final NbMavenProjectImpl project;
+        private final M2ConfigProvider cfg;
+        
+        public ResourceActionProvider(NbMavenProjectImpl prj, URL resource) {
+            this.resource = resource;
+            this.project = prj;
+            cfg = project.getLookup().lookup(M2ConfigProvider.class);
+        }
+        
+        private String getActiveConfigurationId() {
+            M2Configuration active = cfg.getActiveConfiguration();
+            return active.getId();
+        }
+
+        @Override
+        public ActionToGoalMapping getRawMappings() {
+            ActionToGoalMapping super.getRawMappings();
+        }
+
+        @Override
+        protected InputStream getActionDefinitionStream() {
+            try {
+                return resource.openStream();
+            } catch (IOException ex) {
+                throw new IllegalStateException(ex);
+            }
+        }
+
     }
 }

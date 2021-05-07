@@ -268,6 +268,13 @@ public class ModelHandle2 {
     public static Configuration createProfileConfiguration(String id) {
         return ModelHandle.createProfileConfiguration(id);
     }
+
+    public static Configuration createProvidedConfiguration(String id) {
+        ModelHandle.Configuration conf = new ModelHandle.Configuration();
+        conf.setId(id);
+        conf.setDefault(true);
+        return conf;
+    }
     
     public static Configuration createDefaultConfiguration() {
         return ModelHandle.createDefaultConfiguration();
@@ -372,7 +379,19 @@ public class ModelHandle2 {
             return M2Configuration.getFileNameExt(id);
         }
 
+        /**
+         * Identifies the default configuration.
+         * @return true for just the default configuration
+         */
         public boolean isDefault() {
+            return defaul && M2Configuration.DEFAULT.equals(id);
+        }
+
+        /**
+         * True, if the configuration was provided but not default or profile.
+         * @return true for provided configuration
+         */
+        public boolean isProvided() {
             return defaul;
         }
 
@@ -400,6 +419,7 @@ public class ModelHandle2 {
         @Messages({
             "DefaultConfig=<default config>",
             "# {0} - config ID", "ProfileConfig={0} (Profile)",
+            "# {0} - config ID", "ProvidedConfig={0} (provided)",
             "# {0} - config ID", "# {1} - list of profiles", "CustomConfig1={0} (Profiles: {1})",
             "# {0} - config ID", "CustomConfig2={0}"
         })
@@ -409,6 +429,9 @@ public class ModelHandle2 {
             }
             if (isProfileBased()) {
                 return ProfileConfig(id);
+            }
+            if (isProvided()) {
+                return ProvidedConfig(id);
             }
             if (getActivatedProfiles() != null && getActivatedProfiles().size() > 0) {
                 return CustomConfig1(id, Arrays.toString(getActivatedProfiles().toArray()));
