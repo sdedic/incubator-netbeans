@@ -48,6 +48,7 @@ import org.netbeans.modules.maven.execute.DefaultReplaceTokenProvider;
 import org.netbeans.modules.maven.execute.ModelRunConfig;
 import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
+import org.netbeans.modules.maven.execute.model.NetbeansActionProfile;
 import org.netbeans.modules.maven.execute.model.NetbeansActionReader;
 import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3Reader;
 import org.netbeans.modules.maven.execute.model.io.xpp3.NetbeansBuildActionXpp3Writer;
@@ -333,27 +334,61 @@ public abstract class AbstractMavenActionsProvider implements MavenActionsProvid
         if (mvn == null) {
             throw new IllegalArgumentException("Not a maven proejct: " + mavenProject);
         }
+        return new ResourceConfigAwareProvider(mvn, resourceURL);
     }
     
-    static final class ResourceActionProvider extends AbstractMavenActionsProvider {
+    static class ResourceConfigAwareProvider extends AbstractMavenActionsProvider {
         private final URL resource;
-        private final NbMavenProjectImpl project;
-        private final M2ConfigProvider cfg;
+        private final Project project;
+        private final Map<String, ActionToGoalMapping> profileMap = new HashMap<>();
+        private M2ConfigProvider cfg;
         
-        public ResourceActionProvider(NbMavenProjectImpl prj, URL resource) {
+        ResourceConfigAwareProvider(Project prj, URL resource) {
             this.resource = resource;
             this.project = prj;
-            cfg = project.getLookup().lookup(M2ConfigProvider.class);
         }
         
-        private String getActiveConfigurationId() {
-            M2Configuration active = cfg.getActiveConfiguration();
-            return active.getId();
+        private M2ConfigProvider cfg() {
+            if (this.cfg != null) {
+                return this.cfg;
+            }
+            return this.cfg = project.getLookup().lookup(M2ConfigProvider.class);
         }
-
+        
         @Override
         public ActionToGoalMapping getRawMappings() {
-            ActionToGoalMapping super.getRawMappings();
+            ActionToGoalMapping  allMappings = super.getRawMappings();
+            String id = cfg().getActiveConfiguration().getId();
+            if (M2Configuration.DEFAULT.equals(id) || allMappings.getProfiles() == null || allMappings.getProfiles().isEmpty()) {
+                return allMappings;
+            }
+            synchronized (this) {
+                ActionToGoalMapping pm = profileMap.get(id);
+                if (pm != null) {
+                    return pm;
+                }
+                if (!profileMap.isEmpty()) {
+                    return allMappings;
+                }
+                
+                for (NetbeansActionProfile p : allMappings.getProfiles()) {
+                    Set<String> overridenIds = new HashSet<>();
+                    ActionToGoalMapping m = new ActionToGoalMapping();
+                    for (NetbeansActionMapping am : p.getActions()) {
+                        overridenIds.add(am.getActionName());
+                        m.addAction(am);
+                    }
+                    for (NetbeansActionMapping am : allMappings.getActions()) {
+                        if (!overridenIds.contains(am.getActionName())) {
+                            m.addAction(am);
+                        }
+                    }
+                    profileMap.put(p.getId(), m);
+                }
+                
+                pm = profileMap.get(id);
+                return pm == null ? allMappings : pm;
+            }
         }
 
         @Override

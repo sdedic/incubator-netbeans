@@ -277,6 +277,13 @@ public final class ModelHandle {
         return conf;
     }
     
+    public static Configuration createDefaultConfiguration(String id) {
+        Configuration conf = new Configuration();
+        conf.setId(id);
+        conf.setDefault(true);
+        return conf;
+    }
+    
     public static Configuration createCustomConfiguration(String id) {
         Configuration conf = new Configuration();
         conf.setId(id);

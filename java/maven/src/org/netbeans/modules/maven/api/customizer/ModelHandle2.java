@@ -365,6 +365,7 @@ public class ModelHandle2 {
      */
     public static class Configuration {
         private String id;
+        private String displayName;
         private boolean profileBased = false;
         private boolean defaul = false;
 
@@ -393,6 +394,10 @@ public class ModelHandle2 {
          */
         public boolean isProvided() {
             return defaul;
+        }
+        
+        public void setDisplayName(String dn) {
+            this.displayName = dn;
         }
 
         public void setDefault(boolean def) {
@@ -424,19 +429,20 @@ public class ModelHandle2 {
             "# {0} - config ID", "CustomConfig2={0}"
         })
         public String getDisplayName() {
+            String n = displayName == null ? id : displayName;
             if (isDefault()) {
                 return DefaultConfig();
             }
             if (isProfileBased()) {
-                return ProfileConfig(id);
+                return ProfileConfig(n);
             }
             if (isProvided()) {
-                return ProvidedConfig(id);
+                return ProvidedConfig(n);
             }
             if (getActivatedProfiles() != null && getActivatedProfiles().size() > 0) {
-                return CustomConfig1(id, Arrays.toString(getActivatedProfiles().toArray()));
+                return CustomConfig1(n, Arrays.toString(getActivatedProfiles().toArray()));
             }
-            return CustomConfig2(id);
+            return CustomConfig2(n);
         }
 
         public String getId() {

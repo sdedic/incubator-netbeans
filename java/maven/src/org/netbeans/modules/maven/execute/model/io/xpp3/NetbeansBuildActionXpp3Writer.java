@@ -198,7 +198,7 @@ public class NetbeansBuildActionXpp3Writer {
         serializer.startTag( NAMESPACE, tagName);
         serializer.startTag( NAMESPACE, "id" ).text( p.getId()).endTag( NAMESPACE, "id");
         if (p.getDisplayName() != null) {
-            serializer.startTag( NAMESPACE, "displayName" ).text( p.getId()).endTag( NAMESPACE, "id");
+            serializer.startTag( NAMESPACE, "displayName" ).text( p.getId()).endTag( NAMESPACE, "displayName");
         }
         serializer.startTag( NAMESPACE, "actions");
         for (NetbeansActionMapping m : p.getActions()) {

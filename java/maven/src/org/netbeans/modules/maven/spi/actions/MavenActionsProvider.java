@@ -19,9 +19,11 @@
 
 package org.netbeans.modules.maven.spi.actions;
 
+import java.util.List;
 import java.util.Set;
 import org.netbeans.modules.maven.api.execute.RunConfig;
 import org.netbeans.api.project.Project;
+import org.netbeans.modules.maven.api.MavenConfiguration;
 import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.spi.project.ProjectServiceProvider;
 import org.openide.util.Lookup;
@@ -66,4 +68,33 @@ public interface MavenActionsProvider {
      * @return
      */
     Set<String> getSupportedDefaultActions();
+    
+    /**
+     * Enhances the provider to work with project configurations. Adds the ability to 
+     * provide different actions, or map actions differently for different configurations.
+     */
+    public interface ConfigurationAware extends MavenActionsProvider {
+        
+        /**
+         * Enumerates configurations provided or extended by the Provider. May return
+         * {@code null} if configurations are not supported. The set of configurations must be
+         * static - must not change. The {@link #MavenActionsProvider} instance may be
+         * replaced by a new instance, however.
+         * @return list of configurations.
+         */
+        public List<MavenConfiguration> getConfigurations();
+        
+        /**
+         * Returns a provider effective for the specific configuration. May provide 
+         * specialized mappings or logic.
+         * <p/>
+         * This call is valid on the {@link MavenActionsProvider} instance registered in
+         * the (project) Lookup. Results of calling on an instance obtained from {@link #forConfiguration}
+         * call are not defined.
+         * 
+         * @param cfg the configuration.
+         * @return action provider.
+         */
+        public MavenActionsProvider forConfiguration(MavenConfiguration cfg);
+    }
 }

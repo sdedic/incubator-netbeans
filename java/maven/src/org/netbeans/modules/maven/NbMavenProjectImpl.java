@@ -252,6 +252,7 @@ public final class NbMavenProjectImpl implements Project {
         basicLookup = createBasicLookup(projectState, auxiliary);
         //here we always load the MavenProject instance because we need to touch the packaging from pom.
         completeLookup = LookupProviderSupport.createCompositeLookup(basicLookup, new PackagingTypeDependentLookup(watcher));
+        configProvider.setSupplementalLookup(completeLookup);
     }
 
     public File getPOMFile() {
@@ -853,7 +854,7 @@ public final class NbMavenProjectImpl implements Project {
             String groupId = pluginArtifact.getGroupId();
             String artId = pluginArtifact.getArtifactId();
             
-            return groupId + "-" + artId;
+            return groupId + ":" + artId;
         }
         
         private List<String> partialComponentsOrder(Collection<String> componentSet) {
@@ -886,7 +887,12 @@ public final class NbMavenProjectImpl implements Project {
                     newPackaging = NbMavenProject.TYPE_JAR;
                 }
                 Set<Artifact> arts = watcher.getMavenProject().getPluginArtifacts();
-                List<String> compNames = arts.stream().map(this::pluginDirectory).collect(Collectors.toList());
+                List<String> compNames = new ArrayList<>();
+                if (arts != null) {
+                    for (Artifact a : arts) {
+                        compNames.add(pluginDirectory(a));
+                    }
+                }
                 compNames.add(newPackaging);
                 
                 newComponents = partialComponentsOrder(compNames);

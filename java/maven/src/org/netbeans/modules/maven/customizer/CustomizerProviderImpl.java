@@ -223,6 +223,20 @@ public class CustomizerProviderImpl implements CustomizerProvider2 {
                 active = c;
             }
         }
+
+        for (M2Configuration config : provider.getProvidedConfigurations()) {
+            mapps.put(config.getId(), reader.read(new StringReader(config.getRawMappingsAsString())));
+            c = ModelHandle.createDefaultConfiguration(config.getId());
+            String dn = config.getDisplayName();
+            if (!config.getId().equals(dn)) {
+                c.setDisplayName(dn);
+            }
+            configs.add(c);
+            if (act.equals(config)) {
+                active = c;
+            }
+        }
+
         for (M2Configuration config : provider.getProfileConfigurations()) {
             mapps.put(config.getId(), reader.read(new StringReader(config.getRawMappingsAsString())));
             c = ModelHandle.createProfileConfiguration(config.getId());
@@ -231,6 +245,7 @@ public class CustomizerProviderImpl implements CustomizerProvider2 {
                 active = c;
             }
         }
+
         if (active == null) { //#152706
             active = configs.get(0); //default if current not found..
         }

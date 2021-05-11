@@ -79,6 +79,8 @@ public final class NbMavenProject {
      * has changed.
      */
     public static final String PROP_PROJECT = "MavenProject"; //NOI18N
+    
+    public static final String TYPE = "org-netbeans-modules-maven"; //NOI18N
     /**
      * TODO comment
      * 

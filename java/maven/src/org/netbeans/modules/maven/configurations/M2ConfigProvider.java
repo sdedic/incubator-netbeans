@@ -23,6 +23,8 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -40,6 +42,8 @@ import org.netbeans.modules.maven.api.ProjectProfileHandler;
 import org.netbeans.modules.maven.api.customizer.ModelHandle2;
 import static org.netbeans.modules.maven.configurations.ConfigurationPersistenceUtils.*;
 import org.netbeans.modules.maven.customizer.CustomizerProviderImpl;
+import org.netbeans.modules.maven.execute.model.ActionToGoalMapping;
+import org.netbeans.modules.maven.execute.model.NetbeansActionMapping;
 import org.netbeans.modules.maven.execute.model.NetbeansActionProfile;
 import org.netbeans.modules.maven.spi.actions.AbstractMavenActionsProvider;
 import org.netbeans.modules.maven.spi.actions.MavenActionsProvider;
@@ -48,6 +52,8 @@ import org.netbeans.spi.project.AuxiliaryConfiguration;
 import org.netbeans.spi.project.ProjectConfigurationProvider;
 import org.openide.util.Exceptions;
 import org.openide.util.Lookup;
+import org.openide.util.LookupEvent;
+import org.openide.util.LookupListener;
 import org.openide.util.RequestProcessor;
 import org.openide.xml.XMLUtil;
 import org.w3c.dom.Element;
@@ -62,6 +68,7 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
     private final PropertyChangeSupport support = new PropertyChangeSupport(this);
     private final NbMavenProjectImpl project;
     private final M2Configuration DEFAULT;
+    
     // next four guarded by this
     private SortedSet<M2Configuration> provided = null;
     private SortedSet<M2Configuration> profiles = null;
@@ -88,32 +95,37 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
         propertyChange = new PropertyChangeListener() {
             public @Override void propertyChange(PropertyChangeEvent evt) {
                 if (NbMavenProject.PROP_PROJECT.equals(evt.getPropertyName())) {
-                    synchronized (M2ConfigProvider.this) {
-                        provided = null;
-                        profiles = null;
-                        shared = null;
-                        nonshared = null;
-                        initialActive = active != null ? active.getId() : null; //#241337
-                        active = DEFAULT;
-                    }
-                    RP.post(new Runnable() {
-                        public @Override void run() {
-                            checkActiveAgainstAll(getConfigurations(), false);
-                            firePropertyChange();
-                        }
-
-                    });
+                    flush();
                 }
             }
         };
+    }
+    
+    private void flush() {
+        synchronized (M2ConfigProvider.this) {
+            provided = null;
+            profiles = null;
+            shared = null;
+            nonshared = null;
+            initialActive = active != null ? active.getId() : null; //#241337
+        }
+        RP.post(new Runnable() {
+            public @Override void run() {
+                checkActiveAgainstAll(getConfigurations(), false);
+                firePropertyChange();
+            }
+
+        });
     }
 
     public void setSupplementalLookup(Lookup supplementalLookup) {
         this.supplementalLookup = supplementalLookup;
     }
     
-    public void setLocalConfiguration(M2Configuration cfg) {
+    public M2Configuration setLocalConfiguration(M2Configuration cfg) {
+        M2Configuration old = activeOverride.get();
         activeOverride.set(cfg);
+        return old;
     }
     
     private String getInitialActive() {
@@ -123,8 +135,11 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
         return initialActive;
     }
     
+    private ThreadLocal<Boolean> inConfigInit = new ThreadLocal<>();
+    
     private void checkActiveAgainstAll(Collection<M2Configuration> confs, boolean async) {
-        assert !Thread.holdsLock(this);
+        Boolean b = inConfigInit.get();
+        assert b != null || !Thread.holdsLock(this);
         boolean found = false;
         String id;
         synchronized (this) {
@@ -171,7 +186,7 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
             nonshared = readConfigurations(aux, project.getProjectDirectory(), false);
         }
         if (provided == null) {
-            profiles = createProvidedList();
+            provided = createProvidedList();
         }
         Collection<M2Configuration> toRet = new TreeSet<M2Configuration>();
         toRet.add(DEFAULT);
@@ -217,6 +232,11 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
         return nonshared;
     }
     
+    public synchronized Collection<M2Configuration> getProvidedConfigurations() {
+        getConfigurations();
+        return provided;
+    }
+    
     public @Override boolean hasCustomizer() {
         return true;
     }
@@ -238,6 +258,7 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
     public @Override M2Configuration getActiveConfiguration() {
         M2Configuration _active;
         Collection<M2Configuration> confs;
+        Boolean b = inConfigInit.get();
         synchronized (this) {
             _active = internalActive();
             confs = getConfigurations(false);
@@ -255,7 +276,7 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
                         break;
                     }
                 }
-                if (initAct != null) {
+                if (b == null && initAct != null) {
                     RP.post(new Runnable() {
                         public @Override void run() {
                             try {
@@ -268,7 +289,9 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
                 }
                 initialActive = null; //here we reset the initial active field value to prevent this block from happening exactly once.
             }
-            active = _active;
+            if (b == null) {
+                active = _active;
+            }
         }
         checkActiveAgainstAll(confs, true);
         return _active;
@@ -341,32 +364,97 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
         }
     }
     
+    private Lookup.Result<MavenActionsProvider> actionProviders;
+    
+    // @GuardedBy(this)
     private SortedSet<M2Configuration> createProvidedList() {
-        Collection<? extends MavenActionsProvider> providers = 
-                supplementalLookup.lookupAll(MavenActionsProvider.class);
         SortedSet<M2Configuration> result = new TreeSet<>();
+        provided = result;
         
-        for (MavenActionsProvider p : providers) {
-            if (p instanceof AbstractMavenActionsProvider) {
-                List<NetbeansActionProfile> profiles = ((AbstractMavenActionsProvider) p).getRawMappings().getProfiles();
-                if (profiles.isEmpty()) {
+        Boolean b = inConfigInit.get();
+        inConfigInit.set(true);
+        try {
+            Collection<? extends MavenActionsProvider> providers;
+            synchronized (this) {
+                Lookup.Result<MavenActionsProvider> r = actionProviders;
+                if (r == null) {
+                    r = supplementalLookup.lookupResult(MavenActionsProvider.class);;
+                }
+                providers = new ArrayList<>(r.allInstances());
+                // initialize the listener after initial Lookup, otherwise the event may be fired. That could flush() 
+                // e.g. in the middle of getConfigurations() processing.
+                if (actionProviders == null) {
+                    actionProviders = r;
+                    actionProviders.addLookupListener(new LookupListener() {
+                        @Override
+                        public void resultChanged(LookupEvent ev) {
+                            flush();
+                        }
+                    });
+                }
+            }
+            for (MavenActionsProvider p : providers) {
+                if (p == this) {
                     continue;
                 }
-                Set<String> knownIds = new HashSet<>();
-                addProfileNames(knownIds, this.profiles);
-                addProfileNames(knownIds, this.shared);
-                addProfileNames(knownIds, this.nonshared);
-                
-                for (NetbeansActionProfile prof : profiles) {
-                    if (!knownIds.contains(prof.getId())) {
-                        M2Configuration cfg = new M2Configuration(prof.getId(), project.getProjectDirectory());
-                        cfg.setDisplayName(prof.getDisplayName());
-                        result.add(cfg);
+                if (p instanceof AbstractMavenActionsProvider) {
+                    List<NetbeansActionProfile> profiles;
+                    M2Configuration c = setLocalConfiguration(DEFAULT);
+                    try {
+                        profiles = ((AbstractMavenActionsProvider) p).getRawMappings().getProfiles();
+                        if (profiles.isEmpty()) {
+                            continue;
+                        }
+                    } finally {
+                        setLocalConfiguration(c);
+                    }
+                    Set<String> knownIds = new HashSet<>();
+                    addProfileNames(knownIds, this.profiles);
+                    addProfileNames(knownIds, this.shared);
+                    addProfileNames(knownIds, this.nonshared);
+
+                    for (NetbeansActionProfile prof : profiles) {
+                        if (!knownIds.contains(prof.getId())) {
+                            M2Configuration cfg = new M2Configuration(prof.getId(), project.getProjectDirectory()) {
+                                @Override
+                                public ActionToGoalMapping getRawMappings() {
+                                    try (InputStream istm = getActionDefinitionStream()) {
+                                        if (istm != null) {
+                                            return super.getRawMappings();
+                                        }
+                                    } catch (IOException ex) {
+                                        // silently ignore
+                                    }
+                                    ActionToGoalMapping m = new ActionToGoalMapping();
+                                    ActionToGoalMapping allMappings = ((AbstractMavenActionsProvider) p).getRawMappings();
+                                    List<NetbeansActionProfile> profiles = ((AbstractMavenActionsProvider) p).getRawMappings().getProfiles();
+                                    for (NetbeansActionProfile p : profiles) {
+                                        if (prof.getId().equals(p.getId())) {
+                                            Set<String> overridenIds = new HashSet<>();
+                                            for (NetbeansActionMapping am : p.getActions()) {
+                                                overridenIds.add(am.getActionName());
+                                                m.addAction(am);
+                                            }
+                                            for (NetbeansActionMapping am : allMappings.getActions()) {
+                                                if (!overridenIds.contains(am.getActionName())) {
+                                                    m.addAction(am);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    return m;
+                                }
+                            };
+                            cfg.setDisplayName(prof.getDisplayName());
+                            result.add(cfg);
+                        }
                     }
                 }
             }
+            return result;
+        } finally {
+            inConfigInit.set(b);
         }
-        return result;
     }
 
     public @Override synchronized void addPropertyChangeListener(PropertyChangeListener lst) {

@@ -35,5 +35,8 @@ public interface MavenConfiguration extends ProjectConfiguration {
 
     Map<String,String> getProperties();
     
+    default String getId() {
+        return getDisplayName();
+    }
 }
     
