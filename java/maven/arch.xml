@@ -123,6 +123,14 @@
         </p>
         For the details and examples, see description in <a href="@TOP@/org/netbeans/modules/maven/api/execute/PrerequisitesChecker.html">PrerequisitesChecker javadoc</a>.
     </api>
+    <api group="layer" name="PluginLookup" type="export" category="official">
+     <p>
+       Technology-related services can be registered so they activate in a project that has configured a specific Maven plugin. Such services should
+       be placed in <code>Projects/org-netbeans-modules-maven/&lt;plugin-id>/Lookup</code> folder. Maven core module will plug these providers in
+       as soon as the plugin-id appears in the POM model, and will remote them from project's Lookup when the plugin is no longer part of the project's model.
+       See <a href="@TOP@/org/netbeans/modules/maven/api/NbMavenProject.html">NbMavenProject javadoc for details/examples</a>.
+     </p>
+    </api>
     <api group="layer" name="MavenActions" type="export" category="official">
      <p>
        "Projects/org-netbeans-modules-maven/ProjectActions", 
