@@ -30,6 +30,11 @@ import org.openide.util.Lookup;
  * lookup does not enable the action for a given command on the selected file then
  * the first implementation found in default lookup that is enabled will be used.
  * </p>
+ * If the project supports {@link ProjectConfiguration}s, the ActionProvider implementation should also
+ * implement {@link ConfigurationAware} mixing interface, to allow working with actions in non-active
+ * configuration. For backwards compatibility, the {@link ActionProvider} implementations 
+ * must check {@link ProjectConfiguration} presence in the action's context Lookup whether the caller
+ * requested a specific configuration, and use it if found.
  * @see org.netbeans.api.project.Project#getLookup
  * @see <a href="@org-apache-tools-ant-module@/org/apache/tools/ant/module/api/support/ActionUtils.html"><code>ActionUtils</code></a>
  * @see <a href="@org-netbeans-modules-projectuiapi@/org/netbeans/spi/project/ui/support/ProjectSensitiveActions.html#projectCommandAction(java.lang.String,%20java.lang.String,%20javax.swing.Icon)"><code>ProjectSensitiveActions.projectCommandAction(...)</code></a>
@@ -189,5 +194,23 @@ public interface ActionProvider {
      * @throws IllegalArgumentException if the requested command is not supported
      */
     boolean isActionEnabled(String command, Lookup context) throws IllegalArgumentException;
-    
+
+    /**
+     * Enables working with actions in specific {@link ProjectConfiguration}. Project that support
+     * {@link ProjectConfigurationProvider} are advised to implement this mixin interface on their
+     * {@link ActionProvider}. It allows to inspect and invoke project actions with non-active
+     * configurations.
+     * @since 2.148
+     */
+    public static interface ConfigurationAware {
+        /**
+         * Returns an ActionProvider that respects the selected configuration. By default
+         * the ActionProvider works with {@link ProjectConfigurationProvider#getActiveConfiguration()}.
+         * 
+         * @param cfg specific configuration isntance
+         * @return ActionProvider instance
+         * @throws IllegalArgumentException if cfg is not a project configuration.
+         */
+        public ActionProvider forConfiguration(ProjectConfiguration cfg);
+    }
 }

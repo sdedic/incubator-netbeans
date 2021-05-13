@@ -47,6 +47,7 @@ import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.api.project.ui.OpenProjects;
 import static org.netbeans.modules.maven.Bundle.*;
 import org.netbeans.modules.maven.api.Constants;
+import org.netbeans.modules.maven.api.MavenConfiguration;
 import org.netbeans.modules.maven.api.ModelUtils;
 import org.netbeans.modules.maven.api.ModuleInfoUtils;
 import org.netbeans.modules.maven.api.NbMavenProject;
@@ -55,6 +56,7 @@ import org.netbeans.modules.maven.api.customizer.ModelHandle2;
 import org.netbeans.modules.maven.api.execute.RunConfig;
 import org.netbeans.modules.maven.api.execute.RunUtils;
 import org.netbeans.modules.maven.configurations.M2ConfigProvider;
+import org.netbeans.modules.maven.configurations.M2Configuration;
 import org.netbeans.modules.maven.customizer.ActionMappings;
 import org.netbeans.modules.maven.customizer.WarnPanel;
 import org.netbeans.modules.maven.execute.ActionToGoalUtils;
@@ -76,6 +78,8 @@ import org.netbeans.modules.maven.spi.actions.MavenActionsProvider;
 import org.netbeans.modules.maven.spi.actions.ReplaceTokenProvider;
 import org.netbeans.spi.project.ActionProgress;
 import org.netbeans.spi.project.ActionProvider;
+import org.netbeans.spi.project.ProjectConfiguration;
+import org.netbeans.spi.project.ProjectConfigurationProvider;
 import org.netbeans.spi.project.ProjectServiceProvider;
 import org.netbeans.spi.project.SingleMethod;
 import org.netbeans.spi.project.ui.support.DefaultProjectOperations;
@@ -107,7 +111,7 @@ import org.openide.util.lookup.ProxyLookup;
  * @author  Milos Kleint
  */
 @ProjectServiceProvider(service={ActionProvider.class, ActionProviderImpl.class}, projectType="org-netbeans-modules-maven")
-public class ActionProviderImpl implements ActionProvider {
+public class ActionProviderImpl implements ActionProvider.ConfigurationAware {
 
     public static final String BUILD_WITH_DEPENDENCIES = "build-with-dependencies"; // NOI18N
 
@@ -156,15 +160,30 @@ public class ActionProviderImpl implements ActionProvider {
     public ActionProviderImpl(Project proj) {
         this.proj = proj;
     }
+    
+    protected M2Configuration usedConfiguration(boolean useActive) {
+        if (!useActive) {
+            return null;
+        }
+        ProjectConfigurationProvider<MavenConfiguration> p = proj.getLookup().lookup(ProjectConfigurationProvider.class);
+        return (M2Configuration)p.getActiveConfiguration();
+    }
 
     @Override
     public String[] getSupportedActions() {
         Set<String> supp = new HashSet<String>();
-        supp.addAll( Arrays.asList( supported));
-        for (MavenActionsProvider add : ActionToGoalUtils.actionProviders(proj)) {
-            Set<String> added = add.getSupportedDefaultActions();
-            if (added != null) {
-                supp.addAll( added);
+        supp.addAll( Arrays.asList(supported));
+        
+        MavenConfiguration c = usedConfiguration(false);
+        if (c instanceof M2Configuration) {
+            M2Configuration m2c = (M2Configuration)c;
+            supp.addAll(m2c.getSupportedDefaultActions());
+        } else {
+            for (MavenActionsProvider add : ActionToGoalUtils.actionProviders(proj)) {
+                Set<String> added = add.getSupportedDefaultActions();
+                if (added != null) {
+                    supp.addAll( added);
+                }
             }
         }
         return supp.toArray(new String[0]);
@@ -275,7 +294,7 @@ public class ActionProviderImpl implements ActionProvider {
         }
         Lookup enhanced = new ProxyLookup(lookup, Lookups.fixed(replacements(proj, convertedAction, lookup)));
 
-        RunConfig rc = ActionToGoalUtils.createRunConfig(convertedAction, proj.getLookup().lookup(NbMavenProjectImpl.class), enhanced);
+        RunConfig rc = ActionToGoalUtils.createRunConfig(convertedAction, proj.getLookup().lookup(NbMavenProjectImpl.class), usedConfiguration(true), enhanced);
         if (rc == null) {
             Logger.getLogger(ActionProviderImpl.class.getName()).log(Level.INFO, "No handling for action: {0}. Ignoring.", action); //NOI18N
 
@@ -482,7 +501,7 @@ public class ActionProviderImpl implements ActionProvider {
             }
         }
 
-        return ActionToGoalUtils.isActionEnable(convertedAction, proj.getLookup().lookup(NbMavenProjectImpl.class), lookup);
+        return ActionToGoalUtils.isActionEnable(convertedAction, proj.getLookup().lookup(NbMavenProjectImpl.class), usedConfiguration(false), lookup);
     }
 
     public static Action createCustomMavenAction(String name, NetbeansActionMapping mapping, boolean showUI, Lookup context, Project project) {
@@ -864,5 +883,18 @@ public class ActionProviderImpl implements ActionProvider {
             ModelUtils.openAtPlugin(model, Constants.GROUP_APACHE_PLUGINS, Constants.PLUGIN_COMPILER);
         }
     }
-    
+
+    @Override
+    public ActionProvider forConfiguration(ProjectConfiguration cfg) {
+        ProjectConfigurationProvider<MavenConfiguration> p = proj.getLookup().lookup(ProjectConfigurationProvider.class);
+        if (!(cfg instanceof M2Configuration) || !p.getConfigurations().contains(cfg)) {
+            throw new IllegalArgumentException();
+        }
+        return new ActionProviderImpl(proj) {
+            @Override
+            protected M2Configuration usedConfiguration(boolean useActive) {
+                return (M2Configuration)cfg;
+            }
+        };
+    }
 }
