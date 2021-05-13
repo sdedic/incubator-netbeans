@@ -111,7 +111,7 @@ import org.openide.util.lookup.ProxyLookup;
  * @author  Milos Kleint
  */
 @ProjectServiceProvider(service={ActionProvider.class, ActionProviderImpl.class}, projectType="org-netbeans-modules-maven")
-public class ActionProviderImpl implements ActionProvider.ConfigurationAware {
+public class ActionProviderImpl implements ActionProvider, ActionProvider.ConfigurationAware {
 
     public static final String BUILD_WITH_DEPENDENCIES = "build-with-dependencies"; // NOI18N
 
