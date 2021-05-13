@@ -99,10 +99,6 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
         profiles = Collections.<String>emptyList();
     }
     
-    protected final Project getProject() {
-        return FileOwnerQuery.getOwner(projectDirectory);
-    }
-    
      @Override       
      @Messages("TXT_DefaultConfig=<default config>")
      public String getDisplayName() {
@@ -385,34 +381,5 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
                 return M2Configuration.this.performDynamicSubstitutions(replaceMap, in);
             }
         }.getMappingForAction(reader, LOG, actionName, null, project, null, replaceMap);
-    }
-
-    static class Delegate extends M2Configuration {
-        private List<MavenActionsProvider>  providers;
-
-        public Delegate(String id, FileObject projectDirectory, List<MavenActionsProvider> providers) {
-            super(id, projectDirectory);
-        }
-
-        @Override
-        public ActionToGoalMapping getRawMappings() {
-            ActionToGoalMapping providedMappings = new ActionToGoalMapping();
-            Set<String> actionIds = new HashSet<>();
-            
-            for (MavenActionsProvider p : providers) {
-                for (String id : p.getSupportedDefaultActions()) {
-                    if (actionIds.contains(id)) {
-                        continue;
-                    }
-                    NetbeansActionMapping m = p.getMappingForAction(id, getProject());
-                    if (m != null) {
-                        actionIds.add(id);
-                        providedMappings.getActions().add(m);
-                    }
-                }
-            }
-            
-            return super.getRawMappings();
-        }
     }
 }
