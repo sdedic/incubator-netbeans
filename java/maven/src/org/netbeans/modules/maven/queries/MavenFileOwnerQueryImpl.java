@@ -382,7 +382,7 @@ public class MavenFileOwnerQueryImpl implements FileOwnerQueryImplementation {
                         if (projectDir != null && projectDir.isFolder()) {
                             File pomFile = new File(FileUtil.toFile(projectDir), "pom.xml");
                             //TODO the file instance will not be the same instance passed by project. how does weakhashmap behave in such a case?
-                            MavenProject prj = MavenProjectCache.getMavenProject(pomFile, false);
+                            MavenProject prj = MavenProjectCache.getMavenProject(null, pomFile, false);
                             if (prj != null && prj.getGroupId().equals(groupId) && prj.getArtifactId().equals(artifactId) && prj.getVersion().equals(version)) {
                                 return pom;
                             }

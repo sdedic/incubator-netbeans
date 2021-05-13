@@ -75,8 +75,8 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
     public static final String FILENAME_PREFIX = "nbactions-"; //NOI18N
     public static final String FILENAME_SUFFIX = ".xml"; //NOI18N
     
-    public static M2Configuration createDefault(FileObject projectDirectory) {
-        return new M2Configuration(DEFAULT, projectDirectory);
+    public static M2Configuration createDefault(Project project) {
+        return new M2Configuration(DEFAULT, project);
     }
 
     /**
@@ -86,21 +86,21 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
     private @NonNull final String id;
     private List<String> profiles;
     private final Map<String,String> properties = new HashMap<String,String>();
-    private final FileObject projectDirectory;
+    private final Project project;
     
     private final AtomicBoolean resetCache = new AtomicBoolean(false);
     private FileChangeListener listener = null;
     private String displayName;
     
-    public M2Configuration(String id, FileObject projectDirectory) {
+    public M2Configuration(String id, Project project) {
         assert id != null;
         this.id = id;
-        this.projectDirectory = projectDirectory;
+        this.project = project;
         profiles = Collections.<String>emptyList();
     }
     
     protected final Project getProject() {
-        return FileOwnerQuery.getOwner(projectDirectory);
+        return project;
     }
     
      @Override       
@@ -175,7 +175,7 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
 
     final InputStream getActionDefinitionStream(String forId) {
         checkListener();
-        FileObject fo = projectDirectory.getFileObject(getFileNameExt(forId));
+        FileObject fo = project.getProjectDirectory().getFileObject(getFileNameExt(forId));
         customized = fo != null;
         resetCache.set(false);
         if (fo != null) {
@@ -222,7 +222,7 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
                 }
                 
             };
-            projectDirectory.addFileChangeListener(FileUtil.weakFileChangeListener(listener, projectDirectory));
+            project.getProjectDirectory().addFileChangeListener(FileUtil.weakFileChangeListener(listener, project.getProjectDirectory()));
         }
     }
     
@@ -385,34 +385,5 @@ public class M2Configuration extends AbstractMavenActionsProvider implements Mav
                 return M2Configuration.this.performDynamicSubstitutions(replaceMap, in);
             }
         }.getMappingForAction(reader, LOG, actionName, null, project, null, replaceMap);
-    }
-
-    static class Delegate extends M2Configuration {
-        private List<MavenActionsProvider>  providers;
-
-        public Delegate(String id, FileObject projectDirectory, List<MavenActionsProvider> providers) {
-            super(id, projectDirectory);
-        }
-
-        @Override
-        public ActionToGoalMapping getRawMappings() {
-            ActionToGoalMapping providedMappings = new ActionToGoalMapping();
-            Set<String> actionIds = new HashSet<>();
-            
-            for (MavenActionsProvider p : providers) {
-                for (String id : p.getSupportedDefaultActions()) {
-                    if (actionIds.contains(id)) {
-                        continue;
-                    }
-                    NetbeansActionMapping m = p.getMappingForAction(id, getProject());
-                    if (m != null) {
-                        actionIds.add(id);
-                        providedMappings.getActions().add(m);
-                    }
-                }
-            }
-            
-            return super.getRawMappings();
-        }
     }
 }

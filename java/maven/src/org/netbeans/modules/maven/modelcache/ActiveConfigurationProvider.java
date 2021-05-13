@@ -20,6 +20,7 @@ package org.netbeans.modules.maven.modelcache;
 
 import java.util.Collections;
 import java.util.SortedSet;
+import org.netbeans.api.project.Project;
 import static org.netbeans.modules.maven.configurations.ConfigurationPersistenceUtils.*;
 import org.netbeans.modules.maven.configurations.M2Configuration;
 import org.netbeans.spi.project.AuxiliaryConfiguration;
@@ -32,9 +33,9 @@ import org.openide.filesystems.FileObject;
  */
 final class ActiveConfigurationProvider {
     private final AuxiliaryConfiguration aux;
-    private final FileObject projectDirectory;
+    private final Project projectDirectory;
 
-    public ActiveConfigurationProvider(FileObject projectDirectory, AuxiliaryConfiguration aux) {
+    public ActiveConfigurationProvider(Project projectDirectory, AuxiliaryConfiguration aux) {
         this.aux = aux;
         this.projectDirectory = projectDirectory;
     }

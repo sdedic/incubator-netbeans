@@ -342,7 +342,7 @@ public class CustomizerProviderImpl implements CustomizerProvider2 {
             List<M2Configuration> nonshared = new ArrayList<M2Configuration>();
             for (ModelHandle2.Configuration mdlConf : handle.getConfigurations()) {
                 if (!mdlConf.isDefault() && !mdlConf.isProfileBased()) {
-                    M2Configuration c = new M2Configuration(mdlConf.getId(), project.getProjectDirectory());
+                    M2Configuration c = new M2Configuration(mdlConf.getId(), project);
                     c.setActivatedProfiles(mdlConf.getActivatedProfiles());
                     c.setProperties(mdlConf.getProperties());
                     if (mdlConf.isShared()) {

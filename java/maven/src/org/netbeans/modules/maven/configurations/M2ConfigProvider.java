@@ -94,7 +94,7 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
         project = proj;
         this.aux = aux;
         profileHandler = prof;
-        DEFAULT = M2Configuration.createDefault(project.getProjectDirectory());           
+        DEFAULT = M2Configuration.createDefault(project);           
         active = DEFAULT;
         propertyChange = new PropertyChangeListener() {
             public @Override void propertyChange(PropertyChangeEvent evt) {
@@ -180,11 +180,11 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
         skipProfiles |= !Boolean.parseBoolean(NbBundle.getMessage(M2ConfigProvider.class, "ProjectConfigurationProvider.ExportProfiles"));
         if (shared == null) {
             //read from auxconf
-            shared = readConfigurations(aux, project.getProjectDirectory(), true);
+            shared = readConfigurations(aux, project, true);
         }
         if (nonshared == null) {
             //read from auxconf
-            nonshared = readConfigurations(aux, project.getProjectDirectory(), false);
+            nonshared = readConfigurations(aux, project, false);
         }
         if (provided == null) {
             provided = createProvidedList();
@@ -352,7 +352,7 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
         SortedSet<M2Configuration> config = new TreeSet<M2Configuration>();
 //        config.add(DEFAULT);
         for (String prof : profs) {
-            M2Configuration c = new M2Configuration(prof, project.getProjectDirectory());
+            M2Configuration c = new M2Configuration(prof, project);
             c.setActivatedProfiles(Collections.singletonList(prof));
             config.add(c);
         }
@@ -416,7 +416,7 @@ public class M2ConfigProvider implements ProjectConfigurationProvider<M2Configur
 
                     for (NetbeansActionProfile prof : profiles) {
                         if (!knownIds.contains(prof.getId())) {
-                            M2Configuration cfg = new M2Configuration(prof.getId(), project.getProjectDirectory()) {
+                            M2Configuration cfg = new M2Configuration(prof.getId(), project) {
                                 @Override
                                 public ActionToGoalMapping getRawMappings() {
                                     try (InputStream istm = getActionDefinitionStream()) {

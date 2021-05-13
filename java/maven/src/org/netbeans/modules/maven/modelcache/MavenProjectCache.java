@@ -43,6 +43,8 @@ import org.apache.maven.execution.MavenExecutionResult;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.netbeans.api.annotations.common.NonNull;
+import org.netbeans.api.project.FileOwnerQuery;
+import org.netbeans.api.project.Project;
 import org.netbeans.modules.maven.M2AuxilaryConfigImpl;
 import org.netbeans.modules.maven.configurations.M2Configuration;
 import org.netbeans.modules.maven.embedder.EmbedderFactory;
@@ -90,7 +92,7 @@ public final class MavenProjectCache {
      * @param reload consult the cache and return the cached value if true, otherwise force a reload.
      * @return 
      */
-    public static MavenProject getMavenProject(final File pomFile, final boolean reload) {
+    public static MavenProject getMavenProject(final Project p, final File pomFile, final boolean reload) {
         Mutex mutex = getMutex(pomFile);
         MavenProject mp = mutex.writeAccess(new Action<MavenProject>() {
             @Override
@@ -104,7 +106,7 @@ public final class MavenProjectCache {
                         }
                     }
                 }
-                MavenProject mp = loadOriginalMavenProject(pomFile);
+                MavenProject mp = loadOriginalMavenProject(p, pomFile);
                 file2Project.put(pomFile, new WeakReference<MavenProject>(mp));
                 return mp;
             }
@@ -136,7 +138,7 @@ public final class MavenProjectCache {
             + "This is preventing the project model from loading properly. \n"
             + "Please file a bug report with details about your project and the IDE's log file.\n\n"
     })
-    private static @NonNull MavenProject loadOriginalMavenProject(final File pomFile) {
+    private static @NonNull MavenProject loadOriginalMavenProject(Project p, final File pomFile) {
         long startLoading = System.currentTimeMillis();
         MavenEmbedder projectEmbedder = EmbedderFactory.getProjectEmbedder();
         MavenProject newproject = null;
@@ -146,7 +148,10 @@ public final class MavenProjectCache {
             return getFallbackProject(pomFile);
         }
         AuxiliaryConfiguration aux = new M2AuxilaryConfigImpl(projectDir, false);
-        ActiveConfigurationProvider config = new ActiveConfigurationProvider(projectDir, aux);
+        if (p != null) {
+            p = FileOwnerQuery.getOwner(projectDir);
+        }
+        ActiveConfigurationProvider config = new ActiveConfigurationProvider(p, aux);
         M2Configuration active = config.getActiveConfiguration();
         MavenExecutionResult res = null;
         try {

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import org.netbeans.api.project.Project;
 import org.netbeans.spi.project.AuxiliaryConfiguration;
 import org.openide.filesystems.FileObject;
 import org.w3c.dom.DOMException;
@@ -59,7 +60,7 @@ public final class ConfigurationPersistenceUtils {
         return active;
     }
     
-    public static SortedSet<M2Configuration> readConfigurations(AuxiliaryConfiguration aux, FileObject projectDirectory, boolean shared) {
+    public static SortedSet<M2Configuration> readConfigurations(AuxiliaryConfiguration aux, Project projectDirectory, boolean shared) {
         Element el = aux.getConfigurationFragment(ROOT, NAMESPACE, shared);
         if (el != null) {
             NodeList list = el.getElementsByTagNameNS(NAMESPACE, CONFIG);
