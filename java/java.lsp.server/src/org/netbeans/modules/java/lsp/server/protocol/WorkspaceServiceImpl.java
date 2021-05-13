@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -87,6 +88,8 @@ import org.netbeans.modules.parsing.spi.ParseException;
 import org.netbeans.spi.jumpto.type.SearchType;
 import org.netbeans.spi.project.ActionProgress;
 import org.netbeans.spi.project.ActionProvider;
+import org.netbeans.spi.project.ProjectConfiguration;
+import org.netbeans.spi.project.ProjectConfigurationProvider;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.URLMapper;
 import org.openide.util.Exceptions;
@@ -170,6 +173,25 @@ public final class WorkspaceServiceImpl implements WorkspaceService, LanguageCli
                 String uri = ((JsonPrimitive) params.getArguments().get(0)).getAsString();
                 Position pos = gson.fromJson(gson.toJson(params.getArguments().get(1)), Position.class);
                 return (CompletableFuture)((TextDocumentServiceImpl)server.getTextDocumentService()).superImplementations(uri, pos);
+                
+            case Server.JAVA_FIND_CONFIGURATIONS: {
+                String fileUri = ((JsonPrimitive) params.getArguments().get(0)).getAsString();
+                String lookForAction = null;
+                
+                if (params.getArguments().size() > 1) {
+                    lookForAction = ((JsonPrimitive) params.getArguments().get(1) ).getAsString();
+                }
+                
+                FileObject file;
+                try {
+                    file = URLMapper.findFileObject(new URL(fileUri));
+                } catch (MalformedURLException ex) {
+                    Exceptions.printStackTrace(ex);
+                    return CompletableFuture.completedFuture(Collections.emptyList());
+                }
+
+                return findProjectConfigurations(file, lookForAction);
+            }
             default:
                 for (CodeGenerator codeGenerator : Lookup.getDefault().lookupAll(CodeGenerator.class)) {
                     if (codeGenerator.getCommands().contains(command)) {
@@ -178,6 +200,37 @@ public final class WorkspaceServiceImpl implements WorkspaceService, LanguageCli
                 }
         }
         throw new UnsupportedOperationException("Command not supported: " + params.getCommand());
+    }
+    
+    private CompletableFuture<Object> findProjectConfigurations(FileObject ownedFile, String requestAction) {
+        return server.asyncOpenFileOwner(ownedFile).thenApply(p -> {
+            if (p == null) {
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            }
+            ProjectConfigurationProvider<ProjectConfiguration> provider = p.getLookup().lookup(ProjectConfigurationProvider.class);
+            ActionProvider ap = p.getLookup().lookup(ActionProvider.class);
+            if (provider == null) {
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            }
+            ActionProvider.ConfigurationAware cap = null;
+            if (requestAction != null) {
+                if (!(ap instanceof ActionProvider.ConfigurationAware)) {
+                    return CompletableFuture.completedFuture(Collections.emptyList());
+                }
+                cap = (ActionProvider.ConfigurationAware)ap;
+            }
+            List<String> configDispNames = new ArrayList<>();
+            for (ProjectConfiguration c : provider.getConfigurations()) {
+                if (cap != null) {
+                    ActionProvider specific = cap.forConfiguration(c);
+                    if (specific == null || !Arrays.asList(specific.getSupportedActions()).contains(requestAction)) {
+                        continue;
+                    }
+                }
+                configDispNames.add(c.getDisplayName());
+            }
+            return configDispNames;
+        });
     }
 
     private CompletableFuture<Set<URL>> getTestRootURLs(Project prj) {
