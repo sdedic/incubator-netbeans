@@ -16,31 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.netbeans.modules.gradle.spi.actions;
+package org.netbeans.modules.gradle.configs;
 
 import java.io.InputStream;
-import java.util.Collection;
 import java.util.Set;
 import org.netbeans.api.project.Project;
+import org.netbeans.modules.gradle.spi.actions.GradleActionsProvider;
 import org.openide.util.Lookup;
 
 /**
  *
- * @author Laszlo Kishalmi
+ * @author sdedic
  */
-public interface GradleActionsProvider {
+public class ConfigActionsProvider implements GradleActionsProvider {
 
+    @Override
+    public boolean isActionEnabled(String action, Project project, Lookup context) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 
-    boolean isActionEnabled(String action, Project project, Lookup context);
-    Set<String> getSupportedActions();
-    InputStream defaultActionMapConfig();
-    
-    public interface Configurations extends GradleActionsProvider {
-        /**
-         * @return a list of configuration names. 
-         */
-        public Collection<String>   getConfigurationNames();
-        public InputStream getConfigurationActionMap(String confId);
+    @Override
+    public Set<String> getSupportedActions() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public InputStream defaultActionMapConfig() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }

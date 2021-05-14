@@ -16,31 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.netbeans.modules.gradle.spi.actions;
 
 import java.io.InputStream;
 import java.util.Collection;
 import java.util.Set;
-import org.netbeans.api.project.Project;
-import org.openide.util.Lookup;
 
 /**
  *
- * @author Laszlo Kishalmi
+ * @author sdedic
  */
-public interface GradleActionsProvider {
+public abstract class ConfigurableActionsProvider extends DefaultGradleActionsProvider implements GradleActionsProvider.Configurations  {
+    private final Set<String> configNames;
 
+    protected ConfigurableActionsProvider(Set<String> configNames, String... actions) {
+        super(actions);
+        this.configNames = configNames;
+    }
 
-    boolean isActionEnabled(String action, Project project, Lookup context);
-    Set<String> getSupportedActions();
-    InputStream defaultActionMapConfig();
-    
-    public interface Configurations extends GradleActionsProvider {
-        /**
-         * @return a list of configuration names. 
-         */
-        public Collection<String>   getConfigurationNames();
-        public InputStream getConfigurationActionMap(String confId);
+    @Override
+    public Collection<String> getConfigurationNames() {
+        return configNames;
+    }
+
+    @Override
+    public InputStream getConfigurationActionMap(String confId) {
+        if (!configNames.contains(confId)) {
+            return null;
+        }
+        return getClass().getResourceAsStream("action-mapping-" + confId + ".xml");
     }
 }

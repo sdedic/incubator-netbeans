@@ -19,6 +19,14 @@
 
 package org.netbeans.modules.gradle.spi;
 
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+
 /**
  *
  * @author Laszlo Kishalmi
@@ -50,5 +58,72 @@ public final class Utils {
         StringBuilder sb = new StringBuilder(s.replaceAll("\\p{Upper}", " $0")); //NOI18N
         sb.setCharAt(0, Character.toUpperCase(sb.charAt(0)));
         return sb.toString();
+    }
+    
+    public InputStream  concatStreams(InputStream... delegates) {
+        return new MultiStream(Arrays.asList(delegates));
+    }
+    
+    static final class MultiStream extends FilterInputStream {
+        private final List<InputStream> delegates;
+        private final Iterator<InputStream> nextDelegate;
+        
+        MultiStream(List<InputStream> delegates) {
+            super(delegates.get(0));
+            this.delegates = new ArrayList<>(delegates);
+            
+            Iterator<InputStream> i = delegates.iterator();
+            i.next();
+            nextDelegate = i;
+        }
+        
+        public List<InputStream> getParts() {
+            return delegates;
+        }
+
+        @Override
+        public boolean markSupported() {
+            return false;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (in == null) {
+                return -1;
+            }
+            while (true) {
+                int l = super.read(b, off, len);
+                if (l != -1) {
+                    return l;
+                }
+                if (nextDelegate.hasNext()) {
+                    in = nextDelegate.next();
+                } else {
+                    break;
+                }
+            }
+            in = null;
+            return -1;
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (in == null) {
+                return -1;
+            }
+            while (true) {
+                int r = super.read();
+                if (r != -1) {
+                    return r;
+                }
+                if (nextDelegate.hasNext()) {
+                    in = nextDelegate.next();
+                } else {
+                    break;
+                }
+            }
+            in = null;
+            return -1;
+        }
     }
 }
