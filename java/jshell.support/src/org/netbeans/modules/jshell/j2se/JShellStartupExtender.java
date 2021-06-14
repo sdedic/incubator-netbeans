@@ -77,9 +77,7 @@ public class JShellStartupExtender implements StartupExtenderImplementation {
         
         J2SEPropertyEvaluator  prjEval = p.getLookup().lookup(J2SEPropertyEvaluator.class);
         JavaPlatform platform = ShellProjectUtils.findPlatform(p);
-        List<String> args = ShellProjectUtils.quoteCmdArgs(
-                ShellLaunchManager.buildLocalJVMAgentArgs(platform, agent, prjEval.evaluator()::getProperty)
-        );
+        List<String> args = ShellLaunchManager.buildLocalJVMAgentArgs(platform, agent, prjEval.evaluator()::getProperty);
 
         args.addAll(ShellProjectUtils.launchVMOptions(p));
 

@@ -31,7 +31,7 @@ import org.openide.util.Lookup;
  *
  * @author Petr Hejl
  */
-public class ProxyStartupExtender implements StartupExtenderImplementation {
+public class ProxyStartupExtender implements StartupExtenderImplementation, StartupExtenderRegistrationOptions {
 
     private final Map<String,?> attributes;
 
@@ -79,5 +79,13 @@ public class ProxyStartupExtender implements StartupExtenderImplementation {
             }
             return delegate;
         }
+    }
+
+    /**
+     * Returns false only if the extender registration explicitly says it does not escape arguments.
+     */
+    @Override
+    public boolean argumentsEscaped() {
+        return attributes.get(StartupExtenderRegistrationProcessor.ESCAPED_ATTRIBUTE) != Boolean.FALSE;
     }
 }

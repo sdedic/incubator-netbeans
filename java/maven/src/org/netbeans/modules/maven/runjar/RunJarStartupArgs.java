@@ -108,7 +108,7 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
                 }
             }
             for (StartupExtender group : StartupExtender.getExtenders(new AbstractLookup(ic), mode)) {
-                fixedArgs.addAll(group.getArguments());
+                fixedArgs.addAll(group.getRawArguments());
             }
         }
         
@@ -196,16 +196,24 @@ public class RunJarStartupArgs implements LateBoundPrerequisitesChecker {
             }
             
             vmArgs.addAll(changedParams.getLauncherArguments());
-            config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS, 
+            config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS,  
                     MavenExecuteUtils.joinParameters(vmArgs));
             config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 
                     MavenExecuteUtils.joinParameters(changedParams.getArguments()));
+            /*
+            config.setProperty("NbIde." + MavenExecuteUtils.RUN_VM_PARAMS + ".escaped", "true");
+            config.setProperty("NbIde." + MavenExecuteUtils.RUN_APP_PARAMS + ".escaped", "true");
+            */
         } else {
             vmArgs.addAll(vmArgsValue);
             config.setProperty(MavenExecuteUtils.RUN_VM_PARAMS, 
                     MavenExecuteUtils.joinParameters(vmArgs));
             config.setProperty(MavenExecuteUtils.RUN_APP_PARAMS, 
                     MavenExecuteUtils.joinParameters(appArgsValue));
+            /*
+            config.setProperty("NbIde." + MavenExecuteUtils.RUN_VM_PARAMS + ".escaped", "true");
+            config.setProperty("NbIde." + MavenExecuteUtils.RUN_APP_PARAMS + ".escaped", "true");
+            */
         }
 
         if ("test".equals(props.get("exec.classpathScope"))) {

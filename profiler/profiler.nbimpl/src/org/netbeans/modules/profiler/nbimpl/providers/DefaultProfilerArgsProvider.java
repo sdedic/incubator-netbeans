@@ -53,6 +53,8 @@ public class DefaultProfilerArgsProvider implements StartupExtenderImplementatio
                     args.add(agentArgs);
                     
                     String jvmargs = m.get("profiler.info.jvmargs"); // NOI18N // May not be set
+
+
                     if (jvmargs != null) {
                         jvmargs = jvmargs.replace(" -", "^"); // NOI18N
                         StringTokenizer st = new StringTokenizer(jvmargs, "^"); // NOI18N

@@ -414,6 +414,7 @@ public class MavenCommandLineExecutor extends AbstractMavenExecutor {
         // the command line parameters with space in them need to be quoted and escaped to arrive
         // correctly to the java runtime on windows
         String escaped = "\\" + quote;        
+        boolean w = false && Utilities.isWindows();
         for (Map.Entry<? extends String,? extends String> entry : config.getProperties().entrySet()) {
             String k = entry.getKey();
             // filter out env vars AND internal properties.
@@ -422,12 +423,28 @@ public class MavenCommandLineExecutor extends AbstractMavenExecutor {
             }
             //skip envs, these get filled in later.
             //#228901 since u21 we need to use cmd /c to execute on windows, quotes get escaped and when there is space in value, the value gets wrapped in quotes.
-            String value = (Utilities.isWindows() ? entry.getValue().replace(quote, escaped) : entry.getValue().replace(quote, "'"));
-            if (Utilities.isWindows() && value.endsWith("\"")) {
+            String value = (w ? entry.getValue().replace(quote, escaped) : entry.getValue().replace(quote, "'"));
+
+            /*
+            String v = entry.getValue();
+            String value;
+            boolean surround = false;
+            if ((v.startsWith(quote) && v.regionMatches(v.length() - quote.length(), quote, 0, quote.length())) /* ||
+                "true".equals(config.getProperties().get(INTERNAL_PREFIX + k + ".escaped"))* /) {
+                // already quoted
+                value = v;
+            } else {
+                value = (Utilities.isWindows() ? entry.getValue().replace(quote, escaped) : entry.getValue().replace(quote, "'"));
+                surround = true;
+            }
+            */
+            if (w && value.endsWith("\"")) {
                 //#201132 property cannot end with 2 double quotes, add a space to the end after our quote to prevent the state
                 value = value + " ";
             }
-            String s = "-D" + entry.getKey() + "=" + (Utilities.isWindows() && value.contains(" ") ? quote + value + quote : value);            
+            String p = "-D" + entry.getKey() + "=" + value;
+            String s = (Utilities.isWindows() && value.contains(" ") ? quote + p + quote : p);            
+            // String s = "-D" + entry.getKey() + "=" + (Utilities.isWindows() && value.contains(" ") && surround ? quote + value + quote : value);
             toRet.add(s);
         }
         
@@ -597,6 +614,7 @@ public class MavenCommandLineExecutor extends AbstractMavenExecutor {
             StringBuilder sb = new StringBuilder();
             Iterator<String> it = cmdLine.iterator();
             //sb.append("cmd.exe /c ");
+//            sb.append('"');
             it.next(); //cmd
             it.next(); //c
             String m = it.next();
@@ -605,6 +623,7 @@ public class MavenCommandLineExecutor extends AbstractMavenExecutor {
             while (it.hasNext()) {
                 sb.append(" ").append(it.next());
             }
+//            sb.append('"');
             
             // NETBEANS-3251, NETBEANS-3254: 
             // JDK-8221858 (non public) / CVE-2019-2958 changed the way cmd 
