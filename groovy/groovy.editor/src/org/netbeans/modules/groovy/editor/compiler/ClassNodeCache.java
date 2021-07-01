@@ -23,6 +23,7 @@ import groovy.lang.GroovyResourceLoader;
 import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
@@ -310,10 +311,49 @@ public final class ClassNodeCache {
                 @NonNull ClassPath path,
                 @NonNull CompilerConfiguration config,
                 @NonNull ClassNodeCache cache) {
-            super(path.getClassLoader(true), config);
+            super(new WrapLoader(path.getClassLoader(true)), config);
             this.config = config;
             this.path = path;
             this.cache = cache;
+            ((WrapLoader)getParent()).id = System.identityHashCode(this);
+        }
+        
+        static class WrapLoader extends URLClassLoader {
+            private int id;
+            
+            
+            public WrapLoader(ClassLoader cl) {
+                super(new URL[0], cl);
+            }
+
+            @Override
+            public URL findResource(String name) {
+                LOG.log(Level.INFO, "Wrapper {1} findResource {0}", 
+                        new Object[] { name, id });
+                URL u = super.findResource(name);
+                if (u == null) {
+                    LOG.log(Level.INFO, " Wrapper {1} FAIL findResource {0}", 
+                            new Object[] { name, id });
+                }
+                return u;
+            }
+
+            @Override
+            protected Class<?> findClass(String name) throws ClassNotFoundException {
+                LOG.log(Level.INFO, "Wrapper {1} findClass {0}", 
+                        new Object[] { name, id });
+                boolean ok = false;
+                try {
+                    Class<?> r = super.findClass(name);
+                    ok = true;
+                    return r;
+                } finally {
+                    if (!ok) {
+                        LOG.log(Level.INFO, " Wrapper {1} FAILED findClass {0}", 
+                                new Object[] { name, id });
+                    }
+                }
+            }
         }
         
         @Override
@@ -322,14 +362,26 @@ public final class ClassNodeCache {
                 final boolean lookupScriptFiles,
                 final boolean preferClassOverScript,
                 final boolean resolve) throws ClassNotFoundException, CompilationFailedException {
+            LOG.log(Level.INFO, "Parser {4} asking for {0}, scripts {1}, classOverScript {2}, resolve {3}", 
+                    new Object[] { name, lookupScriptFiles, preferClassOverScript, resolve, 
+                        System.identityHashCode(this)
+                    });
             if (preferClassOverScript && !lookupScriptFiles) {
                 //Ideally throw CNF but we need to workaround fix of issue #206811
                 //which hurts performance.
                 if (cache.isNonExistent(name)) {
+                    LOG.log(Level.INFO, " -> cached NONE");
                     throw CNF;
                 }
             }
             return super.loadClass(name, lookupScriptFiles, preferClassOverScript, resolve);
+        }
+
+        @Override
+        public URL findResource(String name) {
+            LOG.log(Level.INFO, "Parser {1} findResource {0}", 
+                    new Object[] { name, System.identityHashCode(this) });
+            return super.findResource(name);
         }
 
         @Override

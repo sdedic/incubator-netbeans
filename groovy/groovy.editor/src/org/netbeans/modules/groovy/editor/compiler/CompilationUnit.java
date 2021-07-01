@@ -37,6 +37,7 @@ import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MixinNode;
+import org.codehaus.groovy.control.ClassNodeResolver;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.api.java.source.ClasspathInfo;
@@ -63,6 +64,13 @@ public final class CompilationUnit extends org.codehaus.groovy.control.Compilati
 
         super(configuration, security, loader, transformationLoader);
         this.ast = new CompileUnit(parser, this.classLoader, security, this.configuration, cpInfo, classNodeCache);
+    }
+    
+    private static class DebugResolver extends ClassNodeResolver {
+
+        public DebugResolver() {
+        }
+        
     }
 
     private static class CompileUnit extends org.codehaus.groovy.ast.CompileUnit {
