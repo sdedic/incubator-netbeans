@@ -248,6 +248,10 @@ public final class GradleDaemonExecutor extends AbstractGradleExecutor {
         } catch (BuildCancelledException ex) {
             showAbort();
         } catch (UncheckedException | BuildException ex) {
+            synchronized (this ) {
+                // null the token before gradleTask.finish().
+                cancelTokenSource = null;
+            }
             if (!cancelling) {
                 StatusDisplayer.getDefault().setStatusText(Bundle.BUILD_FAILED(getProjectName()));
                 gradleTask.finish(1);
@@ -272,6 +276,12 @@ public final class GradleDaemonExecutor extends AbstractGradleExecutor {
             }
             if (!handled) throw ex;
         } finally {
+            synchronized (this) {
+                cancelTokenSource = null;
+            }
+            if (!gradleTask.isFinished()) {
+                gradleTask.finish(2);
+            }
             BuildExecutionSupport.registerFinishedItem(item);
             closeInOutErr();
             checkForExternalModifications();
@@ -362,16 +372,19 @@ public final class GradleDaemonExecutor extends AbstractGradleExecutor {
     @Messages("LBL_ABORTING_BUILD=Aborting Build...")
     @Override
     public boolean cancel() {
-        if (!cancelling && (cancelTokenSource != null)) {
-            handle.switchToIndeterminate();
-            handle.setDisplayName(Bundle.LBL_ABORTING_BUILD());
-            // Closing out and err streams to prevent ambigous output NETBEANS-2038
-            closeInOutErr();
-            cancelling = true;
-            cancelTokenSource.cancel();
-            return true;
+        synchronized (this) {
+            if (!cancelling && (cancelTokenSource != null)) {
+                cancelling = true;
+            } else {
+                return false;
+            }
         }
-        return false;
+        handle.switchToIndeterminate();
+        handle.setDisplayName(Bundle.LBL_ABORTING_BUILD());
+        // Closing out and err streams to prevent ambigous output NETBEANS-2038
+        closeInOutErr();
+        cancelTokenSource.cancel();
+        return true;
     }
 
     private static String gradlewExecutable() {
