@@ -41,7 +41,6 @@ import org.openide.util.lookup.ServiceProvider;
  */
 @ServiceProvider(service=Processor.class)
 public class ApplyGroovyTransformationProcessor extends LayerGeneratingProcessor {
-    private static final Set<String> APPLY_ALL = new HashSet<>(Arrays.asList(new String[] { "parse", "index" })); // NOI18N
     private static final Set<String> APPLY_DEFAULT = new HashSet<>(Arrays.asList(new String[] { "parse" })); // NOI18N
 
     public @Override Set<String> getSupportedAnnotationTypes() {
@@ -77,7 +76,7 @@ public class ApplyGroovyTransformationProcessor extends LayerGeneratingProcessor
             }
             
             for (String mt : agt.mimeTypes()) {
-                String fnbase = "Editors/" + mt + "/Parser/Transformations/";
+                String fnbase = "Editors/" + mt + "/Parser"; // NOI18N
                 String en = null;
                 
                 if (e instanceof TypeElement) {
@@ -88,37 +87,34 @@ public class ApplyGroovyTransformationProcessor extends LayerGeneratingProcessor
                     throw new LayerGenerationException("Unexpected annotated element:" + e, e); //NOI18N
                 }
                 
+                File f = null;
                 if (!enableFor.isEmpty()) {
-                    generateFile(e, fnbase, en, enableFor, "enable", transformations);
+                    f = generateFile(f, e, fnbase, en, enableFor, "enable", transformations); // NOI18N
                 }
                 if (!disableFor.isEmpty()) {
-                    generateFile(e, fnbase, en, disableFor, "disable", transformations);
+                    f = generateFile(f, e, fnbase, en, disableFor, "disable", transformations); // NOI18N
+                }
+                if (f != null) {
+                    f.write();
                 }
             }
         }
         return true;
     }
     
-    private void generateFile(Element e, String fnbase, String en, Set<String> items, String att, String[] transformations) {
-        String suff;
-        String fn;
+    private File generateFile(File f, Element e, String fnbase, String en, Set<String> items, String att, String[] transformations) throws LayerGenerationException {
         boolean simple = items.size() == 1 && items.contains(ApplyGroovyTransformation.APPLY_PARSE);
         
-        if (transformations.length == 1) {
-            fn = fnbase + transformations[0] + "." + att;
-        } else {
-            fn = fnbase + en + ".control"; // NOI18N
+        if (f == null) {
+            f = layer(e).instanceFile(fnbase, en).
+                    stringvalue("instanceOf", ParsingCompilerCustomizer.class.getName()). // NOI18N
+                    methodvalue("instanceCreate", SimpleTransformationCustomizer.class.getName(), "fromLayer"); // NOI18N
         }
-        
-        File f = layer(e).file(fn);
         if (!simple) {
-            f.stringvalue("apply", String.join(",", items));
+            f.stringvalue("apply", String.join(",", items)); // NOI18N
         }
-        
-        if (transformations.length > 1) {
-            f.stringvalue(att, String.join(",", transformations));
-        }
-        f.write();
+        f.stringvalue(att, String.join(",", transformations)); // NOI18N
+        return f;
     }
     
 }

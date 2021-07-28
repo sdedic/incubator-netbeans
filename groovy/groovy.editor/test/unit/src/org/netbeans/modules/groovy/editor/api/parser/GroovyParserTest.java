@@ -228,7 +228,9 @@ public class GroovyParserTest extends GroovyTestBase {
                 "\t\tprintln 'Hello, world'\n" +
                 "\t}\n" +
                 "}");
-
+        // delete the instruction from annotation processor, to check the default behaviour
+        FileUtil.getConfigFile("Editors/text/x-groovy/Parser/org.netbeans.modules.groovy.editor.test.DisableTransformersStub.instance").delete();
+        FileUtil.getConfigFile("Editors/text/x-groovy/Parser/org.netbeans.modules.groovy.editor.api.parser.GroovyParserTest.DormantTransformation.instance").delete();
         Source source = Source.create(testFO);
         ParserManager.parse(Collections.singleton(source), new UserTask() {
             public @Override void run(ResultIterator resultIterator) throws Exception {
@@ -247,42 +249,8 @@ public class GroovyParserTest extends GroovyTestBase {
      * Checks that simple .disable file will disable the transformation
      * @throws Exception 
      */
-    public void testGlobalASTProcessorDisabledByFile() throws Exception {
-        // add an instruction to skip the transformation
-        FileUtil.createData(FileUtil.getConfigRoot(),
-                "Editors/text/x-groovy/Parser/Transformations/org.netbeans.modules.groovy.editor.api.parser.GroovyParserTest$TestingTransformation.disable");
-        copyStringToFileObject(testFO,
-                "class Hello {\n" +
-                "\tdef name = 'aaa'\n" +
-                "\tprintln name\n" +
-                "\tstatic void main(args) {\n" +
-                "\t\tprintln 'Hello, world'\n" +
-                "\t}\n" +
-                "}");
-
-        Source source = Source.create(testFO);
-        ParserManager.parse(Collections.singleton(source), new UserTask() {
-            public @Override void run(ResultIterator resultIterator) throws Exception {
-                GroovyParserResult result = ASTUtils.getParseResult(resultIterator.getParserResult());
-                assertNotNull(result);
-                // the global transofrmer did not run - disabled.
-                assertNull(parserUnit);
-                assertNotNull(GroovyTestTransformer.parserCompUnit);
-            }
-        });
-    }
-    
-    /**
-     * Checks that simple .disable file will disable the transformation
-     * @throws Exception 
-     */
     public void testGlobalASTProcessorDisabledByAttribute() throws Exception {
         // add an instruction to skip the transformation
-        FileUtil.getConfigRoot().getFileSystem().runAtomicAction(() -> {
-            FileObject fo = FileUtil.createData(FileUtil.getConfigRoot(),
-                    "Editors/text/x-groovy/Parser/Transformations/org.netbeans.modules.groovy.editor.api.parser.testingInstruction");
-            fo.setAttribute("disable", "org.netbeans.modules.groovy.editor.api.parser.GroovyParserTest$TestingTransformation");
-        });
         copyStringToFileObject(testFO,
                 "class Hello {\n" +
                 "\tdef name = 'aaa'\n" +
@@ -298,40 +266,12 @@ public class GroovyParserTest extends GroovyTestBase {
                 GroovyParserResult result = ASTUtils.getParseResult(resultIterator.getParserResult());
                 assertNotNull(result);
                 assertNull(parserUnit);
-                assertNotNull(GroovyTestTransformer.parserCompUnit);
-            }
-        });
-    }
-    
-    public void testExplicitlyEnableASTTransformationByFile() throws Exception {
-        FileObject fo = FileUtil.createData(FileUtil.getConfigRoot(),
-                "Editors/text/x-groovy/Parser/Transformations/org.netbeans.modules.groovy.editor.api.parser.GroovyParserTest$DormantTransformation.enable");
-        copyStringToFileObject(testFO,
-                "class Hello {\n" +
-                "\tdef name = 'aaa'\n" +
-                "\tprintln name\n" +
-                "\tstatic void main(args) {\n" +
-                "\t\tprintln 'Hello, world'\n" +
-                "\t}\n" +
-                "}");
-
-        Source source = Source.create(testFO);
-        ParserManager.parse(Collections.singleton(source), new UserTask() {
-            public @Override void run(ResultIterator resultIterator) throws Exception {
-                GroovyParserResult result = ASTUtils.getParseResult(resultIterator.getParserResult());
-                assertNotNull(result);
-                assertNotNull(enabledForUnit);
                 assertNotNull(GroovyTestTransformer.parserCompUnit);
             }
         });
     }
     
     public void testExplicitlyEnableASTTransformationByAttr() throws Exception {
-        FileUtil.getConfigRoot().getFileSystem().runAtomicAction(() -> {
-            FileObject fo = FileUtil.createData(FileUtil.getConfigRoot(),
-                    "Editors/text/x-groovy/Parser/Transformations/org.netbeans.modules.groovy.editor.api.parser.testingInstruction");
-            fo.setAttribute("enable", "org.netbeans.modules.groovy.editor.api.parser.GroovyParserTest$DormantTransformation");
-        });
         copyStringToFileObject(testFO,
                 "class Hello {\n" +
                 "\tdef name = 'aaa'\n" +
@@ -359,6 +299,7 @@ public class GroovyParserTest extends GroovyTestBase {
     static CompilationUnit enabledForUnit;
     
     @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
+    @ApplyGroovyTransformation(enable = "parse")
     public static class DormantTransformation implements ASTTransformation, CompilationUnitAware {
 
         @Override

@@ -20,7 +20,6 @@ package org.netbeans.modules.groovy.editor.compiler;
 
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
-import org.codehaus.groovy.transform.GroovyASTTransformation;
 import org.netbeans.modules.parsing.api.Snapshot;
 import org.netbeans.modules.parsing.api.Task;
 import org.netbeans.spi.editor.mimelookup.MimeLocation;
@@ -35,7 +34,6 @@ import org.netbeans.spi.editor.mimelookup.MimeLocation;
  * @author sdedic
  */
 @MimeLocation(subfolderName = "Parser")
-@GroovyASTTransformation
 public interface ParsingCompilerCustomizer {
     
     /**

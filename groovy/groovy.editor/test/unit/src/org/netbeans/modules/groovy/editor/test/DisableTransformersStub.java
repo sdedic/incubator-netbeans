@@ -21,9 +21,9 @@ package org.netbeans.modules.groovy.editor.test;
 import org.netbeans.modules.groovy.editor.api.parser.ApplyGroovyTransformation;
 
 // BEGIN:DisableTransformersStub
-@ApplyGroovyTransformation(disable = ApplyGroovyTransformation.APPLY_INDEX, value = {
+@ApplyGroovyTransformation(disable = ApplyGroovyTransformation.APPLY_PARSE, value = {
     "org.netbeans.modules.groovy.editor.test.DisabledGlobalAnnotation",
-    "org.netbeans.modules.groovy.editor.test.AnotherDisabledGlobalAnnotation",
+    "org.netbeans.modules.groovy.editor.api.parser.GroovyParserTest$TestingTransformation",
 })
 public class DisableTransformersStub {
     

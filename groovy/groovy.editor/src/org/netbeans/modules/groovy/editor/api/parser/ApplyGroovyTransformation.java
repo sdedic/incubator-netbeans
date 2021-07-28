@@ -28,17 +28,17 @@ import org.codehaus.groovy.transform.GroovyASTTransformation;
 
 /**
  * Enables or disables Groovy Transformations in parsing or indexing process. A transformation can be enabled/disabled for parsing, indexing or both. 
- * The annotation can be used on either a {@link ASTTransformation} subclass without any {@link #value} to how that transformation class is
- * applied. The ASTTransformation must be also annotated by {@link GroovyASTTransformation} that specifies the {@link CompilePhase}
+ * The annotation can be used on either a {@link ASTTransformation} subclass without any {@link #value} to define how the class is going to be
+ * applied (value will default to the annotated class' name). The ASTTransformation <b>must be also annotated by {@link GroovyASTTransformation}</b> that specifies the {@link CompilePhase}
  * the transformation is applied in. 
  * <div class="nonnormative">
- * An exmaple of an additional ASTTransformation registered for parsing only (default) in PARSING phase: {@codesnippet GroovyTestTransformer}
+ * An example of an additional ASTTransformation registered for parsing only (default) in PARSING phase: {@codesnippet GroovyTestTransformer}
  * </div>
  * <p>
  * Any other type (or package element) can be also annotated by this annotation, but {@link #value} must identify fully qualified class name(s) of
  * transformation(s) to be affected. 
  * <div class="nonnormative">
- * An exmaple of an some "foreign" global transformations disabled for indexing tasks: {@codesnippet DisableTransformersStub}
+ * An example of an some "foreign" global transformations disabled for parsing tasks: {@codesnippet DisableTransformersStub}
  * </div>
  * <p>
  * If {@link #enable} attribute is not specified when ASTTransformation is annotated, it will default to {@link #APPLY_PARSE}. 

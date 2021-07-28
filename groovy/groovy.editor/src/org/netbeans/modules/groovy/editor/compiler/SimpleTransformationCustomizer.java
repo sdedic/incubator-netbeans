@@ -23,7 +23,7 @@ import groovy.transform.CompilationUnitAware;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -35,9 +35,6 @@ import org.codehaus.groovy.transform.ASTTransformation;
 import org.codehaus.groovy.transform.GroovyASTTransformation;
 import org.netbeans.modules.groovy.editor.api.parser.ApplyGroovyTransformation;
 import org.netbeans.modules.parsing.spi.indexing.support.IndexingSupport;
-import org.netbeans.spi.editor.mimelookup.InstanceProvider;
-import org.netbeans.spi.editor.mimelookup.MimeLocation;
-import org.openide.filesystems.FileObject;
 
 /**
  * Simple {@link ParsingCompilerCustomizer} implementation: adds or disables Groovy AST
@@ -59,10 +56,7 @@ import org.openide.filesystems.FileObject;
  * 
  * @author sdedic
  */
-@MimeLocation(subfolderName = SimpleTransformationCustomizer.PARSING_COMPILER_CONFIG, 
-    instanceProviderClass = SimpleTransformationCustomizer.class)
-public class SimpleTransformationCustomizer implements ParsingCompilerCustomizer,
-        InstanceProvider<SimpleTransformationCustomizer> {
+final class SimpleTransformationCustomizer implements ParsingCompilerCustomizer {
     
     private static final Logger LOG = Logger.getLogger(SimpleTransformationCustomizer.class.getName());
     
@@ -89,7 +83,7 @@ public class SimpleTransformationCustomizer implements ParsingCompilerCustomizer
         private final Collection<String> addTransformations = new LinkedHashSet<>();
     }
     
-    public SimpleTransformationCustomizer() {
+    private SimpleTransformationCustomizer() {
     }
 
     @Override
@@ -148,24 +142,6 @@ public class SimpleTransformationCustomizer implements ParsingCompilerCustomizer
         }
     }
     
-    private void processFile2(FileObject f, Cfg target) {
-        Collection<String> disable = findNames(f, ATTR_DISABLE_TRANSFORMATIONS);
-        if (disable != null) {
-            target.disableTransformations.addAll(disable);
-            // in addition, remove layer-registered transformations.
-            target.addTransformations.removeAll(disable);
-        }
-        
-        Collection<String> enable = findNames(f, ATTR_ENABLE_TRANSFORMATIONS);
-        if (enable != null) {
-            target.addTransformations.addAll(enable);
-        }
-        
-        if (disable == null && enable == null) {
-            LOG.log(Level.WARNING, "Entry does not disable or enable transformation: {0}", f);
-        }
-    }
-
     /**
      * Modes to apply the setting. 
      */
@@ -191,9 +167,9 @@ public class SimpleTransformationCustomizer implements ParsingCompilerCustomizer
      */
     private static final String ATTR_ENABLE_TRANSFORMATIONS = "enable"; // NOI18N
 
-    /* Package-private for testing */
-    void processFile(FileObject f, SimpleTransformationCustomizer instance) {
-        Object o = f.getAttribute(ATTR_MODE);
+    static SimpleTransformationCustomizer fromLayer(Map<String, Object> values) {
+        SimpleTransformationCustomizer instance = new SimpleTransformationCustomizer();
+        Object o = values.get(ATTR_MODE);
         boolean applied = false;
         if (o instanceof String) {
             boolean warn = false;
@@ -201,35 +177,52 @@ public class SimpleTransformationCustomizer implements ParsingCompilerCustomizer
                 v = v.trim();
                 switch (v) {
                     case VALUE_MODE_INDEXING:
-                        processFile2(f, instance.indexing);
+                        processMap(values, instance.indexing);
                         applied = true;
                         break;
                     case VALUE_MODE_PARSING:
-                        processFile2(f, instance.parsing);
+                        processMap(values, instance.parsing);
                         applied = true;
                         break;
                     default:
                         applied = true;
                         if (!warn) {
                             warn = true;
-                            LOG.log(Level.WARNING, "Unexpected contents of 'apply' in {0}: {1}", 
-                                    new Object[] { f.getPath(), v });
+                            LOG.log(Level.WARNING, "Unexpected value of 'apply': {1}", v);
                         }
                         break;
                 }
             }
         } else if (o != null) {
-            LOG.log(Level.WARNING, "Unexpected contents of 'apply' in {0}", f.getPath());
+            LOG.log(Level.WARNING, "Unexpected contents of 'apply': {0}", o);
             applied = true;
         }
         if (!applied) {
             // by default apply for parsing.
-            processFile2(f, instance.parsing);
+            processMap(values, instance.parsing);
         }
+        return instance;
     }
     
-    static Collection<String> findNames(FileObject f, String attName) {
-        Object o = f.getAttribute(attName);
+    static void processMap(Map<String, Object> map, Cfg target) {
+        Collection<String> disable = findNames(map.get(ATTR_DISABLE_TRANSFORMATIONS));
+        if (disable != null) {
+            target.disableTransformations.addAll(disable);
+            // in addition, remove layer-registered transformations.
+            target.addTransformations.removeAll(disable);
+        }
+        
+        Collection<String> enable = findNames(map.get(ATTR_ENABLE_TRANSFORMATIONS));
+        if (enable != null) {
+            target.addTransformations.addAll(enable);
+        }
+        
+        if (disable == null && enable == null) {
+            LOG.log(Level.WARNING, "Entry does not disable or enable transformation: {0}", map);
+        }
+    }
+
+    static Collection<String> findNames(Object o) {
         Set<String> dtnames = new LinkedHashSet<>();
         if (o instanceof Collection) {
             dtnames.addAll((Collection)o);
@@ -240,20 +233,9 @@ public class SimpleTransformationCustomizer implements ParsingCompilerCustomizer
                     dtnames.add(s);
                 }
             }
-        } else if (f.getExt().equals(attName)) {
-            dtnames.add(f.getName());
         } else {
             return null;
         }
         return dtnames;
-    }
-    
-    @Override
-    public SimpleTransformationCustomizer createInstance(List<FileObject> fileObjectList) {
-        SimpleTransformationCustomizer cust = new SimpleTransformationCustomizer();
-        for (FileObject f : fileObjectList) {
-            processFile(f, cust);
-        }
-        return cust;
     }
 }

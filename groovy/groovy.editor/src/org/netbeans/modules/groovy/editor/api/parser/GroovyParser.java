@@ -62,7 +62,6 @@ import org.netbeans.modules.groovy.editor.utils.GroovyUtils;
 import org.netbeans.modules.groovy.editor.api.lexer.GroovyTokenId;
 import org.netbeans.modules.groovy.editor.api.lexer.LexUtilities;
 import org.netbeans.modules.groovy.editor.compiler.ParsingCompilerCustomizer;
-import org.netbeans.modules.groovy.editor.compiler.SimpleTransformationCustomizer;
 import org.netbeans.modules.groovy.editor.compiler.error.CompilerErrorResolver;
 import org.netbeans.modules.parsing.api.Snapshot;
 import org.netbeans.modules.parsing.api.Task;
@@ -819,11 +818,7 @@ public class GroovyParser extends Parser {
 
 
             Lookup mlkp = MimeLookup.getLookup(snapshot.getMimePath());
-            SimpleTransformationCustomizer simple = mlkp.lookup(SimpleTransformationCustomizer.class);
             List<ParsingCompilerCustomizer> cc = new ArrayList<>(mlkp.lookupAll(ParsingCompilerCustomizer.class));
-            if (mlkp != null) {
-                cc.add(0, simple);
-            }
             compilerCustomizers = cc;
             if (!cc.isEmpty()) {
                 customizerCtx = new ParsingCompilerCustomizer.Context(snapshot, parserTask);

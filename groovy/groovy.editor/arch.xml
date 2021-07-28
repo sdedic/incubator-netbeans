@@ -1053,10 +1053,10 @@
 -->
  <answer id="resources-read">
   <p>
-      <api group="layer" name="SimpleParserCustomizer" type="export" category="private">
+      <api group="layer" name="ParsingCompilerCustomizer" type="export" category="private">
           <p>
-              <code>Editors/text/x-groovy/Parser/Transformations</code> (replace the prefix with the source file's MIME type) folder may contain entries that are processed
-              and enable/disable transformers during parsing or indexing.
+              <code>Editors/text/x-groovy/Parser</code> (replace the prefix with the source file's MIME type) folder may contain entries that are processed
+              and enable/disable transformers, or alter Groovy compiler configuration during parsing or indexing.
           </p>
       </api>
       `
