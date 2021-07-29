@@ -65,12 +65,12 @@ public interface ParsingCompilerCustomizer {
 
         /**
          * Constructs the context. 
-         * @param snap
-         * @param calerTask 
+         * @param snap Snapshot to be parsed.
+         * @param consumerTask task that is going to consume the parsing result. 
          */
-        public Context(Snapshot snap, Task calerTask) {
+        public Context(Snapshot snap, Task consumerTask) {
             this.snapshot = snap;
-            this.consumerTask = calerTask;
+            this.consumerTask = consumerTask;
         }
 
         /**
