@@ -72,9 +72,12 @@
                     </file>
                 </folder>
                 <folder name="Parser">
-                    <folder name="Transformations">
-                        <file name="org.spockframework.compiler.SpockTransform.disable"/>
-                    </folder>
+                    <file name="org.spockframework.compiler.SpockTransform.instance">
+                        <attr name="instanceOf" stringvalue="org.netbeans.modules.groovy.editor.compiler.ParsingCompilerCustomizer"/>
+                        <attr
+                            methodvalue="org.netbeans.modules.groovy.editor.api.parser.GroovyParser.customizeTransformsFromLayer" name="instanceCreate"/>
+                        <attr name="disable" stringvalue="org.spockframework.compiler.SpockTransform"/>
+                    </file>
                 </folder>
                 <folder name="Popup">
                     <file name="fix-groovy-imports">

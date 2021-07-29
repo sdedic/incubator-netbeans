@@ -56,7 +56,7 @@ import org.netbeans.modules.parsing.spi.indexing.support.IndexingSupport;
  * 
  * @author sdedic
  */
-final class SimpleTransformationCustomizer implements ParsingCompilerCustomizer {
+public final class SimpleTransformationCustomizer implements ParsingCompilerCustomizer {
     
     private static final Logger LOG = Logger.getLogger(SimpleTransformationCustomizer.class.getName());
     
@@ -167,7 +167,7 @@ final class SimpleTransformationCustomizer implements ParsingCompilerCustomizer 
      */
     private static final String ATTR_ENABLE_TRANSFORMATIONS = "enable"; // NOI18N
 
-    static SimpleTransformationCustomizer fromLayer(Map<String, Object> values) {
+    public static SimpleTransformationCustomizer fromLayer(Map<String, Object> values) {
         SimpleTransformationCustomizer instance = new SimpleTransformationCustomizer();
         Object o = values.get(ATTR_MODE);
         boolean applied = false;

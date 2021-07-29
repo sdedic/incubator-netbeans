@@ -62,6 +62,7 @@ import org.netbeans.modules.groovy.editor.utils.GroovyUtils;
 import org.netbeans.modules.groovy.editor.api.lexer.GroovyTokenId;
 import org.netbeans.modules.groovy.editor.api.lexer.LexUtilities;
 import org.netbeans.modules.groovy.editor.compiler.ParsingCompilerCustomizer;
+import org.netbeans.modules.groovy.editor.compiler.SimpleTransformationCustomizer;
 import org.netbeans.modules.groovy.editor.compiler.error.CompilerErrorResolver;
 import org.netbeans.modules.parsing.api.Snapshot;
 import org.netbeans.modules.parsing.api.Task;
@@ -857,5 +858,10 @@ public class GroovyParser extends Parser {
 
         void error(Error error);
 
+    }
+    
+    // to be used form layers.
+    static ParsingCompilerCustomizer customizeTransformsFromLayer(Map<String, Object> attributes) {
+        return SimpleTransformationCustomizer.fromLayer(attributes);
     }
 }

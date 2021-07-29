@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Scanner;
+import java.util.Set;
 import org.codehaus.groovy.ast.ASTNode;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.modules.groovy.editor.api.AstPath;
@@ -290,6 +291,27 @@ public class GroovyParserTest extends GroovyTestBase {
                 assertNotNull(GroovyTestTransformer.parserCompUnit);
             }
         });
+    }
+    
+    public void testSpockDisabledByDefault() throws Exception {
+        copyStringToFileObject(testFO,
+                "class Hello {\n" +
+                "\tdef name = 'aaa'\n" +
+                "\tprintln name\n" +
+                "\tstatic void main(args) {\n" +
+                "\t\tprintln 'Hello, world'\n" +
+                "\t}\n" +
+                "}");
+
+        Source source = Source.create(testFO);
+        ParserManager.parse(Collections.singleton(source), new UserTask() {
+            public @Override void run(ResultIterator resultIterator) throws Exception {
+                // the parser is lazy, must trigger parsing.
+                ASTUtils.getParseResult(resultIterator.getParserResult());
+            }
+        });
+        Set<String> disabledClasses = enabledForUnit.getConfiguration().getDisabledGlobalASTTransformations();
+        assertTrue(disabledClasses.contains("org.spockframework.compiler.SpockTransform"));
     }
     
     static SourceUnit parserUnit;

@@ -30,6 +30,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import org.codehaus.groovy.transform.ASTTransformation;
 import org.netbeans.modules.groovy.editor.api.parser.ApplyGroovyTransformation;
+import org.netbeans.modules.groovy.editor.api.parser.GroovyParser;
 import org.openide.filesystems.annotations.LayerBuilder.File;
 import org.openide.filesystems.annotations.LayerGeneratingProcessor;
 import org.openide.filesystems.annotations.LayerGenerationException;
@@ -108,7 +109,8 @@ public class ApplyGroovyTransformationProcessor extends LayerGeneratingProcessor
         if (f == null) {
             f = layer(e).instanceFile(fnbase, en).
                     stringvalue("instanceOf", ParsingCompilerCustomizer.class.getName()). // NOI18N
-                    methodvalue("instanceCreate", SimpleTransformationCustomizer.class.getName(), "fromLayer"); // NOI18N
+                    methodvalue("instanceCreate", 
+                            GroovyParser.class.getName(), "customizeTransformsFromLayer"); // NOI18N
         }
         if (!simple) {
             f.stringvalue("apply", String.join(",", items)); // NOI18N
