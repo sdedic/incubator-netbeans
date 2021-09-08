@@ -22,6 +22,7 @@ package org.netbeans.modules.groovy.editor.compiler;
 import groovy.lang.GroovyClassLoader;
 import groovyjarjarasm.asm.Opcodes;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.security.CodeSource;
 import java.util.*;
 import java.util.concurrent.CancellationException;
@@ -41,6 +42,7 @@ import org.codehaus.groovy.ast.MixinNode;
 import org.codehaus.groovy.control.ClassNodeResolver.LookupResult;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.netbeans.api.annotations.common.NonNull;
+import org.netbeans.api.java.classpath.ClassPath;
 import org.netbeans.api.java.source.ClasspathInfo;
 import org.netbeans.api.java.source.CompilationController;
 import org.netbeans.api.java.source.JavaSource;
@@ -48,6 +50,7 @@ import org.netbeans.api.java.source.Task;
 import org.netbeans.modules.groovy.editor.api.parser.GroovyParser;
 import org.netbeans.modules.groovy.editor.java.ElementSearch;
 import org.netbeans.modules.groovy.editor.java.Utilities;
+import org.openide.filesystems.FileObject;
 import org.openide.util.Exceptions;
 
 /**
@@ -100,7 +103,10 @@ public class CompilationUnit extends org.codehaus.groovy.control.CompilationUnit
         private final GroovyParser parser;
         private final JavaSource javaSource;
         private final HashMap<String, ClassNode> temp = new HashMap<>();
-
+        private final ClasspathInfo cpInfo;
+        private final Set<FileObject> cachedRoots;
+        private final ClassPath cachedCompile;
+        
         public CompileUnit(GroovyParser parser, GroovyClassLoader classLoader,
                 Function<String, ClassNode> classResolver,
                 CodeSource codeSource, CompilerConfiguration config,
@@ -111,6 +117,13 @@ public class CompilationUnit extends org.codehaus.groovy.control.CompilationUnit
             this.cache = classNodeCache;
             this.javaSource = cache.createResolver(cpInfo);
             this.classResolver = classResolver;
+            this.cpInfo = cpInfo;
+            
+            ClassPath cp1 = cpInfo.getClassPath(ClasspathInfo.PathKind.COMPILE);
+            this.cachedCompile = CompilationUnit.pryOutCachedClassPath(cpInfo, ClasspathInfo.PathKind.COMPILE);
+            Set<FileObject> r = new HashSet<>(Arrays.asList(cachedCompile.getRoots()));
+            r.removeAll(Arrays.asList(cp1.getRoots()));
+            cachedRoots = r;
         }
 
 
@@ -141,6 +154,15 @@ public class CompilationUnit extends org.codehaus.groovy.control.CompilationUnit
             
             classNode = classResolver.apply(name);
             if (classNode != null) {
+                String tryClassName = name.replace(".", "/") + ".class"; // NOI18N
+                FileObject f = cachedCompile.findResource(tryClassName);
+                if (f != null) {
+                    FileObject r = cachedCompile.findOwnerRoot(f);
+                    if (cachedRoots.contains(r)) {
+                        // do not cache:
+                        return classNode;
+                    }
+                }
                 cache.put(name, classNode);
                 return classNode;
             }
@@ -163,6 +185,7 @@ public class CompilationUnit extends org.codehaus.groovy.control.CompilationUnit
                 Task<CompilationController> task = new Task<CompilationController>() {
                     @Override
                     public void run(CompilationController controller) throws Exception {
+                        controller.toPhase(JavaSource.Phase.ELEMENTS_RESOLVED);
                         Elements elements = controller.getElements();
                         TypeElement typeElement = ElementSearch.getClass(elements, name);
                         if (typeElement != null) {
@@ -290,6 +313,29 @@ public class CompilationUnit extends org.codehaus.groovy.control.CompilationUnit
                 classNode.setGenericsTypes(generics.toArray(new GenericsType[generics.size()]));
             }
             return classNode;
+        }
+    }
+    
+    private static Method getCachedClassPathMethod;
+    
+    public static ClassPath pryOutCachedClassPath(ClasspathInfo cpInfo, ClasspathInfo.PathKind kind) {
+        try {
+            if (getCachedClassPathMethod == null) {
+                Method m = ClasspathInfo.class.getDeclaredMethod("getCachedClassPath", ClasspathInfo.PathKind.class);
+                m.setAccessible(true);
+                getCachedClassPathMethod = m;
+            } else if (getCachedClassPathMethod.getDeclaringClass() == String.class) {
+                return cpInfo.getClassPath(kind);
+            }
+            return (ClassPath)getCachedClassPathMethod.invoke(cpInfo, kind);
+        } catch (ReflectiveOperationException | SecurityException ex) {
+            Exceptions.printStackTrace(ex);
+            try {
+                getCachedClassPathMethod = String.class.getMethod("toString");
+            } catch (ReflectiveOperationException | SecurityException ex2) {
+                Exceptions.printStackTrace(ex2);
+            }
+            return cpInfo.getClassPath(kind);
         }
     }
 }

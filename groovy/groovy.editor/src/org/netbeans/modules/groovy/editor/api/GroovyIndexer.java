@@ -18,12 +18,14 @@
  */
 package org.netbeans.modules.groovy.editor.api;
 
-import groovy.transform.PackageScope;
 import groovyjarjarasm.asm.Opcodes;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
@@ -41,19 +43,27 @@ import org.openide.filesystems.FileObject;
 import org.openide.util.Exceptions;
 import java.util.logging.Logger;
 import java.util.logging.Level;
-import org.codehaus.groovy.ast.ClassHelper;
-import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
+import org.netbeans.api.java.source.ClasspathInfo;
 import org.netbeans.modules.csl.api.Modifier;
 import org.netbeans.modules.groovy.editor.api.lexer.LexUtilities;
 import org.netbeans.modules.groovy.editor.api.elements.ast.ASTField;
 import org.netbeans.modules.groovy.editor.api.elements.ast.ASTMethod;
+import org.netbeans.modules.groovy.editor.api.elements.index.IndexedField;
+import org.netbeans.modules.groovy.editor.api.elements.index.IndexedMethod;
 import org.netbeans.modules.groovy.editor.compiler.ClassNodeCache;
+import org.netbeans.modules.groovy.editor.compiler.PerfData;
 import org.netbeans.modules.groovy.editor.utils.GroovyUtils;
+
+import org.netbeans.modules.parsing.api.ParserManager;
+import org.netbeans.modules.parsing.api.ResultIterator;
+import org.netbeans.modules.parsing.api.UserTask;
+import org.netbeans.modules.parsing.spi.ParseException;
 import org.netbeans.modules.parsing.spi.indexing.EmbeddingIndexer;
 import org.netbeans.modules.parsing.spi.indexing.EmbeddingIndexerFactory;
 import org.netbeans.modules.parsing.spi.indexing.support.IndexDocument;
 import org.netbeans.modules.parsing.spi.indexing.support.IndexingSupport;
+import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
 
 /**
  *
@@ -140,6 +150,8 @@ public class GroovyIndexer extends EmbeddingIndexer {
         long indexerThisStopTime = System.currentTimeMillis();
         long indexerThisRunTime = indexerThisStopTime - indexerThisStartTime;
         indexerRunTime += indexerThisRunTime;
+        
+        PerfData.global.addPerfCounter("Indexer time", indexerThisRunTime);
 
         LOG.log(Level.FINEST, "Indexed File                : {0}", r.getSnapshot().getSource().getFileObject());
         LOG.log(Level.FINEST, "Indexing time (ms)          : {0}", indexerThisRunTime);
@@ -229,15 +241,74 @@ public class GroovyIndexer extends EmbeddingIndexer {
                 return false;
             }
             ClassNodeCache.createThreadLocalInstance();
+            PerfData.global.clear();
             return super.scanStarted(context);
         }
 
         @Override
-        public void scanFinished(Context context) {            
+        public void scanFinished(Context context) {
+            PerfData.LOG.info("***** Indexing statistics");
+            PerfData.global.dumpStatsAndMerge();
             ClassNodeCache.clearThreadLocalInstance();
+            
+            try {
+                class UT extends UserTask implements ClasspathInfo.Provider {
+                    final ClasspathInfo cpi = ClasspathInfo.create(context.getRoot());
+                    public UT() {
+                    }
+                    
+                    public ClasspathInfo getClasspathInfo() {
+                        return cpi;
+                    }
+                    
+                    @Override
+                    public void run(ResultIterator resultIterator) throws Exception {
+                        DUMPLOG.log(Level.INFO, "Dumping discovered methods and fields: {0}", context.getRoot());
+                        GroovyIndex index = GroovyIndex.get(Collections.singleton(context.getRoot()));
+                        List<IndexedMethod> lm = new ArrayList<>(index.getMethods(".*", null, QuerySupport.Kind.REGEXP));
+                        lm.sort(new Comparator<IndexedMethod>() {
+                            @Override
+                            public int compare(IndexedMethod o1, IndexedMethod o2) {
+                                String in1 = o1.getIn();
+                                String in2 = o2.getIn();
+
+                                int c = Objects.toString(in1).compareTo(Objects.toString(in2));
+                                if (c != 0) {
+                                    return c;
+                                }
+                                return o1.getSignature().compareTo(o2.getSignature());
+                            }
+                        });
+                        lm.forEach(m -> {
+                            DUMPLOG.log(Level.INFO, "METHOD {0}::{1}", new Object[] { m.getIn(), m.getSignature() });
+                        });
+                        List<IndexedField> lf = new ArrayList<>(index.getFields(".*", null, QuerySupport.Kind.REGEXP));
+                        lf.sort(new Comparator<IndexedField>() {
+                            @Override
+                            public int compare(IndexedField o1, IndexedField o2) {
+                                String in1 = o1.getIn();
+                                String in2 = o2.getIn();
+
+                                int c = Objects.toString(in1).compareTo(Objects.toString(in2));
+                                if (c != 0) {
+                                    return c;
+                                }
+                                return o1.getSignature().compareTo(o2.getSignature());
+                            }
+                        });
+                        lf.forEach(f -> {
+                            DUMPLOG.log(Level.INFO, "FIELD {0}::{1}", new Object[] { f.getIn(), f.getSignature() });
+                        });
+                    }
+                }
+                ParserManager.parseWhenScanFinished("text/x-java", new UT());
+            } catch (ParseException ex) {
+            }
             super.scanFinished(context);
         }
     }
+    
+    private static final Logger DUMPLOG = Logger.getLogger(GroovyIndexer.class.getName() + ".DUMP");
     
     private static class TreeAnalyzer {
 

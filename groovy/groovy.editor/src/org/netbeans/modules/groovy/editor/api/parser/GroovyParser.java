@@ -21,29 +21,36 @@ package org.netbeans.modules.groovy.editor.api.parser;
 import groovy.lang.GroovyClassLoader;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.security.CodeSource;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import javax.swing.event.ChangeListener;
 import javax.swing.text.BadLocationException;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.CompileUnit;
-import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.GroovyClassVisitor;
 import org.codehaus.groovy.ast.ModuleNode;
-import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.decompiled.AsmReferenceResolver;
+import org.codehaus.groovy.classgen.GeneratorContext;
+import org.codehaus.groovy.classgen.VariableScopeVisitor;
+import org.codehaus.groovy.control.ClassNodeResolver;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.ErrorCollector;
@@ -53,6 +60,7 @@ import org.codehaus.groovy.control.messages.Message;
 import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
+import org.codehaus.groovy.tools.GroovyClass;
 import org.codehaus.groovy.transform.StaticTypesTransformation;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.netbeans.api.editor.mimelookup.MimeLookup;
@@ -60,6 +68,10 @@ import org.netbeans.api.java.classpath.ClassPath;
 import org.netbeans.api.java.source.ClasspathInfo;
 import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenSequence;
+import org.netbeans.api.project.FileOwnerQuery;
+import org.netbeans.api.project.Project;
+import org.netbeans.api.project.ProjectUtils;
+import org.netbeans.api.project.SourceGroup;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.modules.csl.api.Error;
 import org.netbeans.modules.csl.api.OffsetRange;
@@ -72,7 +84,9 @@ import org.netbeans.modules.groovy.editor.compiler.error.GroovyError;
 import org.netbeans.modules.groovy.editor.utils.GroovyUtils;
 import org.netbeans.modules.groovy.editor.api.lexer.GroovyTokenId;
 import org.netbeans.modules.groovy.editor.api.lexer.LexUtilities;
+import org.netbeans.modules.groovy.editor.compiler.ClassNodeCache.ParsingClassLoader;
 import org.netbeans.modules.groovy.editor.compiler.ParsingCompilerCustomizer;
+import org.netbeans.modules.groovy.editor.compiler.PerfData;
 import org.netbeans.modules.groovy.editor.compiler.SimpleTransformationCustomizer;
 import org.netbeans.modules.groovy.editor.compiler.error.CompilerErrorResolver;
 import org.netbeans.modules.parsing.api.Snapshot;
@@ -83,6 +97,7 @@ import org.netbeans.modules.parsing.spi.SourceModificationEvent;
 import org.netbeans.modules.parsing.spi.indexing.support.IndexingSupport;
 import org.netbeans.spi.java.classpath.support.ClassPathSupport;
 import org.openide.filesystems.FileObject;
+import org.openide.filesystems.FileUtil;
 import org.openide.util.Exceptions;
 import org.openide.util.Lookup;
 
@@ -95,6 +110,8 @@ import org.openide.util.Lookup;
 public class GroovyParser extends Parser {
 
     private static final Logger LOG = Logger.getLogger(GroovyParser.class.getName());
+
+    private static final Logger PERFLOG = Logger.getLogger(GroovyParser.class.getName() + ".perf");
 
     private static final AtomicLong PARSING_TIME = new AtomicLong(0);
 
@@ -135,6 +152,8 @@ public class GroovyParser extends Parser {
         assert lastResult != null : "getResult() called prior parse()"; //NOI18N
         return lastResult;
     }
+    
+    static Map<Integer, Long>    phaseCounters = new HashMap<>();
 
     @Override
     public void parse(Snapshot snapshot, Task task, SourceModificationEvent event) throws ParseException {
@@ -157,7 +176,50 @@ public class GroovyParser extends Parser {
                 errors.add(error);
             }
         };
-        lastResult = parseBuffer(context, Sanitize.NONE);
+        /*
+        FileObject fo = snapshot.getSource().getFileObject();
+        if (fo != null) {
+            Project p = FileOwnerQuery.getOwner(fo);
+            SourceGroup[] grps = ProjectUtils.getSources(p).getSourceGroups("java");
+            for (SourceGroup g : grps) {
+                System.err.println("Java root: " + g.getRootFolder().getPath());
+                ClassPath cp = ClassPath.getClassPath(fo, ClassPath.COMPILE);
+                FileObject[] r = cp.getRoots();
+                FileObject[] r2 = cp.getRoots();
+                for (int i = 0; i < r.length; i++) {
+                    if (FileUtil.isArchiveArtifact(r[i])) {
+                        r2[i] = FileUtil.getArchiveFile(r[i]);
+                    } else {
+                        r2[i] = r[i];
+                    }
+                }
+                System.err.println(
+                        String.join("\n", Arrays.asList(r2).stream().map(f -> "\t" + f.getPath()).collect(Collectors.toList()))
+                );
+            }
+
+            grps = ProjectUtils.getSources(p).getSourceGroups("main");
+            for (SourceGroup g : grps) {
+                System.err.println("Main root: " + g.getRootFolder().getPath());
+                ClassPath cp = ClassPath.getClassPath(fo, ClassPath.COMPILE);
+                System.err.println(
+                        String.join("\n", Arrays.asList(cp.getRoots()).stream().map(f -> "\t" + f.getPath()).collect(Collectors.toList()))
+                );
+            }
+            System.err.println("\n\n");
+        }
+        */
+        long t1 = System.currentTimeMillis();
+        try {
+            lastResult = parseBuffer(context, Sanitize.NONE);        
+        } catch (Throwable t) {
+            LOG.log(Level.SEVERE, "Error during parsing: ", t);
+        }
+        long t2 = System.currentTimeMillis();
+        context.perfData.addPerfCounter("Total parsing time", t2 - t1);
+        context.perfData.dumpStatsAndMerge();
+        PERFLOG.log(Level.INFO, "------------------------------------------------\n\n");
+
         if (lastResult != null) {
             lastResult.setErrors(errors);
         } else {
@@ -475,6 +537,20 @@ public class GroovyParser extends Parser {
         return configuration;
     }
 
+    static final Method doPhaseOperation;
+
+    static {
+        Method m = null;
+        try {
+            Class c = Class.forName("org.codehaus.groovy.control.CompilationUnit$PhaseOperation");
+            m = c.getDeclaredMethod("doPhaseOperation", org.codehaus.groovy.control.CompilationUnit.class);
+            m.setAccessible(true);
+        } catch (ReflectiveOperationException | SecurityException ex) {
+            Exceptions.printStackTrace(ex);
+        }
+        doPhaseOperation = m;
+    }
+
     /**
      * Provides special processing: injects {@link StaticTypeCheckingVisitor} in {@link Phases.INSTRUCTION_SELECTION}
      * compilation phase. Also overrides ErrorCollector implementation with {@link NbGroovyErrorCollector}.
@@ -485,7 +561,9 @@ public class GroovyParser extends Parser {
          * Disable type attribution for indexing now.
          */
         final boolean indexing;
-
+        final long parsingStartTime;
+        final PerfData perfData;
+        
         StaticTypesTransformation typesXform = new StaticTypesTransformation() {
             @Override
             protected StaticTypeCheckingVisitor newVisitor(SourceUnit unit, ClassNode node) {
@@ -493,17 +571,37 @@ public class GroovyParser extends Parser {
             }
         };
 
-        public CU(boolean indexing, GroovyParser parser, CompilerConfiguration configuration, CodeSource security, GroovyClassLoader loader, GroovyClassLoader transformationLoader, ClasspathInfo cpInfo, ClassNodeCache classNodeCache) {
-            super(parser, configuration, security, loader, transformationLoader, cpInfo, classNodeCache);
-            this.indexing = indexing;
-            this.errorCollector = new NbGroovyErrorCollector(configuration);
-        }
-
-        public CU(boolean indexing, GroovyParser parser, CompilerConfiguration configuration, CodeSource security, GroovyClassLoader loader, GroovyClassLoader transformationLoader, ClasspathInfo cpInfo, ClassNodeCache classNodeCache, boolean isIndexing) {
+        public CU(boolean indexing, GroovyParser parser, CompilerConfiguration configuration, CodeSource security, GroovyClassLoader loader, GroovyClassLoader transformationLoader, ClasspathInfo cpInfo, ClassNodeCache classNodeCache, boolean isIndexing, PerfData perfData) {
             super(parser, configuration, security, loader, transformationLoader, cpInfo, classNodeCache, isIndexing);
             this.indexing = indexing;
             this.errorCollector = new NbGroovyErrorCollector(configuration);
+            this.parsingStartTime = System.currentTimeMillis();
+            this.perfData = perfData;
+            
+            classNodeResolver = new ClassNodeResolver() {
+                @Override
+                protected AsmReferenceResolver createReferencesResolver(org.codehaus.groovy.control.CompilationUnit unit) {
+                    return new AsmReferenceResolver(this, CU.this) {
+                        @Override
+                        public ClassNode resolveClassNullable(String className) {
+                            long t = System.currentTimeMillis();
+                            ClassNode c;
+                            try {
+                                c = super.resolveClassNullable(className);
+                                return c;
+                            } finally {
+                                long t2 = System.currentTimeMillis();
+                                perfData.addVisitorTime(phase, "AsmReferenceResolver", t2 - t);
+                            }
+                        }
+                    };
+                }
+            };
         }
+        
+        int lastPhaseSeen = 0;
+        
+        SortedMap<Integer, Long> phaseStartTime = new TreeMap<>();
 
         /**
          * Inject static compilation transofmrations; apply them in the
@@ -514,12 +612,14 @@ public class GroovyParser extends Parser {
         @Override
         public void gotoPhase(int phase) throws CompilationFailedException {
             super.gotoPhase(phase);
+            recordPhaseStart(phase);
             if (phase != Phases.INSTRUCTION_SELECTION) {
                 return;
             }
             if (indexing) {
                 return;
             }
+            long t = System.currentTimeMillis();
             typesXform.setCompilationUnit(this);
             ClassNode annoClass = getClassNodeResolver().resolveName("groovy.transform.TypeChecked", this).getClassNode();
             for (SourceUnit su : sources.values()) {
@@ -529,6 +629,160 @@ public class GroovyParser extends Parser {
                     typesXform.visit(new ASTNode[]{fakeTypeChecked, cn}, su);
                 }
             }
+            long t2 = System.currentTimeMillis();
+            perfData.addVisitorTime(phase, "Parsing - static type analysis", t2 - t);
+        }
+        
+        void recordPhaseStart(int phase) {
+            if (phase > lastPhaseSeen) {
+                // start of phase
+                long l = System.currentTimeMillis();
+                phaseStartTime.put(phase, l);
+                for (int i = phase - 1; i > lastPhaseSeen; i++) {
+                    phaseStartTime.putIfAbsent(i, l);
+                }
+                lastPhaseSeen = phase;
+            }
+        }
+        
+        void logAndCollectPhaseStats() {
+            long end = System.currentTimeMillis();
+            int lastPhase = 0;
+            
+            for (int i = Phases.INITIALIZATION; i < Phases.ALL; i++) {
+                Long phaseStart = phaseStartTime.get(i);
+                Long phaseEnd = phaseStartTime.get(i + 1);
+                if (phaseStart == null) {
+                    if (lastPhase > 0) {
+                        continue;
+                    }
+                    phaseStart = parsingStartTime;
+                }
+                if (phaseStart != null) {
+                    lastPhase = i;
+                }
+                if (phaseEnd == null || phaseStart == null) {
+                    continue;
+                }
+                long diff = phaseEnd - phaseStart;
+                perfData.addParserPhase(i, diff);
+            }
+            if (lastPhase > 0) {
+                Long lastStart = phaseStartTime.get(lastPhase);
+                long diff = end - lastStart;
+                perfData.addParserPhase(lastPhase, diff);
+            }
+        }
+        
+        class TimingOp implements ISourceUnitOperation, IPrimaryClassNodeOperation, IGroovyClassOperation {
+            
+            private final Object delegate;
+            private final String key;
+            private final int phase;
+            
+            public TimingOp(Object delegate, int phase) {
+                this.delegate = delegate;
+                this.phase = phase;
+                
+                String cn = delegate.getClass().getName();
+                if (cn.contains("$$Lambda")) {
+                    StackTraceElement invokedFrom = null;
+                    for (StackTraceElement ele : new Throwable().getStackTrace()) {
+                        boolean myClass = ele.getClassName().startsWith(GroovyParser.class.getName());
+                        if (!myClass) {
+                            invokedFrom = ele;
+                            break;
+                        }
+                    }
+                    key = invokedFrom != null ? invokedFrom.toString() : cn;
+                } else {
+                    key = cn;
+                }
+            }
+            
+            @Override
+            public void call(SourceUnit source) throws CompilationFailedException {
+                throw new UnsupportedOperationException("Should not be called.");
+            }
+
+            @Override
+            public void call(SourceUnit source, GeneratorContext context, ClassNode classNode) throws CompilationFailedException {
+                throw new UnsupportedOperationException("Should not be called.");
+            }
+
+            @Override
+            public void doPhaseOperation(org.codehaus.groovy.control.CompilationUnit unit) throws CompilationFailedException {
+                long t = System.currentTimeMillis();
+                recordPhaseStart(phase);
+                try {
+                    try {
+                        doPhaseOperation.invoke(delegate, unit);
+                    } catch (ReflectiveOperationException ex) {
+                        Exceptions.printStackTrace(ex);
+                    }
+                } finally {
+                    long t2 = System.currentTimeMillis();
+                    perfData.addVisitorTime(getPhase(), key, t2 - t);
+                }
+            }
+
+            @Override
+            public boolean needSortedInput() {
+                if (delegate instanceof IPrimaryClassNodeOperation) {
+                    return ((IPrimaryClassNodeOperation)delegate).needSortedInput();
+                }
+                throw new UnsupportedOperationException("Should not be called.");
+            }
+
+            @Override
+            public void call(GroovyClass groovyClass) throws CompilationFailedException {
+                throw new UnsupportedOperationException("Should not be called.");
+            }
+        }
+        
+        protected ISourceUnitOperation createResolve() {
+            return (final SourceUnit source) -> {
+                recordPhaseStart(phase);
+                for (ClassNode classNode : source.getAST().getClasses()) {
+                    long t = System.currentTimeMillis();
+                    GroovyClassVisitor visitor = new VariableScopeVisitor(source);
+                    visitor.visitClass(classNode);
+                    long t2 = System.currentTimeMillis();
+                    long d = t2 - t;
+                    perfData.addVisitorTime(phase, visitor.getClass().getName(), d);
+
+                    resolveVisitor.setClassNodeResolver(classNodeResolver);
+                    resolveVisitor.startResolving(classNode, source);
+                    long t3 = System.currentTimeMillis();
+                    d = t3 -t2;
+                    perfData.addVisitorTime(phase, resolveVisitor.getClass().getName(), d);
+                }
+            };
+        }
+        
+        @Override
+        public void addNewPhaseOperation(ISourceUnitOperation op, int phase) {
+            super.addNewPhaseOperation(new TimingOp(op, phase), phase);
+        }
+
+        @Override
+        public void addFirstPhaseOperation(IPrimaryClassNodeOperation op, int phase) {
+            super.addFirstPhaseOperation(new TimingOp(op, phase), phase);
+        }
+
+        @Override
+        public void addPhaseOperation(IPrimaryClassNodeOperation op, int phase) {
+            super.addPhaseOperation((IPrimaryClassNodeOperation)new TimingOp(op, phase), phase);
+        }
+
+        @Override
+        public void addPhaseOperation(ISourceUnitOperation op, int phase) {
+            super.addPhaseOperation((ISourceUnitOperation)new TimingOp(op, phase), phase);
+        }
+
+        @Override
+        public void addPhaseOperation(IGroovyClassOperation op) {
+            super.addPhaseOperation(new TimingOp(op, phase));
         }
     }
 
@@ -560,21 +814,31 @@ public class GroovyParser extends Parser {
         }
 
         String fileName = "";
+        String path = "";
         if (context.snapshot.getSource().getFileObject() != null) {
             fileName = context.snapshot.getSource().getFileObject().getNameExt();
+            path = context.snapshot.getSource().getFileObject().getPath();
         }
 
         FileObject fo = context.snapshot.getSource().getFileObject();
         ClassPath bootPath = fo == null ? ClassPath.EMPTY : ClassPath.getClassPath(fo, ClassPath.BOOT);
         ClassPath compilePath = fo == null ? ClassPath.EMPTY : ClassPath.getClassPath(fo, ClassPath.COMPILE);
         ClassPath sourcePath = fo == null ? ClassPath.EMPTY : ClassPath.getClassPath(fo, ClassPath.SOURCE);
-        ClassPath transformPath = ClassPathSupport.createProxyClassPath(bootPath, compilePath);
-        ClassPath cp = ClassPathSupport.createProxyClassPath(transformPath, sourcePath);
+        
+        FileObject javafx = compilePath.findResource("javafx");
+        
+        Set<FileObject> compileRoots = new HashSet<>(Arrays.asList(compilePath.getRoots()));
+        Set<FileObject> srcRoots = new HashSet<>(Arrays.asList(sourcePath.getRoots()));
+        
+        Set<FileObject> test = new HashSet<>(compileRoots);
+        test.removeAll(srcRoots);
+        
+        test = new HashSet<>(srcRoots);
+        test.removeAll(compileRoots);
 
         CompilerConfiguration configuration = new CompilerConfiguration();
         final ClassNodeCache classNodeCache = ClassNodeCache.get();
-        final GroovyClassLoader classLoader = classNodeCache.createResolveLoader(cp, configuration);
-        final GroovyClassLoader transformationLoader = classNodeCache.createTransformationLoader(transformPath, configuration);
+        classNodeCache.setPerfData(context.perfData);
         ClasspathInfo cpInfo = ClasspathInfo.create(
                 // we should try to load everything by javac instead of classloader,
                 // but for now it is faster to use javac only for sources - not true
@@ -583,20 +847,45 @@ public class GroovyParser extends Parser {
                 bootPath == null ? ClassPath.EMPTY : bootPath,
                 compilePath == null ? ClassPath.EMPTY : compilePath,
                 sourcePath);        
+        ClassPath cachedCompile = CompilationUnit.pryOutCachedClassPath(cpInfo, ClasspathInfo.PathKind.COMPILE);
+        ClassPath transformPath = ClassPathSupport.createProxyClassPath(bootPath, cachedCompile);
+        ClassPath cp = ClassPathSupport.createProxyClassPath(transformPath, sourcePath);
+        final ParsingClassLoader classLoader = classNodeCache.createResolveLoader(cp, configuration);
+        final GroovyClassLoader transformationLoader = classNodeCache.createTransformationLoader(transformPath, configuration);
         
+        LOG.log(Level.INFO, "*** Parsing file: {0}", path);
+        FileObject[] roots = cp.getRoots();
+        FileObject[] roots2 = new FileObject[roots.length];
+        
+        for (int i = 0; i < roots.length; i++) {
+            if (FileUtil.isArchiveArtifact(roots[i])) {
+                roots2[i] = FileUtil.getArchiveFile(roots[i]);
+            } else {
+                roots2[i] = roots[i];
+            }
+        }
+        LOG.log(Level.INFO, "Using compile path: {0}", 
+                String.join("\n", Arrays.asList(roots2).stream().map(f -> "\t" + f.getPath()).collect(Collectors.toList()))
+        );
+
         boolean indexing = IndexingSupport.isIndexingTask(context.parserTask);
         configuration = makeConfiguration(configuration, context, indexing);
-        org.codehaus.groovy.control.CompilationUnit compilationUnit = new CU(indexing, this, configuration,
+        CU compilationUnit = new CU(indexing, this, configuration,
                 null, classLoader, transformationLoader, cpInfo, classNodeCache,
-                indexing);
+                indexing, context.perfData);
+        classLoader.setPerfData(compilationUnit.perfData);
+        classLoader.setUnit(compilationUnit);
         InputStream inputStream = new ByteArrayInputStream(source.getBytes());
         compilationUnit.addSource(fileName, inputStream);
+        
+        PERFLOG.log(Level.INFO, "Parsing: " + path);
         
         for (ParsingCompilerCustomizer pcc : context.compilerCustomizers) {
             pcc.decorateCompilation(context.customizerCtx, compilationUnit);
         }
 
         if (isCancelled()) {
+            LOG.info("*** cancelled");
             return null;
         }
 
@@ -607,6 +896,7 @@ public class GroovyParser extends Parser {
         }
 
         try {
+            LOG.log(Level.INFO, "Time from CU create up to now: {0}", System.currentTimeMillis() - compilationUnit.parsingStartTime);
             try {
                 compilationUnit.compile(Phases.CLASS_GENERATION);
                 NbGroovyErrorCollector coll = (NbGroovyErrorCollector)compilationUnit.getErrorCollector();
@@ -617,8 +907,10 @@ public class GroovyParser extends Parser {
             } catch (CancellationException ex) {
                 // cancelled probably
                 if (isCancelled()) {
+                LOG.info("*** cancelled");
                     return null;
                 }
+                LOG.log(Level.INFO, "*** Cancellation ", ex);
                 throw ex;
             }
         } catch (Throwable e) {
@@ -728,7 +1020,8 @@ public class GroovyParser extends Parser {
         }
 
         handleErrorCollector(compilationUnit.getErrorCollector(), context, module, ignoreErrors, sanitizing);
-
+        
+        reportParsingTimes(compilationUnit, path);
         if (module != null) {
             context.sanitized = sanitizing;
             // FIXME parsing API
@@ -738,6 +1031,11 @@ public class GroovyParser extends Parser {
         } else {
             return sanitize(context, sanitizing);
         }
+    }
+    
+    private void reportParsingTimes(CU unit, String path) {
+        PERFLOG.log(Level.INFO, "End Parsing: " + path);
+        unit.logAndCollectPhaseStats();
     }
 
     private static void logParsingTime(Context context, long start, boolean cancelled) {
@@ -894,6 +1192,7 @@ public class GroovyParser extends Parser {
         private Sanitize sanitized = Sanitize.NONE;
         final List<ParsingCompilerCustomizer> compilerCustomizers;
         final ParsingCompilerCustomizer.Context customizerCtx;
+        final PerfData perfData = new PerfData();
 
         public Context(Snapshot snapshot, SourceModificationEvent event) {
             this.snapshot = snapshot;
