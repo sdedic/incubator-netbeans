@@ -385,6 +385,29 @@ public class GroovyParser extends Parser {
                             // Just remove the comma
                             removeChars = 1;
                             removeEnd -= 2;
+                        } else if (line.endsWith(":")) {
+                            // handle situation like "some.  identifier:" where either "some" may have a dangling .
+                            // or the ":" may be mistyped. Need to check whether a alphanum precedes
+                            TokenSequence<GroovyTokenId> seq = LexUtilities.getGroovyTokenSequence(context.document, offset);
+                            seq.move(offset);
+                            if (seq.movePrevious()) {
+                                Token<GroovyTokenId> tukac = seq.token();
+                                // just in case
+                                if (tukac.id() == GroovyTokenId.COLON) {
+                                    while (seq.movePrevious() && seq.offset() >= lineStart) {
+                                        tukac = seq.token();
+                                        GroovyTokenId tid = tukac.id();
+                                        if (tid != GroovyTokenId.WHITESPACE && tid != GroovyTokenId.LINE_COMMENT && tid != GroovyTokenId.BLOCK_COMMENT) {
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if (tukac.id() == GroovyTokenId.IDENTIFIER) {
+                                    // remove the :
+                                    removeChars = 1;
+                                }
+                            }
                         }
 
                         if (removeChars == 0) {
@@ -687,7 +710,7 @@ public class GroovyParser extends Parser {
             List<? extends Message> filtered = errorCollector.getErrors();
             if (errorCollector.hasErrors()) {
                 Message message = filtered.get(filtered.size() - 1);
-                if (message instanceof SyntaxErrorMessage) {
+                    if (message instanceof SyntaxErrorMessage) {
                     SyntaxException se = ((SyntaxErrorMessage) message).getCause();
 
                     // if you have a single line starting with: "$
@@ -784,7 +807,7 @@ public class GroovyParser extends Parser {
             }
         }
 
-        handleErrorCollector(compilationUnit.getErrorCollector(), context, module, ignoreErrors, sanitizing);
+        handleErrorCollector(compilationUnit.getErrorCollector(), context, module, false /* ignoreErrors */, sanitizing);
         
         if (module != null) {
             context.sanitized = sanitizing;
