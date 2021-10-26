@@ -1614,6 +1614,11 @@ public class ServerTest extends NbTestCase {
             public void disposeTextEditorDecoration(String params) {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
+
+            @Override
+            public void notifyNodeChange(int params) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
         }, client.getInputStream(), client.getOutputStream());
         serverLauncher.startListening();
         LanguageServer server = serverLauncher.getRemoteProxy();
@@ -2965,6 +2970,10 @@ public class ServerTest extends NbTestCase {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
+            @Override
+            public void notifyNodeChange(int params) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
         }, client.getInputStream(), client.getOutputStream());
         serverLauncher.startListening();
         LanguageServer server = serverLauncher.getRemoteProxy();
@@ -3179,6 +3188,10 @@ public class ServerTest extends NbTestCase {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
+            @Override
+            public void notifyNodeChange(int params) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
         }, client.getInputStream(), client.getOutputStream());
         serverLauncher.startListening();
         LanguageServer server = serverLauncher.getRemoteProxy();
@@ -3310,6 +3323,10 @@ public class ServerTest extends NbTestCase {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
+            @Override
+            public void notifyNodeChange(int params) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
         }, client.getInputStream(), client.getOutputStream());
         serverLauncher.startListening();
         LanguageServer server = serverLauncher.getRemoteProxy();
@@ -3439,6 +3456,10 @@ public class ServerTest extends NbTestCase {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
+            @Override
+            public void notifyNodeChange(int params) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
         }, client.getInputStream(), client.getOutputStream());
         serverLauncher.startListening();
         LanguageServer server = serverLauncher.getRemoteProxy();
@@ -3559,6 +3580,10 @@ public class ServerTest extends NbTestCase {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
+            @Override
+            public void notifyNodeChange(int params) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
         }, client.getInputStream(), client.getOutputStream());
         serverLauncher.startListening();
         LanguageServer server = serverLauncher.getRemoteProxy();
@@ -3683,6 +3708,10 @@ public class ServerTest extends NbTestCase {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
+            @Override
+            public void notifyNodeChange(int params) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
         }, client.getInputStream(), client.getOutputStream());
         serverLauncher.startListening();
         LanguageServer server = serverLauncher.getRemoteProxy();
@@ -3804,6 +3833,10 @@ public class ServerTest extends NbTestCase {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
+            @Override
+            public void notifyNodeChange(int params) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
         }, client.getInputStream(), client.getOutputStream());
         serverLauncher.startListening();
         LanguageServer server = serverLauncher.getRemoteProxy();
