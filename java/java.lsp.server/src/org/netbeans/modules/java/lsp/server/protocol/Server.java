@@ -18,6 +18,7 @@
  */
 package org.netbeans.modules.java.lsp.server.protocol;
 
+import org.netbeans.modules.java.lsp.server.explorer.api.NodeChangedParams;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -68,7 +69,7 @@ import org.eclipse.lsp4j.jsonrpc.MessageIssueException;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
-import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
+import org.eclipse.lsp4j.jsonrpc.services.JsonDelegate;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageClientAware;
@@ -89,16 +90,14 @@ import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.modules.java.lsp.server.LspServerState;
 import org.netbeans.modules.java.lsp.server.LspSession;
 import org.netbeans.modules.java.lsp.server.Utils;
-import org.netbeans.modules.java.lsp.server.explorer.TreeItem;
-import org.netbeans.modules.java.lsp.server.explorer.TreeViewProvider;
+import org.netbeans.modules.java.lsp.server.explorer.LspTreeViewServiceImpl;
+import org.netbeans.modules.java.lsp.server.explorer.api.TreeViewService;
 import org.netbeans.modules.java.lsp.server.files.OpenedDocuments;
 import org.netbeans.modules.java.lsp.server.progress.OperationContext;
 import org.netbeans.modules.progress.spi.InternalHandle;
 import org.netbeans.spi.project.ActionProgress;
 import org.netbeans.spi.project.ActionProvider;
-import org.openide.explorer.ExplorerManager;
 import org.openide.filesystems.FileObject;
-import org.openide.nodes.Node;
 import org.openide.util.Lookup;
 import org.openide.util.NbBundle;
 import org.openide.util.Pair;
@@ -280,7 +279,7 @@ public final class Server {
         };
     }
 
-    static class LanguageServerImpl implements LanguageServer, LanguageClientAware, LspServerState {
+    public static class LanguageServerImpl implements LanguageServer, LanguageClientAware, LspServerState {
 
         // change to a greater throughput if the initialization waits on more processes than just (serialized) project open.
         private static final RequestProcessor SERVER_INIT_RP = new RequestProcessor(LanguageServerImpl.class.getName());
@@ -295,7 +294,9 @@ public final class Server {
                 Lookup.getDefault()
         );
 
-        /**
+        private final LspTreeViewServiceImpl treeService = new LspTreeViewServiceImpl(sessionLookup);
+
+                /**
          * Projects that are or were opened. After projects open, their CompletableFutures
          * remain here to signal no further priming build is required.
          */
@@ -719,48 +720,9 @@ public final class Server {
         public void exit() {
         }
 
-        private final ExplorerManager lv = OpenProjects.getDefault().createLogicalView();
-        private final TreeViewProvider tvp = new TreeViewProvider(lv) {
-            @Override
-            protected void onDidChangeTreeData(Node n, int id) {
-                client.notifyNodeChange(id);
-            }
-        };
-
-	@JsonRequest(value = "nodes/delete")
-	public CompletableFuture<Boolean> nodesDelete(int nodeId) {
-            CompletableFuture<Boolean> ret = new CompletableFuture<>();
-            Node n = TreeItem.findNode(nodeId);
-            if (n != null && n.canDestroy()) {
-                try {
-                    n.destroy();
-                    ret.complete(true);
-                } catch (IOException ex) {
-                    ret.completeExceptionally(ex);
-                }
-            } else {
-                ret.complete(false);
-            }
-            return ret;
-        }
-
-	@JsonRequest(value = "nodes/info")
-	public CompletableFuture<TreeItem> nodesInfo(int nodeId) {
-            return tvp.getTreeItem(nodeId).toCompletableFuture();
-        }
-
-//    export const init = new RequestType<string, Data, void, void>('nodes/explorermanager');
-
-	@JsonRequest(value = "nodes/explorermanager")
-	public CompletableFuture<TreeItem> explorerManager(String id) {
-            return tvp.getRootInfo().toCompletableFuture();
-        }
-
-//    export const children = new RequestType<number, number[], void, void>('nodes/children');
-
-	@JsonRequest(value = "nodes/children")
-	public CompletableFuture<int[]> getChildren(int id) {
-            return tvp.getChildren(id).toCompletableFuture();
+        @JsonDelegate
+        public TreeViewService getTreeViewService() {
+            return treeService;
         }
 
         @Override
@@ -792,6 +754,7 @@ public final class Server {
             sessionServices.add(new WorkspaceUIContext(client));
             ((LanguageClientAware) getTextDocumentService()).connect(client);
             ((LanguageClientAware) getWorkspaceService()).connect(client);
+            ((LanguageClientAware) treeService).connect(client);
         }
     }
 
@@ -912,7 +875,7 @@ public final class Server {
         }
 
         @Override
-        public void notifyNodeChange(int params) {
+        public void notifyNodeChange(NodeChangedParams params) {
             logWarning(params);
         }
     };

@@ -131,21 +131,35 @@ export namespace NodeQueryRequest {
     export const type = new RequestType<string, string, void, void>('nodes/delete');
 };
 
+export interface NodeChangedParams {
+    rootId : number;
+    nodeId : number | null;
+}
+
+export namespace NodeInfoNotification {
+    export const type = new NotificationType<NodeChangedParams, void>('nodes/nodeChanged');
+}
+
 export namespace NodeInfoRequest {
+    export const contextvalues = new RequestType<string, string[], void, void>('nodes/contextvalues');
     export const explorermanager = new RequestType<string, Data, void, void>('nodes/explorermanager');
     export const info = new RequestType<number, Data, void, void>('nodes/info');
     export const children = new RequestType<number, number[], void, void>('nodes/children');
     export const destroy = new RequestType<number, boolean, void, void>('nodes/delete');
-    export const notifyChange = new NotificationType<number, void>('nodes/notifyChange');
 
     export interface Data {
         id : number; /* numeric ID of the node */
         name : string; /* Node.getName() */
         label : string; /* Node.getDisplayName() */
+        tooltip? : string; 
         description : string; /* Node.getShortDescription() */
         resourceUri? : string; /* external URL to file: resource */
         collapsibleState : vscode.TreeItemCollapsibleState;
         canDestroy : boolean; /* Node.canDestroy() */
+        contextValue : string; /* Node.getCookies() */
+        iconUri : string | null;
+        iconIndex : number;
+        command? : string;
     }
 };
 

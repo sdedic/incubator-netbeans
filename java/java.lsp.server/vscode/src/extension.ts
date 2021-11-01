@@ -43,8 +43,7 @@ import * as vscode from 'vscode';
 import * as launcher from './nbcode';
 import {NbTestAdapter} from './testAdapter';
 import { asRanges, StatusMessageRequest, ShowStatusMessageParams, QuickPickRequest, InputBoxRequest, TestProgressNotification, DebugConnector,
-         TextEditorDecorationCreateRequest, TextEditorDecorationSetNotification, TextEditorDecorationDisposeNotification,
-         NodeQueryRequest
+         TextEditorDecorationCreateRequest, TextEditorDecorationSetNotification, TextEditorDecorationDisposeNotification
 } from './protocol';
 import * as launchConfigurations from './launchConfigurations';
 import * as explorer from './explorer';
@@ -637,6 +636,9 @@ function doActivateWithJDK(specifiedJDK: string | null, context: ExtensionContex
             handleLog(log, 'Language Client: Ready');
             setClient[0](c);
             commands.executeCommand('setContext', 'nbJavaLSReady', true);
+
+            // create project explorer:
+            explorer.createTreeView('foundProjects', 'Projects', { canSelectMany : false });
         }).catch(setClient[1]);
     }).catch((reason) => {
         activationPending = false;
