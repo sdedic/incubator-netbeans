@@ -447,8 +447,12 @@
 			{
 				"command": "java.project.clean",
 				"title": "Clean Project"
+			},
+			{
+				"command": "java.local.db.set.preferred.connection",
+				"title": "Make Default Connection"
 			}
-		],
+	],
 		"keybindings": [
 			{
 				"command": "java.workspace.compile",
@@ -574,7 +578,12 @@
 				{
 					"command": "java.project.clean",
 					"when": "view == foundProjects && viewItem =~ /class:project.Project/"
+				},
+				{
+					"command": "java.local.db.set.preferred.connection",
+					"when": "viewItem =~ /class:ddl.DBConnection/"
 				}
+				
 			]
 		}
 	},
