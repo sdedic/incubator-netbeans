@@ -153,7 +153,32 @@ class VisualizerProvider extends vscode.Disposable implements CustomizableTreeDa
     return this.root.copy();
   }
 
+  returned : Map<number, vscode.TreeItem> = new Map();
+
   getTreeItem(element: Visualizer): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    let c = this.getTreeItem2(element);
+    if (c instanceof vscode.TreeItem) {
+      let n = Number(c.id);
+      const old = this.returned.get(n);
+      if (old != null && old !== c) {
+        console.log("Error");
+      }
+      this.returned.set(n, c);
+      return c;
+    } else {
+      return c.then((item) => {
+        let n = Number(item.id);
+        const old = this.returned.get(n);
+        if (old != null && old !== item) {
+          console.log("Error");
+        }
+          this.returned.set(n, item);
+        return item;
+      });
+    }
+  }
+
+  getTreeItem2(element: Visualizer): vscode.TreeItem | Thenable<vscode.TreeItem> {
     const n = Number(element.id);
     if (this.pendingRefresh.delete(n)) {
       return this.fetchItem(n).then((newV) => {
@@ -211,7 +236,7 @@ class VisualizerProvider extends vscode.Disposable implements CustomizableTreeDa
       }
       const now : Visualizer[] = element.updateChildren(res, self);
       for (let i = 0; i < arr.length; i++) {
-        const v = res[i];
+        const v = now[i];
         const n : number = Number(v.id || -1);
         self.treeData.set(n, v);
         v.parent = element;
@@ -286,7 +311,6 @@ export class Visualizer extends vscode.TreeItem {
   children: Map<number, Visualizer> | null = null;
 
   update(other : Visualizer) {
-    this.id = "" + other.id;
     // this.visId = visualizerSerial++;
     this.label = other.label;
     this.description = other.description;
