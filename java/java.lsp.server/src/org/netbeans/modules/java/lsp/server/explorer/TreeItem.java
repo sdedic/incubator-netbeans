@@ -42,6 +42,7 @@ public class TreeItem {
     // rendered less prominent. When true, it is derived from resourceUri
     public String description;
     // ?: string | Uri | {dark: string | Uri, light: string | Uri} | ThemeIcon
+    public IconDescriptor iconDescriptor;
     public URI iconUri;
     public int iconIndex;
     // id for the tree item that has to be unique across tree.
@@ -56,6 +57,11 @@ public class TreeItem {
     public String resourceUri;
     // ?: string | MarkdownString | undefined
     public Object tooltip;
+    
+    public static class IconDescriptor {
+        public URI baseUri;
+        public String[] composition;
+    }
 
     public TreeItem() {
     }

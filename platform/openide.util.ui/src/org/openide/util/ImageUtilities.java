@@ -41,11 +41,16 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.lang.ref.SoftReference;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -58,6 +63,8 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
@@ -118,17 +125,20 @@ public final class ImageUtilities {
      * {@code Image}. See comment in {@link #icon2ToolTipImage(Icon, URL)}.
      */
     private static volatile Component dummyIconComponent;
+    private static volatile Component dummyIconComponent2;
 
     static {
         /* Could have used Mutex.EVENT.writeAccess here, but it doesn't seem to be available during
         testing. */
         if (EventQueue.isDispatchThread()) {
             dummyIconComponent = new JLabel();
+            dummyIconComponent2 = new JButton();
         } else {
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
                     dummyIconComponent = new JLabel();
+                    dummyIconComponent2 = new JCheckBox();
                 }
             });
         }
@@ -209,7 +219,8 @@ public final class ImageUtilities {
             // only non _dark images need filtering
             RGBImageFilter imageFilter = getImageIconFilter();
             if (null != image && null != imageFilter) {
-                image = icon2ToolTipImage(FilteredIcon.create(imageFilter, image), image.url);
+                image = icon2ToolTipImage(FilteredIcon.create(imageFilter, image, 
+                        imageFilter.getClass().getName()), image.url);
             }
         }
         return image;
@@ -352,7 +363,14 @@ public final class ImageUtilities {
         should really only be called on the Event Dispatch Thread. Constructing the component once
         on the EDT fixed the problem. Read-only operations from non-EDT threads shouldn't really be
         a problem; most Icon implementations won't ever access the component parameter anyway. */
-        icon.paintIcon(dummyIconComponent, g, 0, 0);
+        try {
+            icon.paintIcon(dummyIconComponent, g, 0, 0);
+        } catch (ClassCastException ex) {
+            // java.desktop/javax.swing.plaf.metal.OceanTheme$IFIcon.paintIcon assumes a different component,
+            // so let's try second most used one type, it satisfies AbstractButton, JCheckbox. Not all cases are
+            // covered, however.
+            icon.paintIcon(dummyIconComponent2, g, 0, 0);
+        }
         g.dispose();
         return image;
     }
@@ -382,7 +400,8 @@ public final class ImageUtilities {
                     return cached;
                 }
             }
-            cached = ToolTipImage.createNew(text, image, null);
+            Object u = image.getProperty("uri", null);
+            cached = ToolTipImage.createNew(text, image, null, u instanceof URI ? (URI)u : null);
             imageToolTipCache.put(key, new ActiveRef<ToolTipImageKey>(cached, imageToolTipCache, key));
             return cached;
         }
@@ -400,7 +419,7 @@ public final class ImageUtilities {
             return "";
         }
     }
-
+    
     /**
      * Add text to tool tip for given image (creates new or returns cached, original remains unmodified)
      * Text can contain HTML tags e.g. "&#60;b&#62;my&#60;/b&#62; text"
@@ -433,7 +452,7 @@ public final class ImageUtilities {
         /* FilteredIcon's Javadoc mentions a caveat about the Component parameter that is passed to
         Icon.paintIcon. It's not really a problem; previous implementations had the same
         behavior. */
-        return FilteredIcon.create(DisabledButtonFilter.INSTANCE, icon);
+        return FilteredIcon.create(DisabledButtonFilter.INSTANCE, icon, "disabled");
     }
 
     /**
@@ -751,7 +770,7 @@ public final class ImageUtilities {
                 name = new String(name).intern(); // NOPMD
                 ToolTipImage toolTipImage = (result instanceof ToolTipImage)
                         ? (ToolTipImage) result
-                        : ToolTipImage.createNew("", result, url);
+                        : ToolTipImage.createNew("", result, url, null);
                 cache.put(name, new ActiveRef<String>(toolTipImage, cache, name));
                 return toolTipImage;
             } else { // no icon found
@@ -825,21 +844,33 @@ public final class ImageUtilities {
             str.append(toolTip);
         }
         Object firstUrl = image1.getProperty("url", null);
+        Object firstUri = image1.getProperty("uri", null);
         
         ColorModel model = colorModel(bitmask? Transparency.BITMASK: Transparency.TRANSLUCENT);
         // Provide a delegate Icon for scalable rendering.
         Icon delegateIcon = new MergedIcon(image2Icon(image1), image2Icon(image2), x, y);
         ToolTipImage buffImage = new ToolTipImage(str.toString(), delegateIcon,
-                model, model.createCompatibleWritableRaster(w, h), model.isAlphaPremultiplied(), null, firstUrl instanceof URL ? (URL)firstUrl : null
+                model, model.createCompatibleWritableRaster(w, h), model.isAlphaPremultiplied(), null, 
+                firstUrl instanceof URL ? (URL)firstUrl : null,
+                firstUri instanceof URI ? (URI)firstUri : null
             );
 
         // Also provide an Image-based rendering for backwards-compatibility.
         java.awt.Graphics g = buffImage.createGraphics();
-        g.drawImage(image1, 0, 0, null);
-        g.drawImage(image2, x, y, null);
+        drawImage(g, image1, 0, 0, null);
+        drawImage(g, image2, x, y, null);
         g.dispose();
 
         return buffImage;
+    }
+    
+    private static void drawImage(Graphics g, Image image, int x, int y, ImageObserver observer) {
+        Object o = image.getProperty("originalImage", observer);
+        if (o instanceof Image) {
+            g.drawImage((Image)o, x, y, observer);
+        } else {
+            g.drawImage(image, x, y, observer);
+        }
     }
 
     /**
@@ -999,7 +1030,7 @@ public final class ImageUtilities {
         }
     }
      // end of ActiveRef
-
+    
     /**
      * Wraps an arbitrary {@link Icon} inside an {@link ImageIcon}. This allows us to provide
      * scalable icons from {@link #loadImageIcon(String,boolean)} without changing the API.
@@ -1047,6 +1078,51 @@ public final class ImageUtilities {
             this.delegate = new ImageIcon(new BufferedImage(1, 1, BufferedImage.TYPE_4BYTE_ABGR));
         }
     }
+    
+    private static Icon originalIcon(Image image) {
+        if (image instanceof ToolTipImage) {
+            return ((ToolTipImage) image).getDelegateIcon();
+        }
+        Object o = image.getProperty("originalIcon", null); // NOI18N
+        if (o instanceof Icon) {
+            // do not bother if the property is not loaded now.
+            return (Icon)o;
+        }
+        return null;
+    }
+    
+    private static class ImageProperties {
+        private final Image delegate;
+        private final List<URI> additionalURIs;
+
+        ImageProperties(Image delegate, List<URI> additionalURIs) {
+            this.delegate = delegate;
+            this.additionalURIs = additionalURIs;
+        }
+        
+        public Object getProperty(String id, ImageObserver observer) {
+            Object v;
+            
+            if (!"composition".equals(id)) {
+                return delegate.getProperty(id, observer);
+            }
+            URI[] arr;
+            v = delegate.getProperty(id, observer);
+            if (v instanceof URI[]) {
+                URI[] baseComposition = (URI[])v;
+                URI[] res = new URI[baseComposition.length + additionalURIs.size()];
+                additionalURIs.toArray(res);
+                System.arraycopy(baseComposition, 0, res, additionalURIs.size(), baseComposition.length);
+                return res;
+            } else if (additionalURIs.isEmpty()) {
+                return Image.UndefinedProperty;
+            } else {
+                URI[] res = new URI[additionalURIs.size()];
+                additionalURIs.toArray(res);
+                return res;
+            }
+        }
+    }
 
     /**
      * Image with tool tip text (for icons with badges)
@@ -1057,10 +1133,11 @@ public final class ImageUtilities {
         final Icon delegateIcon;
         // May be null.
         final URL url;
+        final URI uri;
         // May be null.
         ImageIcon imageIconVersion;
 
-        public static ToolTipImage createNew(String toolTipText, Image image, URL url) {
+        public static ToolTipImage createNew(String toolTipText, Image image, URL url, URI uri) {
             ImageUtilities.ensureLoaded(image);
             boolean bitmask = (image instanceof Transparency) && ((Transparency) image).getTransparency() != Transparency.TRANSLUCENT;
             ColorModel model = colorModel(bitmask ? Transparency.BITMASK : Transparency.TRANSLUCENT);
@@ -1069,31 +1146,55 @@ public final class ImageUtilities {
             if (url == null) {
                 Object value = image.getProperty("url", null);
                 url = (value instanceof URL) ? (URL) value : null;
-            }            
-            Icon icon = (image instanceof ToolTipImage)
-                    ? ((ToolTipImage) image).getDelegateIcon() : null;
+            }        
+            if (uri == null) {
+                Object value = image.getProperty("uri", null);
+                if (value instanceof URI) {
+                    uri = (URI)value;
+                }
+            }
+            // try to derive a missing URL from URI or vice versa. 
+            if (url != null && uri == null) {
+                try {
+                    // use toString to avoid extra check.
+                    uri = new URI(url.toString());
+                } catch (URISyntaxException ex) {
+                    // ignore;
+                }
+            }
+            if (uri != null && url == null) {
+                // not all URIs can be converted to URLs, but try.
+                try {
+                    url = uri.toURL();
+                } catch (MalformedURLException ex) {
+                    // ignore
+                }
+            }
+            
+            Icon icon = originalIcon(image);
             ToolTipImage newImage = new ToolTipImage(
                 toolTipText,
                 icon,
                 model,
                 model.createCompatibleWritableRaster(w, h),
-                model.isAlphaPremultiplied(), null, url
+                model.isAlphaPremultiplied(), null, url, uri
             );
 
             java.awt.Graphics g = newImage.createGraphics();
-            g.drawImage(image, 0, 0, null);
+            drawImage(g, image, 0, 0, null);
             g.dispose();
             return newImage;
         }
 
         public ToolTipImage(
             String toolTipText, Icon delegateIcon, ColorModel cm, WritableRaster raster,
-            boolean isRasterPremultiplied, Hashtable<?, ?> properties, URL url
+            boolean isRasterPremultiplied, Hashtable<?, ?> properties, URL url, URI uri
         ) {
             super(cm, raster, isRasterPremultiplied, properties);
             this.toolTipText = toolTipText;
             this.delegateIcon = delegateIcon;
             this.url = url;
+            this.uri = uri;
         }
 
         public synchronized ImageIcon asImageIcon() {
@@ -1112,6 +1213,14 @@ public final class ImageUtilities {
             this.delegateIcon = delegateIcon;
             this.toolTipText = toolTipText;
             this.url = url;
+            URI u;
+            try {
+                u = url != null ? url.toURI() : null;
+            } catch (URISyntaxException ex) {
+                // should not happen.
+                u = null;
+            }
+            this.uri = u;
         }
 
         /**
@@ -1178,13 +1287,14 @@ public final class ImageUtilities {
 
         @Override
         public Object getProperty(String name, ImageObserver observer) {
-            if ("url".equals(name)) { // NOI18N
+            if ("url".equals(name) || "uri".equals(name)) { // NOI18N
                 /* In some cases it might strictly be more appropriate to return
                 Image.UndefinedProperty rather than null (see Javadoc spec for this method), but
                 retain the existing behavior and use null instead here. That way there won't be a
                 ClassCastException if someone tries to cast to URL. */
-                if (url != null) {
-                    return url;
+                Object v = "url".equals(name) ? url : uri;
+                if (v != null) {
+                    return v;
                 } else if (!(delegateIcon instanceof ImageIcon)) {
                     return null;
                 } else {
@@ -1192,8 +1302,11 @@ public final class ImageUtilities {
                     if (image == this || image == null) {
                         return null;
                     }
-                    return image.getProperty("url", observer);
+                    return image.getProperty(name, observer);
                 }
+            }
+            if ("originalIcon".equals(name)) {
+                return delegateIcon != null ? delegateIcon : UndefinedProperty;
             }
             return super.getProperty(name, observer);
         }
@@ -1218,5 +1331,37 @@ public final class ImageUtilities {
             props = (Hashtable) props.clone();
             consumer.setProperties(props);
         }
+    }
+    
+    /**
+     * Finds the image's URL
+     * @param i the image
+     * @return URL or {@code null}, if the URL could not be found.
+     * @since 9.24
+     */
+    public static URL findImageURL(Image i) {
+        Object o = i.getProperty("url", null);
+        try {
+            if (o instanceof URL) {
+                return ((URL)o);
+            } else {
+                return o instanceof String ? new URL(o.toString()) : null;
+            }
+        } catch (MalformedURLException ex) {
+            LOGGER.log(Level.WARNING, "Unable to interpret image URL: {0}", o);
+            return null;
+        }
+    }
+    
+    /**
+     * Attempts to determine filters, decorations or compositions applied on an image. The filter
+     * or composition names are returned as Strings, in no particular order.
+     * 
+     * @param i the image
+     * @return composition of the image, or {@code null} if the composition cannot be determined.
+     * @since 9.24
+     */
+    public static String[] findImageComposition(Image i) {
+        return null;
     }
 }

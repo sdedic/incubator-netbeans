@@ -20,8 +20,11 @@ package org.netbeans.modules.java.lsp.server.explorer;
 
 import java.awt.Image;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.concurrent.CompletionStage;
 import org.openide.nodes.Node;
+import org.openide.util.Exceptions;
 
 /**
  * Provides an unique identification to a node and cannonicalizes images for LSP transfer. An instance
@@ -40,6 +43,19 @@ public interface TreeNodeRegistry {
     CompletionStage<TreeViewProvider> createProvider(String id);
     
     public class ImageDataOrIndex {
+        /**
+         * Base URL of the image, if it could be extracted from the Image object.
+         */
+        public URI          baseURI;
+        
+        /**
+         * URLs(?) of additional image constituents.
+         */
+        public String[]     composition;
+        
+        /**
+         * Image URI, data: protocol.
+         */
         public final URI    imageURI;
         public final int    imageIndex;
 
@@ -56,6 +72,25 @@ public interface TreeNodeRegistry {
         public ImageDataOrIndex(int imageIndex) {
             this.imageIndex = imageIndex;
             this.imageURI = null;
+        }
+        
+        public ImageDataOrIndex baseURL(URL u) {
+            try {
+                baseURI = u == null ? null : u.toURI();
+            } catch (URISyntaxException ex) {
+                throw new IllegalArgumentException(ex);
+            }
+            return this;
+        }
+        
+        public ImageDataOrIndex baseURL(URI u) {
+            this.baseURI = u;
+            return this;
+        }
+        
+        public ImageDataOrIndex composition(String[] composition) {
+            this.composition = composition;
+            return this;
         }
     }
 }

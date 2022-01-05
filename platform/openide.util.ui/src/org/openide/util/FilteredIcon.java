@@ -47,16 +47,18 @@ final class FilteredIcon extends CachedHiDPIIcon {
     private static final Logger LOG = Logger.getLogger(FilteredIcon.class.getName());
     private final RGBImageFilter filter;
     private final Icon delegate;
+    private final String filterType;
 
-    private FilteredIcon(RGBImageFilter filter, Icon delegate) {
+    private FilteredIcon(RGBImageFilter filter, Icon delegate, String filterType) {
         super(delegate.getIconWidth(), delegate.getIconHeight());
         Parameters.notNull("filter", filter);
         Parameters.notNull("delegate", delegate);
         this.filter = filter;
         this.delegate = delegate;
+        this.filterType = filterType;
     }
 
-    public static Icon create(RGBImageFilter filter, Icon delegate) {
+    public static Icon create(RGBImageFilter filter, Icon delegate, String filterType) {
         final int width = delegate.getIconWidth();
         final int height = delegate.getIconHeight();
         if (width < 0 || height < 0) {
@@ -68,7 +70,7 @@ final class FilteredIcon extends CachedHiDPIIcon {
                     new Object[] { delegate.getClass().getName(), width, height, url });
             return delegate;
         }
-        return new FilteredIcon(filter, delegate);
+        return new FilteredIcon(filter, delegate, filterType);
     }
 
     @Override
@@ -86,5 +88,9 @@ final class FilteredIcon extends CachedHiDPIIcon {
         }
         return Toolkit.getDefaultToolkit().createImage(
                 new FilteredImageSource(img.getSource(), filter));
+    }
+    
+    String getFilterType() {
+        return filterType;
     }
 }
