@@ -86,12 +86,6 @@ public final class ImageUtilities {
      */
     public static final String PROPERTY_URL = "url"; // NOI18N
     
-    /**
-     * Property that holds ID of the image.
-     * @since 9.24
-     */
-    public static final String PROPERTY_ID = "imageID"; // NOI18N
-
     private static final Logger LOGGER = Logger.getLogger(ImageUtilities.class.getName());
 
     /** separator for individual parts of tool tip text */
@@ -199,7 +193,8 @@ public final class ImageUtilities {
      * <p>Caching of loaded images can be used internally to improve performance.
      * <p> Since version 8.12 the returned image object responds to call
      * <code>image.getProperty({@link #PROPERTY_URL}, null)</code> by returning the internal
-     * {@link URL} of the found and loaded <code>resource</code>. See also {@link #findImageBaseURL}.
+     * {@link URL} of the found and loaded <code>resource</code>. Convenience method {@link #findImageBaseURL}
+     * should be used in preference to direct property access.
      * 
      * <p>If the current look and feel is 'dark' (<code>UIManager.getBoolean("nb.dark.theme")</code>)
      * then the method first attempts to load image <i>&lt;original file name&gt;<b>_dark</b>.&lt;original extension&gt;</i>.
@@ -412,8 +407,7 @@ public final class ImageUtilities {
                     return cached;
                 }
             }
-            Object id = image.getProperty(PROPERTY_ID, null);
-            cached = ToolTipImage.createNew(text, image, null, id instanceof String ? (String)id : null);
+            cached = ToolTipImage.createNew(text, image, null);
             imageToolTipCache.put(key, new ActiveRef<ToolTipImageKey>(cached, imageToolTipCache, key));
             return cached;
         }
@@ -494,38 +488,6 @@ public final class ImageUtilities {
       return o instanceof URL ? (URL)o : null;
     }
     
-    /**
-     * Attempts to find image's ID, if it is defined. The image may have an ID even
-     * though it has no URL. An image whose {@link #findImageBaseURL(java.awt.Image)} returns
-     * non-null has always an ID. Note that image IDs may be the same for bare and badged
-     * icons.
-     * 
-     * @param image image to inspect
-     * @return image's ID or {@code null}.
-     * @since 9.24
-     */
-    public static String findImageBaseId(Image image) {
-      Object o = image.getProperty(PROPERTY_ID, null);  
-      if (o instanceof String) {
-          return (String)o;
-      }
-      URL u = findImageBaseURL(image);
-      if (u == null) {
-          return null;
-      }
-      // special handling for JARs:
-      if (u.getProtocol().equals("jar")) { // NOI18N
-          String p = u.getPath();
-          int idx = p.indexOf("!/"); // NOI18N
-          if (idx > 0) {
-              // return just inner part, as if passed to loadImage().
-              return p.substring(idx + 2);
-          }
-      }
-      return u.toString();
-    }
-    
-
     /**
      * Get an SVG icon loader, if the appropriate service provider module is installed. To ensure
      * lazy loading of the SVG loader module, this method should only be called when there actually
@@ -829,7 +791,7 @@ public final class ImageUtilities {
                 name = new String(name).intern(); // NOPMD
                 ToolTipImage toolTipImage = (result instanceof ToolTipImage)
                         ? (ToolTipImage) result
-                        : ToolTipImage.createNew("", result, url, null);
+                        : ToolTipImage.createNew("", result, url);
                 cache.put(name, new ActiveRef<String>(toolTipImage, cache, name));
                 return toolTipImage;
             } else { // no icon found
@@ -903,15 +865,12 @@ public final class ImageUtilities {
             str.append(toolTip);
         }
         Object firstUrl = image1.getProperty(PROPERTY_URL, null);
-        Object firstId = image1.getProperty(PROPERTY_ID, null);
         
         ColorModel model = colorModel(bitmask? Transparency.BITMASK: Transparency.TRANSLUCENT);
         // Provide a delegate Icon for scalable rendering.
         Icon delegateIcon = new MergedIcon(image2Icon(image1), image2Icon(image2), x, y);
         ToolTipImage buffImage = new ToolTipImage(str.toString(), delegateIcon,
-                model, model.createCompatibleWritableRaster(w, h), model.isAlphaPremultiplied(), null, 
-                firstUrl instanceof URL ? (URL)firstUrl : null,
-                firstId instanceof String ? (String)firstId : null
+                model, model.createCompatibleWritableRaster(w, h), model.isAlphaPremultiplied(), null, firstUrl instanceof URL ? (URL)firstUrl : null
             );
 
         // Also provide an Image-based rendering for backwards-compatibility.
@@ -1138,16 +1097,10 @@ public final class ImageUtilities {
         final Icon delegateIcon;
         // May be null.
         final URL url;
-        
-        /**
-         * This is a better ID than URL, as it may not be openable, but it is just an ID.
-         */
-        final String imageId;
-        
         // May be null.
         ImageIcon imageIconVersion;
 
-        public static ToolTipImage createNew(String toolTipText, Image image, URL url, String imageId) {
+        public static ToolTipImage createNew(String toolTipText, Image image, URL url) {
             ImageUtilities.ensureLoaded(image);
             boolean bitmask = (image instanceof Transparency) && ((Transparency) image).getTransparency() != Transparency.TRANSLUCENT;
             ColorModel model = colorModel(bitmask ? Transparency.BITMASK : Transparency.TRANSLUCENT);
@@ -1157,7 +1110,6 @@ public final class ImageUtilities {
                 Object value = image.getProperty(PROPERTY_URL, null);
                 url = (value instanceof URL) ? (URL) value : null;
             }
-
             Icon icon = (image instanceof ToolTipImage)
                    ? ((ToolTipImage) image).getDelegateIcon() : null;
             ToolTipImage newImage = new ToolTipImage(
@@ -1165,7 +1117,7 @@ public final class ImageUtilities {
                 icon,
                 model,
                 model.createCompatibleWritableRaster(w, h),
-                model.isAlphaPremultiplied(), null, url, imageId
+                model.isAlphaPremultiplied(), null, url
             );
 
             java.awt.Graphics g = newImage.createGraphics();
@@ -1176,13 +1128,12 @@ public final class ImageUtilities {
 
         public ToolTipImage(
             String toolTipText, Icon delegateIcon, ColorModel cm, WritableRaster raster,
-            boolean isRasterPremultiplied, Hashtable<?, ?> properties, URL url, String imageId
+            boolean isRasterPremultiplied, Hashtable<?, ?> properties, URL url
         ) {
             super(cm, raster, isRasterPremultiplied, properties);
             this.toolTipText = toolTipText;
             this.delegateIcon = delegateIcon;
             this.url = url;
-            this.imageId = imageId;
         }
 
         public synchronized ImageIcon asImageIcon() {
@@ -1201,7 +1152,6 @@ public final class ImageUtilities {
             this.delegateIcon = delegateIcon;
             this.toolTipText = toolTipText;
             this.url = url;
-            this.imageId = null;
         }
 
         /**
@@ -1268,14 +1218,13 @@ public final class ImageUtilities {
 
         @Override
         public Object getProperty(String name, ImageObserver observer) {
-            if (PROPERTY_URL.equals(name) || PROPERTY_ID.equals(name)) { // NOI18N
+            if (PROPERTY_URL.equals(name)) { // NOI18N
                 /* In some cases it might strictly be more appropriate to return
                 Image.UndefinedProperty rather than null (see Javadoc spec for this method), but
                 retain the existing behavior and use null instead here. That way there won't be a
                 ClassCastException if someone tries to cast to URL. */
-                Object v = PROPERTY_URL.equals(name) ? url : imageId;
-                if (v != null) {
-                    return v;
+                if (url != null) {
+                    return url;
                 } else if (!(delegateIcon instanceof ImageIcon)) {
                     return null;
                 } else {
