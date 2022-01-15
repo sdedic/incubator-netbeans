@@ -706,17 +706,17 @@
 				"codeicon": "symbol-interface"
 			},
 			{
-				"uriExpression": "uidefaults:Tree.(open|closed)Icon",
+				"uriExpression": "nbres:/org/netbeans/modules/nbcode/integration/resources/uidefaults/Tree.(open|closed)Icon",
 				"valueMatch": [ " [0-9]+([A-Z][A-z]+)?SourceRoot | Dependencies[A-Z]+ | OtherRoots | projectfiles | BootCPNode " ],
 				"codeicon": "file-submodule"
 			},
 			{
-				"uriExpression": "uidefaults:Tree.(open|closed)Icon",
+				"uriExpression": "nbres:/org/netbeans/modules/nbcode/integration/resources/uidefaults/Tree.(open|closed)Icon",
 				"valueMatch": [ " [0-9]+([A-z]+).(java|groovy|generated|resources) " ],
 				"codeicon": "file-submodule"
 			},
 			{
-				"uriExpression": "uidefaults:Tree.(open|closed)Icon",
+				"uriExpression": "nbres:/org/netbeans/modules/nbcode/integration/resources/uidefaults/Tree.(open|closed)Icon",
 				"codeicon": "*folder"
 			},
 			{
