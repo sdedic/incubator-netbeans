@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Properties;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -56,7 +58,14 @@ public class UIDefaultsIconMetadata implements Runnable {
         try (InputStream is = UIDefaultsIconMetadata.class.getResourceAsStream("resources/uimanager-icons.properties")) { // NOI18N
             Properties p = new Properties();
             p.load(is);
-            Set<Object> uiDefaultsKeys = defs.keySet();
+            // UIDefaults.keySet() is so lazy implemented that it does not enumerate any items ... but entrySet
+            // works and even allows to see raw LazyValue and ActiveValue instances...
+            Set<Map.Entry<Object,Object>> entries = defs.entrySet();
+            Set<Object> uiDefaultsKeys = new HashSet<>();
+            for (Map.Entry<Object,Object> e : entries) {
+                uiDefaultsKeys.add(e.getKey());
+            }
+            // defs.keySet() is empty for some reason 
             for (String uiKey : p.stringPropertyNames()) {
                 if (!uiDefaultsKeys.contains(uiKey)) {
                     LOG.log(Level.INFO, "Icon not used: {0}", uiKey);
