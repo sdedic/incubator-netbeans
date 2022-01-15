@@ -259,10 +259,11 @@ public class TreeNodeRegistryImpl implements TreeNodeRegistry {
 
 
     public static URI findImageURI(Image i) {
-        String s = ImageUtilities.findImageBaseId(i);
-        if (s == null) {
+        URL u = ImageUtilities.findImageBaseURL(i);
+        if (u == null) {
             return null;
         }
+        String s = u.toString();
         try {
             if (s.contains(":")) {
                 return new URI(s);
