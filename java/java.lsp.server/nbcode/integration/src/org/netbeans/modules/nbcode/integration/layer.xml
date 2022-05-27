@@ -44,6 +44,10 @@
                 <attr name="action:org.netbeans.modules.cloud.oracle.actions.DownloadWalletAction" stringvalue="Tools"/>
                 <attr name="action:org.netbeans.modules.cloud.oracle.actions.CreateAutonomousDBAction" stringvalue="Tools"/>
                 <attr name="action:org.netbeans.modules.cloud.oracle.actions.OpenServiceConsoleAction" stringvalue="Tools"/>
+                <attr name="action:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction" stringvalue="Tools"/>
+                <attr name="action:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction" stringvalue="Tools"/>
+                <attr name="action:org.netbeans.modules.cloud.oracle.adm.SetAsIdeDefaultAction" stringvalue="Tools"/>
+                <attr name="action:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction" stringvalue="Tools"/>
                 <attr name="action:org.netbeans.modules.cloud.oracle.actions.CloudRefresh" stringvalue="Tools"/>
                 <attr name="action:org.netbeans.modules.cloud.oracle.actions.AddToProject" stringvalue="Tools"/>
                 <attr name="action:org.netbeans.modules.cloud.oracle.actions.CreateBuildRun" stringvalue="Tools"/>
@@ -52,6 +56,9 @@
         </folder>
     </folder>
     <folder name="Explorers">
+        <folder name="foundProjects">
+            <file name="projects.contextValues" url="projects.contextValues"/>
+        </folder>
         <folder name="database.connections">
             <file name="database-cookies.contextValues" url="database-cookies.contextValues"/>
         </folder>

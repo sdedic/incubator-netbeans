@@ -16,11 +16,4 @@
 # under the License.
 
 [org.netbeans.modules.cloud.=]
-org.netbeans.modules.cloud.oracle.database.DatabaseItem
-org.netbeans.modules.cloud.oracle.compartment.CompartmentItem
-org.netbeans.modules.cloud.oracle.items.OCIItem
-org.netbeans.modules.cloud.oracle.devops.BuildPipelineItem
-org.netbeans.modules.cloud.oracle.devops.DevopsProjectItem
-org.netbeans.modules.cloud.oracle.adm.KnowledgeBaseItem
-org.netbeans.modules.cloud.oracle.adm.VulnerabilityAuditItem
-org.netbeans.modules.cloud.oracle.adm.VulnerabilityItem
+org.netbeans.modules.maven.NbMavenProjectImpl
