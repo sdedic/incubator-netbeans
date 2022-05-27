@@ -541,6 +541,24 @@
 				"command": "java.select.editor.projects",
 				"title": "Reveal active editor in Projects",
 				"category": "Project"
+			},
+			{
+				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+				"title": "Show in Browser",
+				"category": "oci"
+			},
+			{
+				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction",
+				"title": "Create Knowledge Base",
+				"category": "oci"
+			},
+			{
+				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.SetAsIdeDefaultAction",
+				"title": "Set as default for the IDE"
+			},
+			{
+				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+				"title": "Run ADM"
 			}
 		],
 		"keybindings": [
@@ -575,6 +593,10 @@
 					"command": "java.workspace.new",
 					"when": "nbJavaLSReady && explorerResourceIsFolder",
 					"group": "navigation@3"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+					"when": "nbJavaLSReady && resourceFilename == pom.xml"
 				}
 			],
 			"commandPalette": [
@@ -635,6 +657,22 @@
 				},
 				{
 					"command": "java.workspace.configureRunSettings",
+					"when": "false"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+					"when": "false"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction",
+					"when": "false"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.SetAsIdeDefaultAction",
+					"when": "false"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
 					"when": "false"
 				}
 			],
@@ -714,6 +752,14 @@
 					"when": "view == foundProjects && viewItem =~ /is:project/"
 				},
 				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+					"when": "view == foundProjects && viewItem =~ /is:project/ && viewItem =~ /org.netbeans.modules.maven.NbMavenProjectImpl/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+					"when": "view == foundProjects && viewItem =~ /is:file/ && resourceFilename == pom.xml"
+				},
+				{
 					"command": "java.local.db.set.preferred.connection",
 					"when": "viewItem =~ /class:org.netbeans.api.db.explorer.DatabaseConnection/"
 				},
@@ -733,6 +779,26 @@
 					"command": "java.workspace.configureRunSettings",
 					"when": "view == run-config && viewItem == configureRunSettings",
 					"group": "inline@1"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+					"when": "viewItem =~ /class:oracle.adm.VulnerabilityAuditItem/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+					"when": "viewItem =~ /class:oracle.adm.VulnerabilityItem/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+					"when": "viewItem =~ /class:oracle.adm.KnowledgeBaseItem/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction",
+					"when": "viewItem =~ /class:oracle.compartment.CompartmentItem/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.SetAsIdeDefaultAction",
+					"when": "viewItem =~ /class:oracle.adm.KnowledgeBaseItem/"
 				}
 			]
 		},
@@ -850,7 +916,7 @@
                         {
                             "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/deploy_artifact_folder.svg",
                             "codeicon": "file-binary"
-                        }
+			}
 		],
 		"jsonValidation": [
 			{

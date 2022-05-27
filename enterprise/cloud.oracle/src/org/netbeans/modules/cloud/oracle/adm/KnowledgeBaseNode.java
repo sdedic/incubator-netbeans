@@ -19,34 +19,44 @@
 package org.netbeans.modules.cloud.oracle.adm;
 
 import com.oracle.bmc.adm.ApplicationDependencyManagementClient;
+import com.oracle.bmc.adm.model.KnowledgeBase;
 import com.oracle.bmc.adm.model.KnowledgeBaseSummary;
 import com.oracle.bmc.adm.requests.ListKnowledgeBasesRequest;
 import com.oracle.bmc.adm.responses.ListKnowledgeBasesResponse;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
 import org.netbeans.modules.cloud.common.explorer.NodeProvider;
 import org.netbeans.modules.cloud.oracle.OCIManager;
+import org.netbeans.modules.cloud.oracle.OCINode;
 import org.netbeans.modules.cloud.oracle.compartment.CompartmentItem;
 import org.netbeans.modules.cloud.oracle.items.OCID;
-import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import org.openide.nodes.Children;
 
 /**
  *
  * @author Jan Horvath
  */
-public class KnowledgeBaseNode extends CloudNode {
+public class KnowledgeBaseNode extends OCINode implements PropertyChangeListener{
 
-    private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/knowledge_base.svg"; // NOI18N
-
-    public KnowledgeBaseNode(OCIItem item) {
-        super(item, Children.LEAF);
+    private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/knowledgeBase.png"; // NOI18N
+    private final KnowledgeBaseItem base;
+    
+    public KnowledgeBaseNode(KnowledgeBaseItem item) {
+        super(item);
         setIconBaseWithExtension(ICON);
+        this.base = item;
+        setDisplayName(getDisplayName(item.getKnowledgeBaseSummary()));
+        setShortDescription(getDescription(item.getKnowledgeBaseSummary()));
+        DefaultKnowledgeBaseStorage.getInstance().addChangeListener(this);
+        
     }
 
-     @NodeProvider.Registration(path = "Oracle/KnowledgeBase")
+    @NodeProvider.Registration(path = "Oracle/KnowledgeBase")
     public static NodeProvider<KnowledgeBaseItem> createNode() {
         return KnowledgeBaseNode::new;
     }
@@ -60,11 +70,45 @@ public class KnowledgeBaseNode extends CloudNode {
                 ListKnowledgeBasesRequest request = ListKnowledgeBasesRequest.builder()
                         .compartmentId(compartment.getKey().getValue()).build();
                 ListKnowledgeBasesResponse response = client.listKnowledgeBases(request);
-                List<KnowledgeBaseSummary> projects = response.getKnowledgeBaseCollection().getItems();
-                return projects.stream().map(p -> new KnowledgeBaseItem(OCID.of(p.getId(), "Oracle/KnowledgeBase"), // NOI18N 
-                        p.getDisplayName())).collect(Collectors.toList());
+                List<KnowledgeBaseSummary> baseSummary = response.getKnowledgeBaseCollection().getItems();
+                return baseSummary.stream().map(p -> new KnowledgeBaseItem(OCID.of(p.getId(), "Oracle/KnowledgeBase"), 
+                        p)).collect(Collectors.toList());
             }
         };
     }
     
+    private static String getDisplayName(KnowledgeBaseSummary base) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(base.getDisplayName());
+        if (base.getLifecycleState() == KnowledgeBase.LifecycleState.Deleted 
+                || base.getLifecycleState() == KnowledgeBase.LifecycleState.Deleting) {
+            // TODO change the text
+            sb.append(" (Deleted)");
+        }
+        String defaultBaseID = DefaultKnowledgeBaseStorage.getInstance().getDefaultKnowledgeBaseId();
+        if ( base.getId().equals(defaultBaseID)) {
+            sb.append(" (Default)");
+        }
+        return sb.toString();
+    }
+    
+    protected static String getDescription(KnowledgeBaseSummary base) {
+        String lifeState = base.getLifecycleState().getValue();
+        lifeState = lifeState.toLowerCase();
+        lifeState = StringUtils.capitalize(lifeState);
+        StringBuilder sb = new StringBuilder();
+        sb.append(lifeState);
+        SimpleDateFormat df = new SimpleDateFormat (" HH:mm:ss dd.MM.yy");
+        sb.append(", Last updated: ");
+        sb.append(df.format(base.getTimeUpdated()));
+        return sb.toString();
+    }
+
+    @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+        String myId = base.getKnowledgeBaseSummary().getId();
+        if (myId.equals(evt.getNewValue()) || myId.equals(evt.getOldValue())) {
+            setDisplayName(getDisplayName(this.base.getKnowledgeBaseSummary()));
+        }
+    }
 }
