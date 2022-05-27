@@ -16,34 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.cloud.oracle.items;
+package org.netbeans.modules.cloud.common.explorer;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  *
  * @author Jan Horvath
  */
-public class DatabaseItem extends OCIItem {
-    private final String serviceUrl;
-    private final String connectionName;
-
-    public DatabaseItem(String id, String name, String serviceUrl, String connectionName) {
-        super(id, name);
-        this.serviceUrl = serviceUrl;
-        this.connectionName = connectionName;
-    }
-
-    public DatabaseItem() {
-        super();
-        serviceUrl = null;
-        connectionName = null;
-    }
+@FunctionalInterface
+public interface NodeProvider<T extends CloudItem> {
     
-    public String getServiceUrl() {
-        return serviceUrl;
-    }
-
-    public String getConnectionName() {
-        return connectionName;
+    public CloudNode apply(T t);
+    
+    @Retention(RetentionPolicy.SOURCE)
+    @Target({ElementType.TYPE, ElementType.METHOD})
+    public @interface Registration {
+        String[] path();
+        
+        int position() default Integer.MAX_VALUE;
     }
     
 }

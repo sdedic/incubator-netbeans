@@ -18,39 +18,45 @@
  */
 package org.netbeans.modules.cloud.oracle;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
-import java.awt.Image;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
+import org.openide.awt.ActionID;
+import org.openide.awt.ActionReference;
+import org.openide.awt.ActionReferences;
+import org.openide.awt.ActionRegistration;
+import org.openide.util.NbBundle;
 
 /**
  *
  * @author Jan Horvath
  */
-public class TenancyNode extends CloudNode {
-    
-    private static final String ORCL_ICON = "org/netbeans/modules/cloud/oracle/resources/tenancy.svg"; // NOI18N
-    
-    public TenancyNode(OCIItem tenancy) {
-        super(tenancy);
-//        super(Children.create(new TenancyChildFactory(tenancy), true), Lookups.fixed(tenancy));
-        setName(tenancy.getName()); 
-        setDisplayName(tenancy.getName());
-        setIconBaseWithExtension(ORCL_ICON);
-        setShortDescription(tenancy.getDescription());
+@ActionID(
+        category = "Tools",
+        id = "org.netbeans.modules.cloud.oracle.actions.CloudRefresh"
+)
+@ActionRegistration( 
+        displayName = "#CloudRefresh", 
+        asynchronous = true
+)
+
+@ActionReferences(value = {
+    @ActionReference(path = "Cloud/Oracle/Common/Actions", position = 250)
+})
+@NbBundle.Messages({
+    "CloudRefresh=Refresh"
+})
+public class CloudRefreshAction implements ActionListener {
+
+    private final OCIItem context;
+
+    public CloudRefreshAction(OCIItem context) {
+        this.context = context;
     }
-    
+
     @Override
-    public Image getIcon(int type) {
-        return badgeIcon(super.getIcon(type));
-    }
-    
-    @Override
-    public Image getOpenedIcon(int type) {
-        return badgeIcon(super.getOpenedIcon(type));
-    }
-    
-    private Image badgeIcon(Image origImg) {
-        return origImg;
+    public void actionPerformed(ActionEvent e) {
+        context.refresh();
     }
     
 }

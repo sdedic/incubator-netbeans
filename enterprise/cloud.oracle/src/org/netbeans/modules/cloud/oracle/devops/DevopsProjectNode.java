@@ -18,25 +18,56 @@
  */
 package org.netbeans.modules.cloud.oracle.devops;
 
+
+import com.oracle.bmc.devops.DevopsClient;
+import com.oracle.bmc.devops.model.ProjectSummary;
+import com.oracle.bmc.devops.requests.ListProjectsRequest;
+import com.oracle.bmc.devops.responses.ListProjectsResponse;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.netbeans.modules.cloud.common.explorer.CloudNode;
+import org.netbeans.modules.cloud.common.explorer.NodeProvider;
+import org.netbeans.modules.cloud.oracle.OCIManager;
+import org.netbeans.modules.cloud.oracle.items.OCID;
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
-import org.openide.nodes.AbstractNode;
-import org.openide.nodes.Children;
-import org.openide.util.lookup.Lookups;
+import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
+import org.netbeans.modules.cloud.oracle.compartment.CompartmentItem;
 
 /**
  *
  * @author Jan Horvath
  */
-public class DevopsProjectNode extends AbstractNode {
+
+public class DevopsProjectNode extends CloudNode {
     
     private static final String DB_ICON = "org/netbeans/modules/cloud/oracle/resources/devops_project.svg"; // NOI18N
     
-    public DevopsProjectNode(OCIItem dbSummary) {
-        super(Children.LEAF, Lookups.fixed(dbSummary));
-        setName(dbSummary.getName()); 
-        setDisplayName(dbSummary.getName());
+    public DevopsProjectNode(OCIItem item) {
+        super(item);
+        setName(item.getName()); 
+        setDisplayName(item.getName());
         setIconBaseWithExtension(DB_ICON);
-        setShortDescription(dbSummary.getDescription());
+        setShortDescription(item.getDescription());
+    }
+    
+    @NodeProvider.Registration(path = "Oracle/DevopsProject")
+    public static NodeProvider<OCIItem> createNode() {
+        return DevopsProjectNode::new;
     }
    
+    @ChildrenProvider.Registration(parentPath = "Oracle/Compartment")
+    public static ChildrenProvider<CompartmentItem, DevopsProjectItem> listDevopsProjects() {
+        return compartmentId -> {
+            try (
+                DevopsClient client = new DevopsClient(OCIManager.getDefault().getConfigProvider());
+            ) {
+                ListProjectsRequest request = ListProjectsRequest.builder().compartmentId(compartmentId.getKey().getValue()).build();
+                ListProjectsResponse response = client.listProjects(request);
+
+                List<ProjectSummary> projects = response.getProjectCollection().getItems();
+                return projects.stream().map(p -> new DevopsProjectItem(OCID.of(p.getId(), "Oracle/DevopsProject"), 
+                        p.getName())).collect(Collectors.toList());
+            }
+        };
+    }
 }
