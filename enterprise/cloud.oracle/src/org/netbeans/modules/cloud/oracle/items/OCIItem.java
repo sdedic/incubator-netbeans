@@ -19,6 +19,7 @@
 package org.netbeans.modules.cloud.oracle.items;
 
 import javax.swing.event.ChangeListener;
+import org.netbeans.modules.cloud.common.explorer.CloudItem;
 import org.openide.util.ChangeSupport;
 
 /**
@@ -26,8 +27,8 @@ import org.openide.util.ChangeSupport;
  * 
  * @author Jan Horvath
  */
-public class OCIItem {
-    final String id;
+public abstract class OCIItem implements CloudItem {
+    final OCID id;
     final String name;
     String description;
     ChangeSupport changeSupport;
@@ -38,7 +39,7 @@ public class OCIItem {
     * @param id OCID of the item
     * @param name Name of the item
     */
-    public OCIItem(String id, String name) {
+    public OCIItem(OCID id, String name) {
         this.id = id;
         this.name = name;
         changeSupport = new ChangeSupport(this);
@@ -53,7 +54,7 @@ public class OCIItem {
      * 
      * @return OCID of the item
      */
-    public String getId() {
+    public OCID getKey() {
         return id;
     }
 

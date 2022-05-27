@@ -19,30 +19,21 @@
 package org.netbeans.modules.cloud.oracle;
 
 import javax.swing.Action;
-import org.netbeans.modules.cloud.oracle.items.DatabaseItem;
-import org.openide.nodes.AbstractNode;
-import org.openide.nodes.Children;
+import org.netbeans.modules.cloud.common.explorer.CloudItem;
+import org.netbeans.modules.cloud.common.explorer.CloudNode;
+import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import org.openide.util.Utilities;
-import org.openide.util.lookup.Lookups;
 
 /**
  *
  * @author Jan Horvath
  */
-public class DatabaseNode extends AbstractNode {
-    
-    private static final String DB_ICON = "org/netbeans/modules/cloud/oracle/resources/database.svg"; // NOI18N
-    
-    public DatabaseNode(DatabaseItem dbSummary) {
-        super(Children.LEAF, Lookups.fixed(dbSummary));
-        setName(dbSummary.getName()); 
-        setDisplayName(dbSummary.getName());
-        setIconBaseWithExtension(DB_ICON);
-        setShortDescription(dbSummary.getDescription());
+public class OCINode extends CloudNode {
+
+    public OCINode(OCIItem item) {
+        super(item);
+        setDisplayName(item.getName());
+        setShortDescription(item.getDescription());
     }
-   
-    @Override
-    public Action[] getActions(boolean context) {
-        return Utilities.actionsForPath("Cloud/Oracle/Databases/Actions").toArray(new Action[0]); // NOI18N
-    }
+    
 }
