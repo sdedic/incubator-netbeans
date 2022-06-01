@@ -214,7 +214,14 @@ export class TreeViewService extends vscode.Disposable {
         } else if (e.iconPath) {
           return e.iconPath;
         }
-        return new ThemeIcon(e.codeicon);
+        let resultIcon;
+        if (e.color) {
+          resultIcon = new ThemeIcon(e.codeicon, new vscode.ThemeColor(e.color));
+        } else {
+          resultIcon = new ThemeIcon(e.codeicon);
+        }
+        
+        return resultIcon;
       }
     }
     return undefined;
@@ -237,7 +244,7 @@ export class TreeViewService extends vscode.Disposable {
                   vals.push(re);
                 }
               }
-              newEntries.push(new ImageEntry(re, m?.codeicon, m?.iconPath, vals));
+              newEntries.push(new ImageEntry(re, m?.codeicon, m?.iconPath, vals, m?.color));
             } catch (e) {
               console.log("Invalid icon mapping in extension %s: %s -> %s", ext.id, reString, m?.codicon);
             }
@@ -717,7 +724,8 @@ class ImageEntry {
     readonly uriRegexp : RegExp,
     readonly codeicon : string,
     readonly iconPath? : string,
-    readonly valueRegexps? : RegExp[]
+    readonly valueRegexps? : RegExp[],
+    readonly color?: string
     ) {}
 }
 class ImageTranslator {
