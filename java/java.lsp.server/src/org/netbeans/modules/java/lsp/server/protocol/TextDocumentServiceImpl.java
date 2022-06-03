@@ -106,6 +106,7 @@ import org.eclipse.lsp4j.ConfigurationParams;
 import org.eclipse.lsp4j.CreateFile;
 import org.eclipse.lsp4j.DefinitionParams;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticCodeDescription;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
@@ -1806,6 +1807,10 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
                     default: throw new IllegalStateException("Unknown severity: " + err.getSeverity());
                 }
                 diag.setCode(id2Error.getKey());
+                URL codeDescription = id2Error.getValue().getCodeDescription();
+                if (codeDescription != null) {
+                    diag.setCodeDescription(new DiagnosticCodeDescription(codeDescription.toString()));
+                }
                 result.add(diag);
             }
             if (offset >= 0) {

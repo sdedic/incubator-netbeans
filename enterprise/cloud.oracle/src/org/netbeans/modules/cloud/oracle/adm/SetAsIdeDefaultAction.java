@@ -56,7 +56,7 @@ public class SetAsIdeDefaultAction implements ActionListener {
     
     @Override
     public void actionPerformed(ActionEvent e) {
-        DefaultKnowledgeBaseStorage.getInstance().setAsDefault(item.getKnowledgeBaseSummary().getId());
+        DefaultKnowledgeBaseStorage.getInstance().setAsDefault(item.getKnowledgeBaseSummary().getCompartmentId(), item.getKnowledgeBaseSummary().getId());
     }
     
     

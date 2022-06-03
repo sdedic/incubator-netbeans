@@ -865,57 +865,71 @@
 				"uriExpression": "nbres:/org/netbeans/modules/java/api/common/project/ui/resources/platform",
 				"codeicon": "vm"
 			},
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/tenancy.svg",
-                            "codeicon": "cloud"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/compartment_nbcode.svg",
-                            "codeicon": "archive"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/database_nbcode.svg",
-                            "codeicon": "database"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/devops_project.svg",
-                            "codeicon": "project"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/knowledge_base.svg",
-                            "codeicon": "book"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/build_pipeline.svg",
-                            "codeicon": "list-tree"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/build_pipeline_folder.svg",
-                            "codeicon": "list-tree"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/build_run.svg",
-                            "codeicon": "primitive-dot"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/build_run_folder.svg",
-                            "codeicon": "history"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/repository.svg",
-                            "codeicon": "repo"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/repository_folder.svg",
-                            "codeicon": "repo"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/deploy_artifact.svg",
-                            "codeicon": "file-binary"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/deploy_artifact_folder.svg",
-                            "codeicon": "file-binary"
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/tenancy.svg",
+				"codeicon": "cloud"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/compartment_nbcode.svg",
+				"codeicon": "archive"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/database_nbcode.svg",
+				"codeicon": "database"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/devops_project.svg",
+				"codeicon": "project"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/knowledge_base.svg",
+				"codeicon": "book"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/build_pipeline.svg",
+				"codeicon": "list-tree"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/build_pipeline_folder.svg",
+				"codeicon": "list-tree"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/build_run.svg",
+				"codeicon": "primitive-dot"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/build_run_folder.svg",
+				"codeicon": "history"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/repository.svg",
+				"codeicon": "repo"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/repository_folder.svg",
+				"codeicon": "repo"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/deploy_artifact.svg",
+				"codeicon": "file-binary"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/audit_bad.png",
+				"codeicon": "error",
+				"color": "charts.red"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/audit_good.png",
+				"codeicon": "pass",
+				"color": "charts.green"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/bug.png",
+				"codeicon": "bug"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/knowledgeBase.png",
+				"codeicon": "book"
 			}
 		],
 		"jsonValidation": [
