@@ -971,6 +971,24 @@
 				"codeicon": "file-binary"
 			},
 			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/audit_bad.png",
+				"codeicon": "error",
+				"color": "charts.red"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/audit_good.png",
+				"codeicon": "pass",
+				"color": "charts.green"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/bug.png",
+				"codeicon": "bug"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/knowledgeBase.png",
+				"codeicon": "book"
+			},
+                        {
 				"uriExpression": "nbres:/org/netbeans/modules/cloud/common/explorer/resources/defaultFolder.svg",
 				"codeicon": "file-submodule"
 			},

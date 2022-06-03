@@ -66,6 +66,8 @@ public class RunFileADMAction implements ActionListener{
         System.out.println("  Project: " + project.toString());
         System.out.println("  File: " + file.getPath());
         System.out.println("  Knowledge Base: " + DefaultKnowledgeBaseStorage.getInstance().getDefaultKnowledgeBaseId());
+        
+        VulnerabilityWorker.getInstance().findVulnerability(project);
     }
     
 }

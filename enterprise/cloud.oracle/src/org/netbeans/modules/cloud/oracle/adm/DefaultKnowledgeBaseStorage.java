@@ -30,16 +30,19 @@ import org.openide.util.NbPreferences;
  */
 public class DefaultKnowledgeBaseStorage implements PreferenceChangeListener {
     private static final String KEY_KNOWLEDGEBASEID = "default_knowledge_base";
+    private static final String KEY_COMPARTMENTID = "default_compartment";
     
     private static DefaultKnowledgeBaseStorage INSTANCE;
     
     private final PropertyChangeSupport pcs;
-    private String value;
+    private String knowledgeBaseId;
+    private String compartmentId;
 
     private DefaultKnowledgeBaseStorage() {
         this.pcs = new PropertyChangeSupport(this);
         NbPreferences.root().addPreferenceChangeListener(this);
-        value = NbPreferences.root().get(KEY_KNOWLEDGEBASEID, null);
+        knowledgeBaseId = NbPreferences.root().get(KEY_KNOWLEDGEBASEID, null);
+        compartmentId = NbPreferences.root().get(KEY_COMPARTMENTID, null);
     }
     
     public static DefaultKnowledgeBaseStorage getInstance() {
@@ -53,19 +56,29 @@ public class DefaultKnowledgeBaseStorage implements PreferenceChangeListener {
         return INSTANCE;
     }
     
-    public void setAsDefault(String knowledgeBaseId) {
+    public void setAsDefault(String compartmentId, String knowledgeBaseId) {
         NbPreferences.root().put(KEY_KNOWLEDGEBASEID, knowledgeBaseId);
+        NbPreferences.root().put(KEY_COMPARTMENTID, compartmentId);
     }
     
     public String getDefaultKnowledgeBaseId() {
         return NbPreferences.root().get(KEY_KNOWLEDGEBASEID, null);
     }
+    
+    public String getDefaultCompartmentId() {
+        return NbPreferences.root().get(KEY_COMPARTMENTID, null);
+    }
 
     @Override
     public void preferenceChange(PreferenceChangeEvent evt) {
         if (evt.getKey().equals(KEY_KNOWLEDGEBASEID)) {
-            pcs.firePropertyChange(KEY_KNOWLEDGEBASEID, value, evt.getNewValue());
-            value = evt.getNewValue();
+            pcs.firePropertyChange(KEY_KNOWLEDGEBASEID, knowledgeBaseId, evt.getNewValue());
+            knowledgeBaseId = evt.getNewValue();
+        }
+        
+        if (evt.getKey().equals(KEY_COMPARTMENTID)) {
+            pcs.firePropertyChange(KEY_COMPARTMENTID, compartmentId, evt.getNewValue());
+            compartmentId = evt.getNewValue();
         }
     }
 
