@@ -57,6 +57,9 @@
         </folder>
     </folder>
     <folder name="Explorers">
+        <folder name="foundProjects">
+            <file name="projects.contextValues" url="projects.contextValues"/>
+        </folder>
         <folder name="database.connections">
             <file name="database-cookies.contextValues" url="database-cookies.contextValues"/>
         </folder>

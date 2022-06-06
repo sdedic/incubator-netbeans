@@ -29,6 +29,7 @@ import com.oracle.bmc.model.BmcException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
 import org.netbeans.modules.cloud.common.explorer.CloudItem;
 import org.netbeans.modules.cloud.common.explorer.ItemLoader;
