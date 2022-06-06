@@ -22,6 +22,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
+import org.netbeans.modules.cloud.common.explorer.CloudItem;
+import org.netbeans.modules.cloud.common.project.CloudResourcesStorage;
 import org.openide.awt.ActionID;
 import org.openide.awt.ActionReference;
 import org.openide.awt.ActionReferences;
@@ -65,9 +67,14 @@ public class RunFileADMAction implements ActionListener{
         System.out.println("Running adm action:");
         System.out.println("  Project: " + project.toString());
         System.out.println("  File: " + file.getPath());
-        System.out.println("  Knowledge Base: " + DefaultKnowledgeBaseStorage.getInstance().getDefaultKnowledgeBaseId());
-        
-        VulnerabilityWorker.getInstance().findVulnerability(project);
+//        CloudResourcesStorage storage = project.getLookup().lookup(CloudResourcesStorage.class);
+        KnowledgeBaseItem kbItem = VulnerabilityWorker.getKnowledgeBaseForProject(project);
+        if (kbItem != null) {
+            System.out.println("  Knowledge Base: " + kbItem.getKey().getValue());
+            VulnerabilityWorker.getInstance().findVulnerability(project);
+        } else {
+            System.out.println("  !!! There is not KnowledgeBase selected for the project.");
+        }
     }
     
 }

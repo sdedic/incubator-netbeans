@@ -381,7 +381,7 @@ public class MavenDependenciesImplementation implements ProjectDependenciesImple
             }
             
             for (org.apache.maven.model.Dependency d : effectiveModel.getDependencies()) {
-                if (dependencyEquals(dep, d)) {
+                if (dependencyEquals(search, d)) {
                     selected = d;
                     break;
                 }
@@ -409,7 +409,7 @@ public class MavenDependenciesImplementation implements ProjectDependenciesImple
                 }
                 d = cake.openDocument();
                 synchronized (this) {
-                    openedPoms.put(fo, d);
+                    openedPoms.putIfAbsent(fo, d);
                 }
             }
             LineDocument ld = LineDocumentUtils.as(d, LineDocument.class);
@@ -456,8 +456,8 @@ public class MavenDependenciesImplementation implements ProjectDependenciesImple
         if (!(
             Objects.equals(spec.getGroupId(), mavenD.getGroupId()) &&
             Objects.equals(spec.getArtifactId(), mavenD.getArtifactId()) &&    
-            Objects.equals(spec.getClassifier(), mavenClass)) &&
-            Objects.equals(spec.getVersionSpec(), mavenD.getVersion())) {
+            Objects.equals(spec.getClassifier(), mavenClass) &&
+            Objects.equals(spec.getVersionSpec(), mavenD.getVersion()))) {
             return false;
         }
         if (spec.getType() != null && !Objects.equals(spec.getType(), mavenD.getType())) {
@@ -479,8 +479,8 @@ public class MavenDependenciesImplementation implements ProjectDependenciesImple
         if (!(
             Objects.equals(spec.getGroupId(), mavenA.getGroupId()) &&
             Objects.equals(spec.getArtifactId(), mavenA.getArtifactId()) &&    
-            Objects.equals(spec.getClassifier(), mavenClass)) &&
-            Objects.equals(spec.getVersionSpec(), mavenA.getVersion())) {
+            Objects.equals(spec.getClassifier(), mavenClass) &&
+            Objects.equals(spec.getVersionSpec(), mavenA.getVersion()))) {
             return false;
         }
         if (spec.getType() != null && !Objects.equals(spec.getType(), mavenA.getType())) {

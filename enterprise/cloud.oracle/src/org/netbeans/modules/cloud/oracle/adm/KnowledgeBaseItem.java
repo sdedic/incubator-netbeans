@@ -32,11 +32,13 @@ import org.openide.util.Exceptions;
 public class KnowledgeBaseItem extends OCIItem implements URLProvider{
 
     protected final Date timeUpdated;
+    protected final String compartmentId;
 //    private final KnowledgeBaseSummary knowledgeBaseSummary;
     
-    public KnowledgeBaseItem(OCID id, String displayName, Date timeUpdated) {
+    public KnowledgeBaseItem(OCID id, String compartmentId, String displayName, Date timeUpdated) {
         super(id, displayName);
         this.timeUpdated = timeUpdated;
+        this.compartmentId = compartmentId;
 //        this.knowledgeBaseSummary = knowledgeBaseSummary;
         
     }

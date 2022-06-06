@@ -18,9 +18,19 @@
  */
 package org.netbeans.modules.cloud.oracle.adm;
 
+import com.oracle.bmc.adm.ApplicationDependencyManagementClient;
+import com.oracle.bmc.adm.model.CreateKnowledgeBaseDetails;
+import com.oracle.bmc.adm.model.KnowledgeBase;
+import com.oracle.bmc.adm.requests.CreateKnowledgeBaseRequest;
+import com.oracle.bmc.adm.requests.GetKnowledgeBaseRequest;
+import com.oracle.bmc.adm.responses.CreateKnowledgeBaseResponse;
+import com.oracle.bmc.adm.responses.GetKnowledgeBaseResponse;
+import com.oracle.bmc.model.BmcException;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Optional;
+import org.netbeans.api.lsp.Diagnostic;
+import org.netbeans.api.progress.ProgressHandle;
 import org.netbeans.modules.cloud.oracle.OCIManager;
 import org.netbeans.modules.cloud.oracle.actions.CreateAutonomousDBDialog;
 import org.netbeans.modules.cloud.oracle.compartment.CompartmentItem;
@@ -30,6 +40,8 @@ import org.openide.awt.ActionID;
 import org.openide.awt.ActionReference;
 import org.openide.awt.ActionReferences;
 import org.openide.awt.ActionRegistration;
+import org.openide.util.Exceptions;
+import org.openide.util.Lookup;
 import org.openide.util.NbBundle;
 import org.openide.util.Pair;
 import org.openide.util.RequestProcessor;
@@ -38,7 +50,6 @@ import org.openide.util.RequestProcessor;
  *
  * @author Petr Pisl
  */
-
 @ActionID(
         category = "Tools",
         id = "org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction"
@@ -53,8 +64,8 @@ import org.openide.util.RequestProcessor;
 })
 @NbBundle.Messages({
     "CTL_CreateKnowledgeBaseAction=Create Knowledge Base",
-    "MSG_KNCreated=Knowledge Base {0} was created.",
-    "MSG_KBNotCreated=Knowledge Base {0} failed to create: {1}"
+    "MSG_KBCreated=Knowledge Base {0} was created.",
+    "MSG_KBNotCreated=Knowledge Base {0} failed to create with code: {1}"
 
 })
 public class CreateKnowledgeBaseAction implements ActionListener {
@@ -64,26 +75,44 @@ public class CreateKnowledgeBaseAction implements ActionListener {
     public CreateKnowledgeBaseAction(CompartmentItem context) {
         this.context = context;
     }
-    
+
     @Override
-    public void actionPerformed(ActionEvent e) {
+    public void actionPerformed(ActionEvent event) {
         Optional<String> result = CreateKnowledgeBaseDialog.showDialog(context);
         result.ifPresent((p) -> {
             RequestProcessor.getDefault().execute(() -> {
-                System.out.println(" !!! vytvorit KB " + result.get());
-//                Optional<String> message = OCIManager.getDefault().createAutonomousDatabase(context.getKey().getValue(), p.first(), p.second());
-//                if (!message.isPresent()) {
-//                    context.refresh();
-//                    DialogDisplayer.getDefault().notifyLater(
-//                            new NotifyDescriptor.Message(
-//                                    org.netbeans.modules.cloud.oracle.actions.Bundle.MSG_DBCreated(p.first())));
-//                } else {
-//                    DialogDisplayer.getDefault().notifyLater(
-//                            new NotifyDescriptor.Message(
-//                                    org.netbeans.modules.cloud.oracle.actions.Bundle.MSG_DBNotCreated(p.first(), message.get())));
-//                }
+                ProgressHandle progressHandle = ProgressHandle.createHandle(String.format(Bundle.MSG_AuditIsRunning(), result.get()));
+                progressHandle.start();
+                
+                try (ApplicationDependencyManagementClient client
+                        = new ApplicationDependencyManagementClient(OCIManager.getDefault().getConfigProvider())) {
+
+                    CreateKnowledgeBaseDetails params = CreateKnowledgeBaseDetails.builder()
+                            .compartmentId(context.getKey().getValue())
+                            .displayName(result.get()).build();
+                    CreateKnowledgeBaseRequest request = CreateKnowledgeBaseRequest.builder()
+                            .createKnowledgeBaseDetails(params).build();
+                    CreateKnowledgeBaseResponse response = client.createKnowledgeBase(request);
+                    int resultCode = response.get__httpStatusCode__();
+                    String message;
+                    if (resultCode == 202) {
+                        context.refresh();
+                        message = Bundle.MSG_KBCreated(result.get());
+                    } else {
+                        message = Bundle.MSG_KBNotCreated(result.get(), resultCode);
+                    }
+                    
+                    
+                    DialogDisplayer.getDefault().notifyLater(new NotifyDescriptor.Message(message));
+                    
+                } catch (BmcException e) {
+                    Exceptions.printStackTrace(e);
+                } finally {
+                    progressHandle.finish();
+                }
+
             });
         });
     }
-    
+
 }

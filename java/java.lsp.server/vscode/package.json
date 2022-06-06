@@ -574,10 +574,6 @@
 				"category": "oci"
 			},
 			{
-				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.SetAsIdeDefaultAction",
-				"title": "Set as default for the IDE"
-			},
-			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
 				"title": "Run ADM"
 			}
@@ -702,10 +698,6 @@
 				},
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction",
-					"when": "false"
-				},
-				{
-					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.SetAsIdeDefaultAction",
 					"when": "false"
 				},
 				{
@@ -852,10 +844,6 @@
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction",
 					"when": "viewItem =~ /class:oracle.compartment.CompartmentItem/"
-				},
-				{
-					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.SetAsIdeDefaultAction",
-					"when": "viewItem =~ /class:oracle.adm.KnowledgeBaseItem/"
 				}
 			]
 		},

@@ -76,7 +76,7 @@ public class KnowledgeBaseNode extends OCINode { //implements PropertyChangeList
                         .build();
                 GetKnowledgeBaseResponse response = client.getKnowledgeBase(request);
                 KnowledgeBase knowledgeBase = response.getKnowledgeBase();
-                return new KnowledgeBaseItem(key, knowledgeBase.getDisplayName(), knowledgeBase.getTimeUpdated());
+                return new KnowledgeBaseItem(key, knowledgeBase.getCompartmentId(), knowledgeBase.getDisplayName(), knowledgeBase.getTimeUpdated());
             } catch(BmcException e) {
                 Exceptions.printStackTrace(e);
             }
@@ -85,7 +85,7 @@ public class KnowledgeBaseNode extends OCINode { //implements PropertyChangeList
 
         @Override
         public OCID fromPersistentForm(String persistedKey) {
-            return OCID.of("Oracle/KnowledgeBase", persistedKey);
+            return OCID.of(persistedKey, "Oracle/KnowledgeBase");
         }
         
     }
@@ -101,7 +101,7 @@ public class KnowledgeBaseNode extends OCINode { //implements PropertyChangeList
                 ListKnowledgeBasesResponse response = client.listKnowledgeBases(request);
                 List<KnowledgeBaseSummary> baseSummary = response.getKnowledgeBaseCollection().getItems();
                 return baseSummary.stream().map(p -> new KnowledgeBaseItem(OCID.of(p.getId(), "Oracle/KnowledgeBase"), 
-                        p.getDisplayName(), p.getTimeUpdated())).collect(Collectors.toList());
+                        p.getCompartmentId(), p.getDisplayName(), p.getTimeUpdated())).collect(Collectors.toList());
             }
         };
     }
