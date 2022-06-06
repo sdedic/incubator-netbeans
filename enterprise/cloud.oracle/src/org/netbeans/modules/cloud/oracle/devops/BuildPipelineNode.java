@@ -31,7 +31,7 @@ import org.netbeans.modules.cloud.oracle.items.OCID;
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import org.openide.util.NbBundle;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
+import org.netbeans.modules.cloud.oracle.OCINode;
 import org.openide.nodes.Children;
 
 /**
@@ -40,7 +40,7 @@ import org.openide.nodes.Children;
  */
 @NbBundle.Messages({
     "BuildPipelines=Build Pipelines",})
-public class BuildPipelineNode extends CloudNode {
+public class BuildPipelineNode extends OCINode {
 
     private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/build_pipeline.svg"; // NOI18N
 
@@ -72,13 +72,17 @@ public class BuildPipelineNode extends CloudNode {
         };
     }
 
-    public static class BuildPipelineFolderNode extends CloudNode {
+    public static class BuildPipelineFolderNode extends OCINode {
 
         private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/build_pipeline_folder.svg"; // NOI18N
 
         public BuildPipelineFolderNode(BuildPipelineItem.BuildPipelineFolder folder) {
             super(folder);
             setIconBaseWithExtension(ICON);
+        }
+        
+        public void refresh() {
+            ((OCINode) getParentNode()).refresh();
         }
     }
 
@@ -91,4 +95,6 @@ public class BuildPipelineNode extends CloudNode {
     public static ChildrenProvider<BuildPipelineItem.BuildPipelineFolder, BuildPipelineItem> expandRepositories() {
         return repositories -> repositories.getPipelines();
     }
+    
+    
 }

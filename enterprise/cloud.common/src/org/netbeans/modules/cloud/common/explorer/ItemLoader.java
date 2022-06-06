@@ -16,14 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.cloud.oracle.devops;
+package org.netbeans.modules.cloud.common.explorer;
 
-import org.netbeans.modules.cloud.oracle.items.OCIItem;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  *
  * @author Jan Horvath
  */
-public class DevopsProject extends OCIItem {
+public interface ItemLoader<T extends CloudItemKey> {
     
+    public T fromPersistentForm(String persistedKey);
+    
+    public CloudItem loadItem(T key); 
+    
+    @Retention(RetentionPolicy.SOURCE)
+    @Target({ElementType.TYPE, ElementType.METHOD})
+    public @interface Registration {
+        String[] path();
+        
+        int position() default Integer.MAX_VALUE;
+    }
 }

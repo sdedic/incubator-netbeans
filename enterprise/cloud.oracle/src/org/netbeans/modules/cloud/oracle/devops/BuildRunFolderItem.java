@@ -25,16 +25,10 @@ import org.netbeans.modules.cloud.oracle.items.OCIItem;
  *
  * @author Jan Horvath
  */
-public class DevopsProjectItem extends OCIItem {
-
-    public DevopsProjectItem(OCID id, String name) {
-        super(id, name);
+public class BuildRunFolderItem extends OCIItem {
+    
+    public BuildRunFolderItem(OCID project, String name) {
+        super(project, name);
     }
-
-    @Override
-    public int maxInProject() {
-        return 1;
-    }
-
     
 }

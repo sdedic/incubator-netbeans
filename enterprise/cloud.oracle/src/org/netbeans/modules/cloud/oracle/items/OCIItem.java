@@ -18,6 +18,7 @@
  */
 package org.netbeans.modules.cloud.oracle.items;
 
+import java.util.Objects;
 import javax.swing.event.ChangeListener;
 import org.netbeans.modules.cloud.common.explorer.CloudItem;
 import org.openide.util.ChangeSupport;
@@ -84,7 +85,7 @@ public abstract class OCIItem implements CloudItem {
     public void setDescription(String description) {
         this.description = description;
     }
-    
+
     /**
      * Triggers node refresh.
      */
@@ -109,4 +110,41 @@ public abstract class OCIItem implements CloudItem {
     public void removeChangeListener(ChangeListener listener) {
         changeSupport.removeChangeListener(listener);
     }
+
+    @Override
+    public int maxInProject() {
+        return 0;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 59 * hash + Objects.hashCode(this.id);
+        hash = 59 * hash + Objects.hashCode(this.name);
+        hash = 59 * hash + Objects.hashCode(this.description);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final OCIItem other = (OCIItem) obj;
+        if (!Objects.equals(this.name, other.name)) {
+            return false;
+        }
+        if (!Objects.equals(this.description, other.description)) {
+            return false;
+        }
+        return Objects.equals(this.id, other.id);
+    }
+    
+    
 }

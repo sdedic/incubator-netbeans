@@ -27,22 +27,17 @@ import org.netbeans.modules.cloud.oracle.items.OCIItem;
  * @author Jan Horvath
  */
 public class BuildRunItem extends OCIItem {
-
-    public BuildRunItem(OCID id, String name) {
-        super(id, name);
-    }
-
-    public static class BuildRunFolder extends OCIItem {
-
-        private final List<BuildRunItem> buildRuns;
-
-        public BuildRunFolder(OCID project, String name, List<BuildRunItem> buildRuns) {
-            super(project, name);
-            this.buildRuns = buildRuns;
-        }
     
-        public List<BuildRunItem> getBuildRuns() {
-            return buildRuns;
-        }
+    private final String lifecycleState;
+
+    public BuildRunItem(OCID id, String name, String lifecycleState) {
+        super(id, name);
+        
+        this.lifecycleState = lifecycleState;
     }
+
+    public String getLifecycleState() {
+        return lifecycleState;
+    }
+    
 }

@@ -48,9 +48,10 @@ public class DatabaseItem extends OCIItem {
     public String getConnectionName() {
         return connectionName;
     }
+
+    @Override
+    public int maxInProject() {
+        return Integer.MAX_VALUE;
+    }
     
-//    @Override
-//    public String path() {
-//        return "Databases";
-//    }
 }

@@ -18,22 +18,83 @@
  */
 package org.netbeans.modules.cloud.oracle;
 
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.Action;
-import org.netbeans.modules.cloud.common.explorer.CloudItem;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import org.netbeans.modules.cloud.common.explorer.CloudChildFactory;
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
+import org.openide.nodes.AbstractNode;
+import org.openide.nodes.Children;
+import org.openide.nodes.Node;
+import org.openide.util.Lookup;
 import org.openide.util.Utilities;
+import org.openide.util.lookup.Lookups;
 
 /**
  *
  * @author Jan Horvath
  */
-public class OCINode extends CloudNode {
+public class OCINode extends AbstractNode {
+    private RefreshListener refreshListener;
+
+    private final OCIItem item;
+    private final CloudChildFactory factory;
 
     public OCINode(OCIItem item) {
-        super(item);
-        setDisplayName(item.getName());
-        setShortDescription(item.getDescription());
+        this(new CloudChildFactory(item), item, Lookups.fixed(item));
+    }
+    
+    private OCINode(CloudChildFactory factory, OCIItem item, Lookup lookup) {
+        super(Children.create(factory, true), lookup);
+        setName(item.getName());
+        this.item = item;
+        this.factory = factory;
+        refreshListener = new RefreshListener();
+        item.addChangeListener(refreshListener);
+    }
+    
+    public OCINode(OCIItem item, Children children) {
+        super(children, Lookups.fixed(item));
+        setName(item.getName());
+        this.item = item;
+        this.factory = null;
+        refreshListener = new RefreshListener();
+        item.addChangeListener(refreshListener);
+    }
+
+    @Override
+    public Action[] getActions(boolean context) {
+        List<Action> result = new ArrayList<>();
+        
+        String path = item.getKey().getPath();
+        String provider = path.substring(0, path.indexOf("/"));
+        
+        result.addAll(Utilities.actionsForPath(
+                String.format("Cloud/%s/Common/Actions", provider)));
+        
+        result.addAll(Utilities.actionsForPath(
+                String.format("Cloud/%s/Actions",
+                        item.getKey().getPath())));
+
+        return result.toArray(new Action[0]); // NOI18N
+    }
+    
+    public void refresh() {
+        factory.refreshKeys();
+    }
+
+    @Override
+    public Node.Handle getHandle() {
+        return super.getHandle();
+    }
+
+    private final class RefreshListener implements ChangeListener {
+        @Override
+        public void stateChanged(ChangeEvent e) {
+            refresh();
+        }
     }
     
 }

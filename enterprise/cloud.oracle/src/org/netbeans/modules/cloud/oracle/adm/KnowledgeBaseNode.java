@@ -19,25 +19,32 @@
 package org.netbeans.modules.cloud.oracle.adm;
 
 import com.oracle.bmc.adm.ApplicationDependencyManagementClient;
+import com.oracle.bmc.adm.model.KnowledgeBase;
 import com.oracle.bmc.adm.model.KnowledgeBaseSummary;
+import com.oracle.bmc.adm.requests.GetKnowledgeBaseRequest;
 import com.oracle.bmc.adm.requests.ListKnowledgeBasesRequest;
+import com.oracle.bmc.adm.responses.GetKnowledgeBaseResponse;
 import com.oracle.bmc.adm.responses.ListKnowledgeBasesResponse;
+import com.oracle.bmc.model.BmcException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
+import org.netbeans.modules.cloud.common.explorer.CloudItem;
+import org.netbeans.modules.cloud.common.explorer.ItemLoader;
 import org.netbeans.modules.cloud.common.explorer.NodeProvider;
 import org.netbeans.modules.cloud.oracle.OCIManager;
+import org.netbeans.modules.cloud.oracle.OCINode;
 import org.netbeans.modules.cloud.oracle.compartment.CompartmentItem;
 import org.netbeans.modules.cloud.oracle.items.OCID;
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import org.openide.nodes.Children;
+import org.openide.util.Exceptions;
 
 /**
  *
  * @author Jan Horvath
  */
-public class KnowledgeBaseNode extends CloudNode {
+public class KnowledgeBaseNode extends OCINode {
 
     private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/knowledge_base.svg"; // NOI18N
 
@@ -46,11 +53,38 @@ public class KnowledgeBaseNode extends CloudNode {
         setIconBaseWithExtension(ICON);
     }
 
-     @NodeProvider.Registration(path = "Oracle/KnowledgeBase")
+    @NodeProvider.Registration(path = "Oracle/KnowledgeBase")
     public static NodeProvider<KnowledgeBaseItem> createNode() {
         return KnowledgeBaseNode::new;
     }
 
+    @ItemLoader.Registration(path = "Oracle/KnowledgeBase")
+    public static class KnowledgeBaseLoader implements ItemLoader<OCID> {
+
+        @Override
+        public CloudItem loadItem(OCID key) {
+            try ( ApplicationDependencyManagementClient client 
+                    = new ApplicationDependencyManagementClient(OCIManager.getDefault().getConfigProvider())) {
+                
+                GetKnowledgeBaseRequest request = GetKnowledgeBaseRequest.builder()
+                        .knowledgeBaseId(key.getValue())
+                        .build();
+                GetKnowledgeBaseResponse response = client.getKnowledgeBase(request);
+                KnowledgeBase knowledgeBase = response.getKnowledgeBase();
+                return new KnowledgeBaseItem(key, knowledgeBase.getDisplayName());
+            } catch(BmcException e) {
+                Exceptions.printStackTrace(e);
+            }
+            return null;
+        }
+
+        @Override
+        public OCID fromPersistentForm(String persistedKey) {
+            return OCID.of("Oracle/KnowledgeBase", persistedKey);
+        }
+        
+    }
+    
     @ChildrenProvider.Registration(parentPath = "Oracle/Compartment")
     public static ChildrenProvider<CompartmentItem, KnowledgeBaseItem> listKnowledgeBases() {
         return compartment -> {

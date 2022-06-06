@@ -26,9 +26,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
 import org.netbeans.modules.cloud.common.explorer.NodeProvider;
 import org.netbeans.modules.cloud.oracle.OCIManager;
+import org.netbeans.modules.cloud.oracle.OCINode;
 import org.netbeans.modules.cloud.oracle.items.OCID;
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import org.openide.nodes.Children;
@@ -40,7 +40,7 @@ import org.openide.util.NbBundle;
  */
 @NbBundle.Messages({
     "DeployArtifacts=Artifacts",})
-public class DeployArtifactNode extends CloudNode {
+public class DeployArtifactNode extends OCINode {
 
     private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/deploy_artifact.svg"; // NOI18N
 
@@ -73,7 +73,7 @@ public class DeployArtifactNode extends CloudNode {
         };
     }
 
-    public static class DeployArtifactFolderNode extends CloudNode {
+    public static class DeployArtifactFolderNode extends OCINode {
 
         private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/deploy_artifact_folder.svg"; // NOI18N
 

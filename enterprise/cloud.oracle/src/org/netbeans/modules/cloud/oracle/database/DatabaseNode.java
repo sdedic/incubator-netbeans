@@ -19,18 +19,25 @@
 package org.netbeans.modules.cloud.oracle.database;
 
 import com.oracle.bmc.database.DatabaseClient;
+import com.oracle.bmc.database.model.AutonomousDatabase;
 import com.oracle.bmc.database.model.AutonomousDatabaseSummary;
 import com.oracle.bmc.database.model.DatabaseConnectionStringProfile;
+import com.oracle.bmc.database.requests.GetAutonomousDatabaseRequest;
 import com.oracle.bmc.database.requests.ListAutonomousDatabasesRequest;
+import com.oracle.bmc.database.responses.GetAutonomousDatabaseResponse;
+import com.oracle.bmc.model.BmcException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
+import org.netbeans.modules.cloud.common.explorer.CloudItem;
+import org.netbeans.modules.cloud.common.explorer.ItemLoader;
 import org.netbeans.modules.cloud.common.explorer.NodeProvider;
 import static org.netbeans.modules.cloud.oracle.OCIManager.getDefault;
+import org.netbeans.modules.cloud.oracle.OCINode;
 import org.netbeans.modules.cloud.oracle.compartment.CompartmentItem;
 import org.netbeans.modules.cloud.oracle.items.OCID;
 import org.openide.nodes.Children;
+import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
 
 /**
@@ -42,23 +49,23 @@ import org.openide.util.NbBundle;
     "LBL_DatabaseVersion=Database version: {0}\n",
     "LBL_Storage=Storage: {0}TB"
 })
-public class DatabaseNode extends CloudNode {
-    
+public class DatabaseNode extends OCINode {
+
     private static final String DB_ICON = "org/netbeans/modules/cloud/oracle/resources/database.svg"; // NOI18N
-    
+
     public DatabaseNode(DatabaseItem dbSummary) {
         super(dbSummary, Children.LEAF);
-        setName(dbSummary.getName()); 
+        setName(dbSummary.getName());
         setDisplayName(dbSummary.getName());
         setIconBaseWithExtension(DB_ICON);
         setShortDescription(dbSummary.getDescription());
     }
-   
+
     @NodeProvider.Registration(path = "Oracle/Database")
     public static NodeProvider<DatabaseItem> createNode() {
         return DatabaseNode::new;
     }
-    
+
     /**
      * Retrieves list of Databases belonging to a given Compartment.
      *
@@ -74,16 +81,18 @@ public class DatabaseNode extends CloudNode {
                     .compartmentId(compartmentId.getKey().getValue())
                     .limit(88)
                     .build();
-
+            
+            
             return client.listAutonomousDatabases(listAutonomousDatabasesRequest)
                     .getItems()
                     .stream()
                     .map(d -> {
+                        List<DatabaseConnectionStringProfile> profiles = d.getConnectionStrings().getProfiles();
                         DatabaseItem item = new DatabaseItem(
                                 OCID.of(d.getId(), "Oracle/Database"), //NOI18N
-                                d.getDbName(), 
-                                d.getServiceConsoleUrl(), 
-                                getConnectionName(d));
+                                d.getDbName(),
+                                d.getServiceConsoleUrl(),
+                                getConnectionName(profiles));
                         StringBuilder sb = new StringBuilder();
                         sb.append(Bundle.LBL_WorkloadType(d.getDbWorkload().getValue()));
                         sb.append(Bundle.LBL_DatabaseVersion(d.getDbVersion()));
@@ -94,17 +103,44 @@ public class DatabaseNode extends CloudNode {
                     .collect(Collectors.toList());
         };
     }
-    
-    private static String getConnectionName(AutonomousDatabaseSummary summary) {
-        List<DatabaseConnectionStringProfile> profiles = summary.getConnectionStrings().getProfiles();
-        if (profiles != null) {
+
+    @ItemLoader.Registration(path = "Oracle/Database")
+    public static class DatabaseLoader implements ItemLoader<OCID> {
+
+        @Override
+        public CloudItem loadItem(OCID key) {
+            
+            try ( DatabaseClient client = new DatabaseClient(getDefault().getConfigProvider())) {
+                GetAutonomousDatabaseRequest request = GetAutonomousDatabaseRequest.builder()
+                        .autonomousDatabaseId(key.getValue()).build();
+                GetAutonomousDatabaseResponse response = client.getAutonomousDatabase(request);
+                AutonomousDatabase ad = response.getAutonomousDatabase();
+                List<DatabaseConnectionStringProfile> profiles = ad.getConnectionStrings().getProfiles();
+                return new DatabaseItem(key, ad.getDbName(), ad.getServiceConsoleUrl(), getConnectionName(profiles));
+            } catch (BmcException e) {
+                Exceptions.printStackTrace(e);
+            }
+            return null;
+        }
+
+        @Override
+        public OCID fromPersistentForm(String persistedKey) {
+            return OCID.of(persistedKey, "Oracle/Database");
+        }
+
+    }
+
+    private static String getConnectionName(List<DatabaseConnectionStringProfile> profiles) {
+        
+        if (profiles != null && !profiles.isEmpty()) {
             for (DatabaseConnectionStringProfile profile : profiles) {
                 if (profile.getDisplayName().contains("high")) { //NOI18N
                     return profile.getDisplayName();
                 }
             }
+            return profiles.get(0).getDisplayName();
         }
         return null;
     }
-    
+
 }

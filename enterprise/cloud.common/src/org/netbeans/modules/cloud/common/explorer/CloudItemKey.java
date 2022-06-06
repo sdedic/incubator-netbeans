@@ -26,4 +26,6 @@ public interface CloudItemKey {
     
     String getPath();
     
+    String toPersistentForm();
+    
 }

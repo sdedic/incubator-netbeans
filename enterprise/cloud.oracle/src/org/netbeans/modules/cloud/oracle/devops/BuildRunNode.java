@@ -19,18 +19,25 @@
 package org.netbeans.modules.cloud.oracle.devops;
 
 import com.oracle.bmc.devops.DevopsClient;
+import com.oracle.bmc.devops.model.BuildPipelineStageRunProgress;
+import com.oracle.bmc.devops.model.BuildRun;
 import com.oracle.bmc.devops.model.BuildRunSummary;
+import com.oracle.bmc.devops.requests.GetBuildRunRequest;
 import com.oracle.bmc.devops.requests.ListBuildRunsRequest;
+import com.oracle.bmc.devops.responses.GetBuildRunResponse;
 import com.oracle.bmc.devops.responses.ListBuildRunsResponse;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
+import org.netbeans.modules.cloud.common.explorer.CloudItem;
+import org.netbeans.modules.cloud.common.explorer.CloudItemKey;
+import org.netbeans.modules.cloud.common.explorer.ItemLoader;
 import org.netbeans.modules.cloud.common.explorer.NodeProvider;
 import org.netbeans.modules.cloud.oracle.OCIManager;
+import org.netbeans.modules.cloud.oracle.OCINode;
 import org.netbeans.modules.cloud.oracle.items.OCID;
-import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import org.openide.nodes.Children;
 import org.openide.util.NbBundle;
 
@@ -40,13 +47,24 @@ import org.openide.util.NbBundle;
  */
 @NbBundle.Messages({
     "BuildRuns=Builds",})
-public class BuildRunNode extends CloudNode {
+public class BuildRunNode extends OCINode {
 
-    private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/build_run.svg"; // NOI18N
+    private static final String GREEN = "org/netbeans/modules/cloud/oracle/resources/green_dot.svg"; // NOI18N
+    private static final String RED = "org/netbeans/modules/cloud/oracle/resources/red_dot.svg"; // NOI18N
+    private static final String YELLOW = "org/netbeans/modules/cloud/oracle/resources/yellow_dot.svg"; // NOI18N
 
-    public BuildRunNode(OCIItem item) {
+    public BuildRunNode(BuildRunItem item) {
         super(item, Children.LEAF);
-        setIconBaseWithExtension(ICON);
+        switch(item.getLifecycleState().toLowerCase()) {
+            case "succeeded": 
+                setIconBaseWithExtension(GREEN);
+                break;
+            case "failed": 
+                setIconBaseWithExtension(RED);
+                break;
+            default:
+                setIconBaseWithExtension(YELLOW);
+        }
     }
 
     @NodeProvider.Registration(path = "Oracle/BuildRun")
@@ -55,41 +73,82 @@ public class BuildRunNode extends CloudNode {
     }
 
     @ChildrenProvider.Registration(parentPath = "Oracle/DevopsProject")
-    public static ChildrenProvider<DevopsProjectItem, BuildRunItem.BuildRunFolder> listBuildRuns() {
+    public static ChildrenProvider<DevopsProjectItem, BuildRunFolderItem> listBuildRuns() {
+        return project -> Collections.singletonList(
+                new BuildRunFolderItem(OCID.of(project.getKey().getValue(), "Oracle/BuildRunFolder"), Bundle.BuildRuns())
+        );
+    }
+    
+    @ChildrenProvider.Registration(parentPath = "Oracle/BuildRunFolder")
+    public static ChildrenProvider<BuildRunFolderItem, BuildRunItem> expandBuildRuns() {
         return project -> {
             try ( DevopsClient client = new DevopsClient(OCIManager.getDefault().getConfigProvider())) {
                 ListBuildRunsRequest request = ListBuildRunsRequest.builder()
-                        .projectId(project.getKey().getValue()).build();
+                        .projectId(project.getKey().getValue())
+                        .sortBy(ListBuildRunsRequest.SortBy.TimeCreated)
+                        .limit(6)
+                        .build();
                 ListBuildRunsResponse response = client.listBuildRuns(request);
                 List<BuildRunSummary> projects = response.getBuildRunSummaryCollection().getItems();
-                return Collections.singletonList(
-                        new BuildRunItem.BuildRunFolder(OCID.of(project.getKey().getValue(), "Oracle/BuildRunFolder"),
-                                Bundle.BuildRuns(),
-                                projects.stream()
-                                        .map(p -> new BuildRunItem(OCID.of(p.getId(), "Oracle/BuildRun"), p.getDisplayName()))
-                                        .collect(Collectors.toList()))
+                return projects.stream()
+                                        .map(p -> new BuildRunItem(
+                                                OCID.of(p.getId(), "Oracle/BuildRun"), 
+                                                p.getDisplayName(),
+                                                p.getLifecycleState().getValue()
+                                        ))
+                                        .collect(Collectors.toList()
                 );
             }
         };
     }
 
-    public static class BuildRunFolderNode extends CloudNode {
+    @ItemLoader.Registration(path = "Oracle/BuildRunFolder")
+    public static class BuildRunLoader implements ItemLoader<OCID> {
+        
+        
+
+        @Override
+        public CloudItem loadItem(OCID key) {
+            try ( DevopsClient client = new DevopsClient(OCIManager.getDefault().getConfigProvider())) {
+                GetBuildRunRequest request = GetBuildRunRequest.builder()
+                        .buildRunId(key.getValue()).build();
+                GetBuildRunResponse response = client.getBuildRun(request);
+                BuildRun buildRun = response.getBuildRun();
+                Map<String, BuildPipelineStageRunProgress> stages = buildRun.getBuildRunProgress().getBuildPipelineStageRunProgress();
+                for (Map.Entry<String, BuildPipelineStageRunProgress> entry : stages.entrySet()) {
+                    entry.getKey();
+                    entry.getValue().getBuildPipelineStageId();
+                    entry.getValue().getTimeStarted();
+                    entry.getValue().getTimeFinished();
+                }
+                return new BuildRunItem(key, buildRun.getDisplayName(), buildRun.getLifecycleState().getValue());
+            }
+        }
+
+        @Override
+        public OCID fromPersistentForm(String persistedKey) {
+            return OCID.of("Oracle/BuildRun", persistedKey);
+        }
+
+    }
+    
+    public static class BuildRunFolderNode extends OCINode {
 
         private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/build_run_folder.svg"; // NOI18N
 
-        public BuildRunFolderNode(BuildRunItem.BuildRunFolder folder) {
+        public BuildRunFolderNode(BuildRunFolderItem folder) {
             super(folder);
             setIconBaseWithExtension(ICON);
+        }
+        
+        public void refresh() {
+            ((OCINode) getParentNode()).refresh();
         }
     }
 
     @NodeProvider.Registration(path = "Oracle/BuildRunFolder")
-    public static NodeProvider<BuildRunItem.BuildRunFolder> createFolderNode() {
+    public static NodeProvider<BuildRunFolderItem> createFolderNode() {
         return BuildRunFolderNode::new;
     }
 
-    @ChildrenProvider.Registration(parentPath = "Oracle/BuildRunFolder")
-    public static ChildrenProvider<BuildRunItem.BuildRunFolder, BuildRunItem> expandBuildRuns() {
-        return repositories -> repositories.getBuildRuns();
-    }
 }

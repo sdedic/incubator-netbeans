@@ -31,4 +31,9 @@ public class KnowledgeBaseItem extends OCIItem {
         super(id, name);
     }
 
+    @Override
+    public int maxInProject() {
+        return 1;
+    }
+
 }

@@ -22,6 +22,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.openide.nodes.Node;
 
 /**
  *
@@ -30,7 +31,7 @@ import java.lang.annotation.Target;
 @FunctionalInterface
 public interface NodeProvider<T extends CloudItem> {
     
-    public CloudNode apply(T t);
+    public Node apply(T t);
     
     @Retention(RetentionPolicy.SOURCE)
     @Target({ElementType.TYPE, ElementType.METHOD})

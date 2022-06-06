@@ -41,18 +41,22 @@ public class CloudChildFactory extends ChildFactory<CloudItem> {
         Lookup.Result<ChildrenProvider> lkpResult = Lookups.forPath(
                 String.format("Cloud/%s/Nodes", parent.getKey().getPath()))
                 .lookupResult(ChildrenProvider.class);
-        for (ChildrenProvider kp : lkpResult.allInstances()) {
-            toPopulate.addAll(kp.apply(parent));
-        }
+        lkpResult.allInstances()
+                .parallelStream()
+                .forEach(kp -> toPopulate.addAll(kp.apply(parent)));
         return true;
     }
-
+    
     @Override
     protected Node[] createNodesForKey(CloudItem key) {
         NodeProvider nodeProvider = Lookups.forPath(
                 String.format("Cloud/%s/Nodes", key.getKey().getPath()))
                 .lookup(NodeProvider.class);
         return new Node[]{nodeProvider.apply(key)};
+    }
+    
+    public void refreshKeys() {
+        refresh(false);
     }
 
 }

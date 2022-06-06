@@ -20,25 +20,32 @@ package org.netbeans.modules.cloud.oracle.devops;
 
 
 import com.oracle.bmc.devops.DevopsClient;
+import com.oracle.bmc.devops.model.Project;
 import com.oracle.bmc.devops.model.ProjectSummary;
+import com.oracle.bmc.devops.requests.GetProjectRequest;
 import com.oracle.bmc.devops.requests.ListProjectsRequest;
+import com.oracle.bmc.devops.responses.GetProjectResponse;
 import com.oracle.bmc.devops.responses.ListProjectsResponse;
+import com.oracle.bmc.model.BmcException;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
 import org.netbeans.modules.cloud.common.explorer.NodeProvider;
 import org.netbeans.modules.cloud.oracle.OCIManager;
 import org.netbeans.modules.cloud.oracle.items.OCID;
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
+import org.netbeans.modules.cloud.common.explorer.CloudItem;
+import org.netbeans.modules.cloud.common.explorer.ItemLoader;
+import org.netbeans.modules.cloud.oracle.OCINode;
 import org.netbeans.modules.cloud.oracle.compartment.CompartmentItem;
+import org.openide.util.Exceptions;
 
 /**
  *
  * @author Jan Horvath
  */
 
-public class DevopsProjectNode extends CloudNode {
+public class DevopsProjectNode extends OCINode {
     
     private static final String DB_ICON = "org/netbeans/modules/cloud/oracle/resources/devops_project.svg"; // NOI18N
     
@@ -65,9 +72,37 @@ public class DevopsProjectNode extends CloudNode {
                 ListProjectsResponse response = client.listProjects(request);
 
                 List<ProjectSummary> projects = response.getProjectCollection().getItems();
+                for (ProjectSummary project : projects) {
+                    project.getNotificationConfig().getTopicId();
+                    
+                }
                 return projects.stream().map(p -> new DevopsProjectItem(OCID.of(p.getId(), "Oracle/DevopsProject"), 
                         p.getName())).collect(Collectors.toList());
             }
         };
     }
+    
+    @ItemLoader.Registration(path = "Oracle/DevopsProject")
+    public static class DevopsLoader implements ItemLoader<OCID> {
+
+        @Override
+        public CloudItem loadItem(OCID key) {
+            try (DevopsClient client = new DevopsClient(OCIManager.getDefault().getConfigProvider())) {
+                GetProjectRequest request = GetProjectRequest.builder().projectId(key.getValue()).build();
+                GetProjectResponse response = client.getProject(request);
+                Project project = response.getProject();
+                return new DevopsProjectItem(key, project.getName());
+            } catch(BmcException e) {
+                Exceptions.printStackTrace(e);
+            }
+            return null;
+        }
+
+        @Override
+        public OCID fromPersistentForm(String persistedKey) {
+            return OCID.of(persistedKey, "Oracle/DevopsProject");
+        }
+
+    }
+    
 }

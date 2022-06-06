@@ -28,4 +28,5 @@ public interface CloudItem {
     
     CloudItemKey getKey();
     
+    int maxInProject();
 }

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!--
 
     Licensed to the Apache Software Foundation (ASF) under one
@@ -19,46 +19,10 @@
     under the License.
 
 -->
-
 <!-- Generator: Adobe Illustrator 23.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-
-<svg
-   version="1.1"
-   id="Vector_Icons"
-   x="0px"
-   y="0px"
-   width="16px"
-   height="16px"
-   viewBox="0 0 16 16"
-   style="enable-background:new 0 0 16 16;"
-   xml:space="preserve"
-   sodipodi:docname="devops_project.svg"
-   inkscape:version="1.1.2 (b8e25be8, 2022-02-05)"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg"><defs
-   id="defs17027" /><sodipodi:namedview
-   id="namedview17025"
-   pagecolor="#ffffff"
-   bordercolor="#666666"
-   borderopacity="1.0"
-   inkscape:pageshadow="2"
-   inkscape:pageopacity="0.0"
-   inkscape:pagecheckerboard="0"
-   showgrid="false"
-   inkscape:zoom="29.651788"
-   inkscape:cx="7.841011"
-   inkscape:cy="5.109304"
-   inkscape:window-width="1570"
-   inkscape:window-height="1049"
-   inkscape:window-x="412"
-   inkscape:window-y="105"
-   inkscape:window-maximized="0"
-   inkscape:current-layer="Vector_Icons" />
-<style
-   type="text/css"
-   id="style17020">
+<svg version="1.1" id="Vector_Icons" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px"
+	 y="0px" width="16px" height="16px" viewBox="0 0 16 16" style="enable-background:new 0 0 16 16;" xml:space="preserve">
+<style type="text/css">
 	.st0{fill:#FFFFFF;}
 	.st1{opacity:0.25;}
 	.st2{fill:#FAFAFA;}
@@ -122,27 +86,6 @@
 	.st60{fill:#3AEA00;}
 	.st61{fill:#303030;}
 </style>
-
-<path
-   style="color:#000000;-inkscape-font-specification:codicon;fill:#989b00;fill-opacity:0;stroke-width:0.51613;-inkscape-stroke:none"
-   d="M 0.23919814,15.723068 H 15.723068 V 0.23919814 H 0.23919814 Z M 1.4779077,1.5467341 h 2.615054 V 14.484372 h -2.615054 z m 7.7763451,0 H 6.6391986 v 7.7763361 h 2.6150542 z m 2.5462352,0 h 2.615055 V 11.869321 h -2.615055 z"
-   id="path18340"
-   sodipodi:nodetypes="cccccccccccccccccccc" /><rect
-   style="fill:none;fill-opacity:1;stroke:#9d9d9d;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:2.2;stroke-dasharray:none;paint-order:markers stroke fill"
-   id="rect19833"
-   width="3.1308594"
-   height="13.453126"
-   x="1.2207031"
-   y="1.2890625" /><rect
-   style="fill:none;fill-opacity:1;stroke:#9d9d9d;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:2.2;stroke-dasharray:none;paint-order:markers stroke fill"
-   id="rect19835"
-   width="3.1308594"
-   height="8.2929688"
-   x="6.3808594"
-   y="1.2890625" /><rect
-   style="fill:none;fill-opacity:1;stroke:#9d9d9d;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:2.2;stroke-dasharray:none;paint-order:markers stroke fill"
-   id="rect19837"
-   width="3.1308589"
-   height="10.837891"
-   x="11.542969"
-   y="1.2890625" /></svg>
+<polygon class="st14" points="15,14 0,14 0,2 6,2 7.5,4 15,4 "/>
+<path class="st3" d="M7.5,4L6,2H0v2.5V5v9h15V4H7.5z M1,3h4.5l1.125,1.5H1V3z M14,13H1V5h6h0.5H14V13z"/>
+</svg>

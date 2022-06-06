@@ -25,18 +25,18 @@ import com.oracle.bmc.identity.responses.ListCompartmentsResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
 import org.netbeans.modules.cloud.common.explorer.NodeProvider;
 import static org.netbeans.modules.cloud.oracle.OCIManager.getDefault;
 import org.netbeans.modules.cloud.oracle.items.OCID;
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
+import org.netbeans.modules.cloud.oracle.OCINode;
 
 /**
  *
  * @author Jan Horvath
  */
-public class CompartmentNode extends CloudNode {
+public class CompartmentNode extends OCINode {
 
     private static final String COMPARTMENT_ICON = "org/netbeans/modules/cloud/oracle/resources/compartment.svg"; // NOI18N
 

@@ -30,6 +30,7 @@ import org.openide.filesystems.annotations.LayerGeneratingProcessor;
 import org.openide.filesystems.annotations.LayerGenerationException;
 import org.openide.util.lookup.ServiceProvider;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
+import org.netbeans.modules.cloud.common.explorer.ItemLoader;
 
 /**
  *
@@ -41,6 +42,7 @@ public class CloudNodeFactoryAnnotationProcessor extends LayerGeneratingProcesso
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         return new HashSet(Arrays.asList(ChildrenProvider.Registration.class.getCanonicalName(),
+                ItemLoader.Registration.class.getCanonicalName(),
                 NodeProvider.Registration.class.getCanonicalName()));
     }
 
@@ -56,6 +58,16 @@ public class CloudNodeFactoryAnnotationProcessor extends LayerGeneratingProcesso
             }
             for (String type : r.parentPath()) {
                 layer(e).instanceFile(String.format("Cloud/%s/Nodes", type), null, ChildrenProvider.class, r, null). //NOI18N
+                        position(r.position()).write();
+            }
+        }
+        for (Element e : roundEnv.getElementsAnnotatedWith(ItemLoader.Registration.class)) {
+            ItemLoader.Registration r = e.getAnnotation(ItemLoader.Registration.class);
+            if (r == null) {
+                continue;
+            }
+            for (String type : r.path()) {
+                layer(e).instanceFile(String.format("Cloud/%s/Nodes", type), null, ItemLoader.class, r, null). //NOI18N
                         position(r.position()).write();
             }
         }

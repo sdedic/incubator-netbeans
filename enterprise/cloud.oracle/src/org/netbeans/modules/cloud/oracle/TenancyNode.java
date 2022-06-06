@@ -20,13 +20,12 @@ package org.netbeans.modules.cloud.oracle;
 
 import org.netbeans.modules.cloud.oracle.items.OCIItem;
 import java.awt.Image;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
 
 /**
  *
  * @author Jan Horvath
  */
-public class TenancyNode extends CloudNode {
+public class TenancyNode extends OCINode {
     
     private static final String ORCL_ICON = "org/netbeans/modules/cloud/oracle/resources/tenancy.svg"; // NOI18N
     

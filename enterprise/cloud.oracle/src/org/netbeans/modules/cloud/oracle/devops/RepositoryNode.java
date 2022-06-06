@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.netbeans.modules.cloud.common.explorer.ChildrenProvider;
-import org.netbeans.modules.cloud.common.explorer.CloudNode;
 import org.netbeans.modules.cloud.common.explorer.NodeProvider;
 import org.netbeans.modules.cloud.oracle.OCIManager;
 import org.netbeans.modules.cloud.oracle.OCINode;
@@ -42,7 +41,7 @@ import org.openide.util.NbBundle;
  */
 @NbBundle.Messages({
     "Repositories=Code Repositories"})
-public class RepositoryNode extends CloudNode {
+public class RepositoryNode extends OCINode {
 
     private static final String ICON = "org/netbeans/modules/cloud/oracle/resources/repository.svg"; // NOI18N
 
