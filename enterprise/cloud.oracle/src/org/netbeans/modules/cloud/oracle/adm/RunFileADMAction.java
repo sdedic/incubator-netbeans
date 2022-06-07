@@ -20,10 +20,15 @@ package org.netbeans.modules.cloud.oracle.adm;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Optional;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
+import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.modules.cloud.common.explorer.CloudItem;
 import org.netbeans.modules.cloud.common.project.CloudResourcesStorage;
+import org.netbeans.modules.cloud.oracle.OCIManager;
+import org.openide.DialogDisplayer;
+import org.openide.NotifyDescriptor;
 import org.openide.awt.ActionID;
 import org.openide.awt.ActionReference;
 import org.openide.awt.ActionReferences;
@@ -51,7 +56,7 @@ import org.openide.util.NbBundle;
 })
 
 @NbBundle.Messages({
-    "CTL_RunFileAudit=Run ADM",})
+    "CTL_RunFileAudit=Vulnerability Audit",})
 public class RunFileADMAction implements ActionListener{
 
     private final FileObject file;
@@ -70,10 +75,22 @@ public class RunFileADMAction implements ActionListener{
 //        CloudResourcesStorage storage = project.getLookup().lookup(CloudResourcesStorage.class);
         KnowledgeBaseItem kbItem = VulnerabilityWorker.getKnowledgeBaseForProject(project);
         if (kbItem != null) {
-            System.out.println("  Knowledge Base: " + kbItem.getKey().getValue());
             VulnerabilityWorker.getInstance().findVulnerability(project);
         } else {
-            System.out.println("  !!! There is not KnowledgeBase selected for the project.");
+            System.out.println("!!!!!! KnowledgeBase neni");
+            if (OCIManager.getDefault().getConfigProvider() == null
+                    || OCIManager.getDefault().getTenancy().equals(Optional.empty())) {
+                String message = "Project Audits in GraalVM Ext Pack performs check for "
+                        + "vulnerable dependencies using Vulnerabilities knowledgebase in Oracle OCI. "
+                        + "If you want to learn more and setup OCI account, go to https://www.oracle.com/cloud/free/ .";
+                DialogDisplayer.getDefault().notifyLater(new NotifyDescriptor.Message(message));
+            } else {
+                String message = "No Knowlege Base assigned for " + ProjectUtils.getInformation(project).getDisplayName() 
+                        + ".\n Select or create in Cloud Explorer a Knowledge Base, where to run Vulnerability Audit for this project.";
+                DialogDisplayer.getDefault().notifyLater(new NotifyDescriptor.Message(message));
+            }
+            System.out.println("Config provider: " + OCIManager.getDefault().getConfigProvider());
+            System.out.println("Tenancy: " + OCIManager.getDefault().getTenancy());
         }
     }
     

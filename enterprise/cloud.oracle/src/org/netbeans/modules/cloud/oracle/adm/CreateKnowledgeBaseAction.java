@@ -65,7 +65,8 @@ import org.openide.util.RequestProcessor;
 @NbBundle.Messages({
     "CTL_CreateKnowledgeBaseAction=Create Knowledge Base",
     "MSG_KBCreated=Knowledge Base {0} was created.",
-    "MSG_KBNotCreated=Knowledge Base {0} failed to create with code: {1}"
+    "MSG_KBNotCreated=Creating Knowledge Base {0} failed.",
+    "MSG_KBNameIsNotFilled=You must fill in the displayed name of the knowledge base."
 
 })
 public class CreateKnowledgeBaseAction implements ActionListener {
@@ -79,6 +80,9 @@ public class CreateKnowledgeBaseAction implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent event) {
         Optional<String> result = CreateKnowledgeBaseDialog.showDialog(context);
+        if (!result.isPresent()) {
+            DialogDisplayer.getDefault().notifyLater(new NotifyDescriptor.Message(Bundle.MSG_KBNameIsNotFilled()));
+        }
         result.ifPresent((p) -> {
             RequestProcessor.getDefault().execute(() -> {
                 ProgressHandle progressHandle = ProgressHandle.createHandle(String.format(Bundle.MSG_AuditIsRunning(), result.get()));
@@ -98,15 +102,13 @@ public class CreateKnowledgeBaseAction implements ActionListener {
                     if (resultCode == 202) {
                         context.refresh();
                         message = Bundle.MSG_KBCreated(result.get());
+                        DialogDisplayer.getDefault().notifyLater(new NotifyDescriptor.Message(message));
                     } else {
-                        message = Bundle.MSG_KBNotCreated(result.get(), resultCode);
+                        ErrorUtils.processError(response, Bundle.MSG_KBNotCreated(result.get()));
                     }
-                    
-                    
-                    DialogDisplayer.getDefault().notifyLater(new NotifyDescriptor.Message(message));
-                    
                 } catch (BmcException e) {
-                    Exceptions.printStackTrace(e);
+                    System.out.println("Proces exception");
+                    ErrorUtils.processError(e, Bundle.MSG_KBNotCreated(result.get()));
                 } finally {
                     progressHandle.finish();
                 }

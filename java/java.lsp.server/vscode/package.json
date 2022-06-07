@@ -451,7 +451,7 @@
 				"command": "db.add.connection",
 				"title": "Add Database Connection",
 				"category": "Database",
-                                "icon": "$(add)"
+				"icon": "$(add)"
 			},
 			{
 				"command": "nbls:Database:netbeans.db.explorer.action.Connect",
@@ -468,22 +468,22 @@
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.CreateBuildRun",
 				"title": "Run",
-                                "icon": "$(run)"
+				"icon": "$(run)"
 			},
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.AddRepository",
 				"title": "Add Repository",
-                                "icon": "$(github-alt)"
+				"icon": "$(github-alt)"
 			},
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.AddToProject",
 				"title": "Add To Project",
-                                "icon": "$(star-empty)"
+				"icon": "$(star-empty)"
 			},
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.CloudRefresh",
 				"title": "Refresh",
-                                "icon": "$(refresh)"
+				"icon": "$(refresh)"
 			},
 			{
 				"command": "nbls:Edit:org.openide.actions.DeleteAction",
@@ -575,7 +575,7 @@
 			},
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
-				"title": "Run ADM"
+				"title": "Vulnerability Audit"
 			}
 		],
 		"keybindings": [
@@ -807,22 +807,22 @@
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.AddRepository",
 					"when": "viewItem =~ /class:oracle.devops.DevopsProjectItem/",
-                                        "group": "inline@12"
+					"group": "inline@12"
 				},
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.CreateBuildRun",
 					"when": "viewItem =~ /class:oracle.devops.BuildPipelineItem/",
-                                        "group": "inline@12"
+					"group": "inline@12"
 				},
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.AddToProject",
 					"when": "viewItem =~ /class:oracle/",
-                                        "group": "inline@14"
+					"group": "inline@14"
 				},
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.CloudRefresh",
 					"when": "viewItem =~ /class:oracle/",
-                                        "group": "inline@13"
+					"group": "inline@13"
 				},
 				{
 					"command": "java.workspace.configureRunSettings",
@@ -976,7 +976,7 @@
 				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/knowledgeBase.png",
 				"codeicon": "book"
 			},
-                        {
+			{
 				"uriExpression": "nbres:/org/netbeans/modules/cloud/common/explorer/resources/defaultFolder.svg",
 				"codeicon": "file-submodule"
 			},
@@ -988,25 +988,25 @@
 				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/deploy_artifact.svg",
 				"codeicon": "file-binary"
 			},
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/green_dot.svg",
-                                "codeicon": "pass",
-                                "color": "charts.green"
-                        },
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/red_dot.svg",
-                                "codeicon": "error",
-                                "color": "charts.red"
-                        },
-                        {
-                            "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/deploy_artifact_folder.svg",
-                            "codeicon": "file-binary"
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/green_dot.svg",
+				"codeicon": "pass",
+				"color": "charts.green"
 			},
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/yellow_dot.svg",
-                                "codeicon": "circle-large-outline",
-                                "color": "charts.yellow"
-                        }
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/red_dot.svg",
+				"codeicon": "error",
+				"color": "charts.red"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/deploy_artifact_folder.svg",
+				"codeicon": "file-binary"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/yellow_dot.svg",
+				"codeicon": "circle-large-outline",
+				"color": "charts.yellow"
+			}
 		],
 		"jsonValidation": [
 			{
