@@ -300,6 +300,12 @@ public class MavenDependenciesImplementation implements ProjectDependenciesImple
             this.scopes = scopes;
             this.problems = problems;
         }
+
+        @Override
+        public SourceLocation getDeclarationRange(Dependency d, DependencySpecPart part) throws IOException {
+            return getDeclarationRange(d);
+        }
+        
         
         @Override
         public Project getProject() {

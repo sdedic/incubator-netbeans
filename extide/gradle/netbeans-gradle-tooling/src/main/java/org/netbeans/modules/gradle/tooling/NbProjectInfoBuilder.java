@@ -45,12 +45,15 @@ import org.gradle.api.artifacts.ResolveException;
 import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.ResolvedDependency;
 import org.gradle.api.artifacts.component.ComponentIdentifier;
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.component.ModuleComponentSelector;
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
 import org.gradle.api.artifacts.result.ArtifactResolutionResult;
 import org.gradle.api.artifacts.result.ArtifactResult;
 import org.gradle.api.artifacts.result.ComponentArtifactsResult;
+import org.gradle.api.artifacts.result.DependencyResult;
 import org.gradle.api.artifacts.result.ResolvedArtifactResult;
+import org.gradle.api.artifacts.result.ResolvedComponentResult;
 import org.gradle.api.artifacts.result.ResolvedDependencyResult;
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult;
 import org.gradle.api.distribution.DistributionContainer;
@@ -399,7 +402,152 @@ class NbProjectInfoBuilder {
             return true;
         }
     }
+    
+    private static String nonNullString(String s) {
+        return s == null ? "" : s;
+    }
+    
+    class DependencyWalker {
+        final Configuration configuration;
+        final boolean ignoreUnresolvable;
+        final Map<String, String> unresolvedProblems;
+        final Set<String> componentIds;
+        final String configName;
+        final Set<ComponentIdentifier> ids;
+        final Set<String> unresolvedIds;
+        final Map<String, Set<String>> directDependencies;
+        final Map<String, String> projectPaths;
+        final Map<String, String> projectIds;
+        
+        int depth;
 
+        public DependencyWalker(Configuration configuration, 
+                boolean ignoreUnresolvable, 
+                Map<String, String> unresolvedProblems, 
+                Set<String> componentIds, 
+                Set<ComponentIdentifier> ids, 
+                Set<String> unresolvedIds, 
+                Map<String, Set<String>> directDependencies,
+                Map<String, String> projectPaths,
+                Map<String, String> projectIds) {
+            this.configuration = configuration;
+            this.ignoreUnresolvable = ignoreUnresolvable;
+            this.unresolvedProblems = unresolvedProblems;
+            this.componentIds = componentIds;
+            this.ids = ids;
+            this.unresolvedIds = unresolvedIds;
+            this.directDependencies = directDependencies;
+            this.projectPaths = projectPaths;
+            this.projectIds = projectIds;
+            
+            this.configName = configuration.getName();
+        }
+        
+        public void walkResolutionResult(ResolvedComponentResult node) {
+            String nodeIdString = findNodeIdentifier(node.getId());
+            if (nodeIdString == null) {
+                return;
+            }
+            walkChildren(nodeIdString, node.getDependencies(), new HashSet<>());
+        }
+        
+        String findNodeIdentifier(ComponentIdentifier cid) {
+            String nodeIdString;
+            if (cid instanceof ModuleComponentIdentifier) {
+                ModuleComponentIdentifier mid = (ModuleComponentIdentifier)cid;
+
+                nodeIdString = String.format("%s:%s:%s", nonNullString(mid.getGroup()), mid.getModule(), nonNullString(mid.getVersion()));
+
+            } else if (cid instanceof ProjectComponentIdentifier) {
+                ProjectComponentIdentifier pid = (ProjectComponentIdentifier)cid;
+                String absPath = project.getRootProject().absoluteProjectPath(pid.getProjectPath());
+                String rootName = project.getRootProject().getName();
+                
+                String aid;
+                Object g = project.getGroup();
+                Object v = project.getVersion();
+                String gid = g == null ? "" : g.toString();
+                if (project != project.getRootProject()) {
+                    aid = rootName + "-" + project.getName();
+                } else {
+                    aid = project.getName();
+                }
+                String ver = v == null ? "" : v.toString();
+                projectIds.put(absPath, String.format("%s:%s:%s", gid, nonNullString(aid), ver));
+                return "*project:" + absPath;
+            } else {
+                return null;
+            }
+            
+            return nodeIdString;
+        }
+        
+        public void walkResolutionResult(ResolvedDependencyResult node, Set<String> stack) {
+            depth++;
+            if (depth > 15) {
+                System.err.println("V");
+            }
+            ResolvedComponentResult rcr = node.getSelected();
+            String id = findNodeIdentifier(rcr.getId());
+            if (!stack.add(id)) {
+                return;
+            }
+            walkChildren(id, rcr.getDependencies(), stack);
+            stack.remove(id);
+            depth--;
+        }
+        
+        public void walkChildren(String parentId, Collection<? extends DependencyResult> deps, Set<String> stack) {
+            for (DependencyResult it2 : deps) {
+
+                if (it2 instanceof ResolvedDependencyResult) {
+                    ResolvedDependencyResult rdr = (ResolvedDependencyResult) it2;
+                    if (rdr.getRequested() instanceof ModuleComponentSelector) {
+                        ids.add(rdr.getSelected().getId());
+                        // do not bother with components that only select a variant, which is itself a component
+                        // TODO: represent as a special component type so the IDE shows it, but the IDE knows it is an abstract
+                        // intermediate with no artifact(s).
+                        if (rdr.getResolvedVariant() == null) {
+                            componentIds.add(rdr.getSelected().getId().toString());
+                        } else {
+                            sinceGradle("6.8", () -> {
+                                if (!rdr.getResolvedVariant().getExternalVariant().isPresent()) {
+                                    componentIds.add(rdr.getSelected().getId().toString());
+                                }
+                            });
+                        }
+                    }
+                    if (directDependencies.computeIfAbsent(parentId, f -> new HashSet<>()).
+                        add(findNodeIdentifier(rdr.getSelected().getId()))) {
+                        walkResolutionResult(rdr, stack);
+                    }
+                }
+                if (it2 instanceof UnresolvedDependencyResult) {
+                    UnresolvedDependencyResult udr = (UnresolvedDependencyResult) it2;
+                    String id = udr.getRequested().getDisplayName();
+                    if(componentIds.contains(id)) {
+                        unresolvedIds.add(id);
+                    }
+                    if(!ignoreUnresolvable && (configuration.isVisible() || configuration.isCanBeConsumed())) {
+                        // hidden configurations like 'testCodeCoverageReportExecutionData' might contain unresolvable artifacts.
+                        // do not report problems here
+                        Throwable failure = ((UnresolvedDependencyResult) it2).getFailure();
+                        if (project.getGradle().getStartParameter().isOffline()) {
+                            // if the unresolvable is bcs. offline mode, throw an exception to get retry in online mode.
+                            Throwable prev = null;
+                            for (Throwable t = failure; t != prev && t != null; prev = t, t = t.getCause()) {
+                                if (t.getMessage().contains("available for offline")) {
+                                    throw new NeedOnlineModeException("Need online mode", failure);
+                                }
+                            }
+                        }
+                        unresolvedProblems.put(id, ((UnresolvedDependencyResult) it2).getFailure().getMessage());
+                    }
+                }
+            }
+        }
+    }
+    
     private void detectDependencies(NbProjectInfoModel model) {
         long time = System.currentTimeMillis();
         Set<ComponentIdentifier> ids = new HashSet();
@@ -407,6 +555,9 @@ class NbProjectInfoBuilder {
         Map<String, String> unresolvedProblems = new HashMap();
         Map<String, Set<File>> resolvedJvmArtifacts = new HashMap();
         Set<Configuration> visibleConfigurations = configurationsToSave();
+        Map<String, String> projectIds = new HashMap<>();
+        Map<String, String> projectPaths = new HashMap<>();
+        Map<String, Set<String>> directDependencies = new HashMap<>();
 
         // NETBEANS-5846: if this project uses javaPlatform plugin with dependencies enabled, 
         // do not report unresolved problems
@@ -422,6 +573,7 @@ class NbProjectInfoBuilder {
         });
         //visibleConfigurations = visibleConfigurations.findAll() { resolvable(it) }
         visibleConfigurations.forEach(it -> {
+            
             Set<String> componentIds = new HashSet<>();
             Set<String> unresolvedIds = new HashSet<>();
             Set<String> projectNames = new HashSet<>();
@@ -437,6 +589,11 @@ class NbProjectInfoBuilder {
 
             if (resolvable(it)) {
                 try {
+                    DependencyWalker walker = new DependencyWalker(
+                            it, ignoreUnresolvable, unresolvedProblems, componentIds, ids, unresolvedIds, directDependencies, projectPaths, projectIds);
+                    
+                    walker.walkResolutionResult(it.getIncoming().getResolutionResult().getRoot());
+                    
                     it.getIncoming().getResolutionResult().getAllDependencies().forEach( it2 -> {
                         if (it2 instanceof ResolvedDependencyResult) {
                             ResolvedDependencyResult rdr = (ResolvedDependencyResult) it2;
@@ -531,6 +688,7 @@ class NbProjectInfoBuilder {
             model.getInfo().put(configPrefix + "projects", projectNames);
             model.getInfo().put(configPrefix + "files", fileDeps);
             model.getInfo().put(configPrefix + "unresolved", unresolvedIds);
+            model.getInfo().put(configPrefix + "dependencies", directDependencies);
             model.registerPerf(depPrefix + "file", System.currentTimeMillis() - time_report);
             model.registerPerf(depBase, System.currentTimeMillis() - time_inspect_conf);
         });
@@ -596,6 +754,12 @@ class NbProjectInfoBuilder {
 
             model.registerPerf("dependencies_collect", System.currentTimeMillis() - collect_time);
         }
+        
+        // project abs path -> file path, possibly reduntant
+        model.getInfo().put("project_paths", projectPaths);
+        
+        // project abs path -> project's GAV
+        model.getInfo().put("project_ids", projectIds);
 
         model.getExt().put("resolved_jvm_artifacts", resolvedJvmArtifacts);
         model.getExt().put("resolved_sources_artifacts", resolvedSourcesArtifacts);

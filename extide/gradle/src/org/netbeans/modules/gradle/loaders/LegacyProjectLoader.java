@@ -391,7 +391,7 @@ public class LegacyProjectLoader extends AbstractProjectLoader {
     private static BuildActionExecuter<NbProjectInfo> createInfoAction(ProjectConnection pconn, GradleCommandLine cmd, CancellationToken token, ProgressListener pl) {
         BuildActionExecuter<NbProjectInfo> ret = pconn.action(new NbProjectInfoAction());
         cmd.configure(ret);
-        if (DEBUG_GRADLE_INFO_ACTION) {
+        if (true || DEBUG_GRADLE_INFO_ACTION) {
             // This would start the Gradle Daemon in Debug Mode, so the Tooling API can be debugged as well
             ret.addJvmArguments("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5006");
         }

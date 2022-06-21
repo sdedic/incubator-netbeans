@@ -1,0 +1,41 @@
+diff --git a/java/maven.graph/nbproject/project.xml b/java/maven.graph/nbproject/project.xml
+index 5a1524c48f0c..010dacdbcf32 100644
+--- a/java/maven.graph/nbproject/project.xml
++++ b/java/maven.graph/nbproject/project.xml
+@@ -51,24 +51,6 @@
+                         <specification-version>1.13</specification-version>
+                     </run-dependency>
+                 </dependency>
+-                <dependency>
+-                    <code-name-base>org.netbeans.libs.jackson</code-name-base>
+-                    <build-prerequisite/>
+-                    <compile-dependency/>
+-                    <run-dependency>
+-                        <release-version>2</release-version>
+-                        <specification-version>2.13</specification-version>
+-                    </run-dependency>
+-                </dependency>
+-                <dependency>
+-                    <code-name-base>org.netbeans.libs.json_simple</code-name-base>
+-                    <build-prerequisite/>
+-                    <compile-dependency/>
+-                    <run-dependency>
+-                        <release-version>1</release-version>
+-                        <specification-version>0.28</specification-version>
+-                    </run-dependency>
+-                </dependency>
+                 <dependency>
+                     <code-name-base>org.netbeans.modules.java.graph</code-name-base>
+                     <build-prerequisite/>
+@@ -83,11 +65,8 @@
+                     <build-prerequisite/>
+                     <compile-dependency/>
+                     <run-dependency>
+-                        <implementation-version/>
+-                        <!--
+                         <release-version>2</release-version>
+                         <specification-version>2.37</specification-version>
+-                        -->
+                     </run-dependency>
+                 </dependency>
+                 <dependency>
