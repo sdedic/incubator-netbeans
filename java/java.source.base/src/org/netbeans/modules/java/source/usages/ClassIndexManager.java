@@ -59,7 +59,7 @@ public final class ClassIndexManager {
 
 
     private ClassIndexManager() {
-    }
+    } 
 
     public void addClassIndexManagerListener (final ClassIndexManagerListener listener) {
         assert listener != null;

@@ -24,9 +24,12 @@ import org.netbeans.modules.gradle.loaders.GradleArtifactStore;
 import static org.netbeans.modules.gradle.api.GradleDependency.*;
 import org.netbeans.modules.gradle.spi.ProjectInfoExtractor;
 import java.io.File;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -39,7 +42,12 @@ import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.netbeans.modules.gradle.GradleModuleFileCache21;
+import org.netbeans.modules.gradle.queries.GradleDependencyHolder;
 import org.netbeans.modules.gradle.spi.GradleSettings;
+import org.netbeans.modules.project.dependency.ArtifactSpec;
+import org.netbeans.modules.project.dependency.Dependency;
+import org.netbeans.modules.project.dependency.Scopes;
+import org.openide.filesystems.FileUtil;
 import org.openide.util.lookup.ServiceProvider;
 
 /**
@@ -231,6 +239,10 @@ class GradleBaseProjectBuilder implements ProjectInfoExtractor.Result {
                 LOG.log(Level.FINER, "Adding UNRESOLVED dependency: {0} -> {1}", new Object[] { entry.getKey(), dep });
             }
         }
+        
+        GradleDependency.ProjectDependency rootDep = new GradleDependency.ProjectDependency(prj.getPath(), prj.getProjectDir());
+        prj.projectDependencyNode = rootDep;
+        
         if (configurationNames != null) {
             for (String name : configurationNames) {
                 GradleConfiguration conf = prj.createConfiguration(name);
@@ -290,6 +302,44 @@ class GradleBaseProjectBuilder implements ProjectInfoExtractor.Result {
                 conf.attributes = (Map<String, String>) info.get("configuration_" + name + "_attributes");
 
                 conf.description = (String) info.get("configuration_" + name + "_description");
+                
+                Map<String, Collection<String>> directDependencies = (Map<String, Collection<String>>)info.get("configuration_" + name + "_dependencies");
+                Map<GradleDependency, Collection<GradleDependency>> deps = new HashMap<>();
+                for (String parentId : directDependencies.keySet()) {
+                    GradleDependency parentD;
+                    if (parentId.startsWith(DEPENDENCY_PROJECT_PREFIX)) {
+                        int sep1 = parentId.indexOf(':', DEPENDENCY_PROJECT_PREFIX.length());
+                        parentD = projects.get(parentId.substring(DEPENDENCY_PROJECT_PREFIX.length(), sep1));
+                    } else {
+                        parentD = components.get(parentId);
+                        if (parentD == null) {
+                            parentD = unresolved.get(parentId);
+                        }
+                    }
+                    if (parentD == null) {
+                        continue;
+                    }
+                    
+                    for (String cid : directDependencies.get(parentId)) {
+                        GradleDependency childD;
+                        if (cid.startsWith(DEPENDENCY_PROJECT_PREFIX)) {
+                            int sep1 = cid.indexOf(':', DEPENDENCY_PROJECT_PREFIX.length());
+                            childD = projects.get(cid.substring(DEPENDENCY_PROJECT_PREFIX.length(), sep1));
+                        } else {
+                            childD = components.get(cid);
+                            if (childD == null) {
+                                childD = unresolved.get(cid);
+                            }
+                        }
+                        if (childD == null) {
+                            continue;
+                        }
+                        deps.computeIfAbsent(parentD, x -> new ArrayList<>()).
+                            add(childD);
+                    }
+                }
+                
+                conf.dependencyMap = deps;
             }
             for (String name : configurationNames) {
                 GradleConfiguration conf = prj.configurations.get(name);
@@ -304,7 +354,9 @@ class GradleBaseProjectBuilder implements ProjectInfoExtractor.Result {
             }
 
         }
-
+        
+        prj.projectIds = (Map<String, String>)info.getOrDefault("project_ids", Collections.emptyMap());
+        
         // Create file -> component map
         for (ModuleDependency dep : components.values()) {
             for (File f : dep.getArtifacts()) {
@@ -321,6 +373,8 @@ class GradleBaseProjectBuilder implements ProjectInfoExtractor.Result {
         // Add detailed problems on unresolved dependencies
         problems.addAll(unresolvedProblems.values());
     }
+    
+    private static final String DEPENDENCY_PROJECT_PREFIX = "*project;";
 
     private ModuleDependency resolveModuleDependency(File gradleUserHome, String c) {
         GradleModuleFileCache21 moduleCache = GradleModuleFileCache21.getGradleFileCache(gradleUserHome.toPath());

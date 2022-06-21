@@ -23,21 +23,26 @@ import java.util.List;
 /**
  * Represents a dependency of an artifact. The {@link #getChildren()} artifacts are
  * needed in a certain {@link #getScope()}; should be ignored in unrelated scopes.
- * The artifact that is subject of this dependency is the {@link #getArtifact()}.
+ * The artifact that is subject of this dependency is the {@link #getArtifact()} or {@link #getProject()}.
  * Children are expressed using other {@link Dependency} instances.
  * <p>
+ * A project does not need to produce a publishable (identifiable) artifact; in such cases, the
+ * {@link #getArtifact} may return {@code null}.
+ * <p>
  * Dependency does not have well-defined {@link #equals} and {@link #hashCode}, use
- * {@link #getArtifact()} as key in Maps.
+ * {@link #getArtifact()} or {@link #getProject()} as key in Maps.
  * 
  * @author sdedic
  */
 public final class Dependency {
     private final ArtifactSpec  artifact;
+    private final ProjectSpec   project;
     private final List<Dependency> children;
     private final Scope scope;
     final Object data;
 
-    Dependency(ArtifactSpec artifact, List<Dependency> children, Scope scope, Object data) {
+    Dependency(ProjectSpec project, ArtifactSpec artifact, List<Dependency> children, Scope scope, Object data) {
+        this.project = project;
         this.artifact = artifact;
         this.children = children;
         this.scope = scope;
@@ -65,7 +70,11 @@ public final class Dependency {
     }
     
     public static Dependency create(ArtifactSpec artifact, Scope scope, List<Dependency> children, Object data) {
-        return new Dependency(artifact, children, scope, data);
+        return new Dependency(null, artifact, children, scope, data);
+    }
+    
+    public static Dependency create(ProjectSpec project, ArtifactSpec artifact, Scope scope, List<Dependency> children, Object data) {
+        return new Dependency(project, artifact, children, scope, data);
     }
     
     /**

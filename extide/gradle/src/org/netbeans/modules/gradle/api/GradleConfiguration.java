@@ -20,6 +20,7 @@
 package org.netbeans.modules.gradle.api;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -40,6 +41,8 @@ public final class GradleConfiguration implements Serializable, ModuleSearchSupp
     Set<GradleDependency.UnresolvedDependency> unresolved = Collections.emptySet();
     Set<GradleConfiguration> extendsFrom = Collections.emptySet();
     GradleDependency.FileCollectionDependency files;
+    Map<GradleDependency, Collection<GradleDependency>> dependencyMap = Collections.emptyMap();
+    
     boolean transitive;
     boolean canBeResolved = true;
     boolean canBeConsumed;
