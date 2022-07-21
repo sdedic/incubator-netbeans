@@ -23,7 +23,6 @@ import java.util.Collection;
 import javax.swing.event.ChangeListener;
 import org.netbeans.api.annotations.common.CheckForNull;
 import org.netbeans.api.annotations.common.NonNull;
-import org.netbeans.api.annotations.common.NullAllowed;
 import org.netbeans.api.project.Project;
 import org.openide.util.Lookup;
 
@@ -72,70 +71,37 @@ public interface DependencyResult extends Lookup.Provider {
      * @param l listener
      */
     public void removeChangeListener(ChangeListener l);
+    
+    /**
+     * Registers a listener that gets notified if the source locations change.
+     * @param l listener
+     */
+    public void addSourceChangeListener(ChangeListener l);
+    
+    /**
+     * 
+     * @param l 
+     */
+    public void removeSourceChangeListener(ChangeListener l);
+    
+    public static final String PART_NAME = "name"; // NOI18N
+    public static final String PART_GROUP = "group"; // NOI18N
+    public static final String PART_VERSON = "version"; // NOI18N
+    public static final String PART_SCOPE = "scope"; // NOI18N
+    
+    /**
+     * A special part that locates a location appropriate for the surrounding
+     * container. For example {@code dependencies} element in Maven or {@code dependencies}
+     * block in a gradle script.
+     */
+    public static final String PART_CONTAINER = "container"; // NOI18N
 
     /**
      * Attempts to find location where this dependency is declared.
      * @param d
-     * @return 
+     * @param part a specific part that should be located in the text. 
+     * @return the location for the dependency or its part; {@code null} if the
+     * source location can not be determined.
      */
-    public @CheckForNull SourceLocation getDeclarationRange(@NonNull Dependency d) throws IOException;
-    
-    /**
-     * Returns a location for the specific declaration part. Not all parts are converted by the API, but the most
-     * important ones are. To locate the dependency source, the {@link DependencySpecPart#FULL}, {@link DependencySpecPart#ARTIFACT} should
-     * be used, depending on workflow. If the version is an issue (i.e. old version), the {@Link DependencySpecPart#VERSION} can be used.
-     * <p/>
-     * The {@link DependencySpecPart#VARIANT} covers auxiliary artifact identification, whatever it is. If the dependency is declared with
-     * some scope
-     * <p/>
-     * The method returns {@code null] if th<e specified part is not present in the source; for example version can be specified in a parent 
-     * POM
-     * 
-     * @param d the dependency to query
-     * @param part the part 
-     * @return
-     * @throws IOException 
-     */
-    public @CheckForNull SourceLocation getDeclarationRange(@NonNull Dependency d, @NullAllowed DependencySpecPart part) throws IOException;
-    
-    /**
-     * Specifies a part of the dependency specification in the source.
-     */
-    public enum DependencySpecPart {
-        /**
-         * Full dependency specification.
-         */
-        FULL, 
-        
-        /**
-         * Represents location of group specification.
-         */
-        GROUP, 
-
-        /**
-         * Represents location of artifact id specification.
-         */
-        ARTIFACT, 
-
-        /**
-         * Represents the complete group-artifact spec, usually an union of
-         * {@link #GROUP} and {@link #ARTIFACT}
-         */
-        GROUP_AND_ARTIFACT,
-
-        /**
-         * Represents the variant specification like type or classifier.
-         */
-        VARIANT,
-        
-        /**
-         * Represents the scope specification.
-         */
-        SCOPE,
-        
-        /**
-         * The artifact version specification.
-         */
-        VERSION
-    }
+    public @CheckForNull SourceLocation getDeclarationRange(@NonNull Dependency d, String part) throws IOException;
 }

@@ -31,30 +31,14 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Supplier;
-import org.apache.maven.DefaultMaven;
-import org.apache.maven.Maven;
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.resolver.filter.ScopeArtifactFilter;
-import org.apache.maven.execution.MavenExecutionRequest;
-import org.apache.maven.model.building.ModelBuildingRequest;
-import org.apache.maven.project.MavenProject;
-import org.apache.maven.project.ProjectBuildingRequest;
-import org.apache.maven.shared.dependency.graph.DependencyGraphBuilder;
-import org.apache.maven.shared.dependency.graph.DependencyGraphBuilderException;
-import org.apache.maven.shared.dependency.graph.DependencyNode;
-import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.netbeans.api.project.Project;
-import org.netbeans.modules.maven.api.NbMavenProject;
-import org.netbeans.modules.maven.embedder.EmbedderFactory;
-import org.netbeans.modules.maven.embedder.MavenEmbedder;
 import org.netbeans.modules.project.dependency.ArtifactSpec;
 import org.netbeans.modules.project.dependency.Dependency;
 import org.netbeans.modules.project.dependency.DependencyResult;
 import org.netbeans.modules.project.dependency.ProjectDependencies;
-import org.netbeans.modules.project.dependency.Scope;
+import org.netbeans.modules.project.dependency.ProjectSpec;
 import org.netbeans.modules.project.dependency.Scopes;
 import org.netbeans.modules.project.dependency.SourceLocation;
 import org.openide.awt.ActionID;
@@ -71,7 +55,8 @@ import org.openide.util.Exceptions;
 @ActionID(category = "Maven", id = DumpJsonAction.ID)
 @ActionReferences({
     @ActionReference(path = "Loaders/text/x-maven-pom+xml/Actions"),
-    @ActionReference(path = "Projects/org-netbeans-modules-maven/Actions")
+    @ActionReference(path = "Projects/org-netbeans-modules-maven/Actions"),
+    @ActionReference(path = "Projects/org-netbeans-modules-gradle/Actions"),
 })
 public class DumpJsonAction implements ActionListener {
     public static final String ID = "org.netbeans.modules.maven.graph.DumpJsonAction";
@@ -85,27 +70,30 @@ public class DumpJsonAction implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
         RuntimeException ex = new IllegalStateException();
-        if (true) {
+        if (false) {
             Exceptions.printStackTrace(ex);
             return;
         }
-        NbMavenProject p = ideProject.getLookup().lookup(NbMavenProject.class);
-        if (p == null) {
-            return;
-        }
-        MavenProject mp = p.getMavenProject();
         //DependencyNode n = DependencyTreeFactory.createDependencyTree(mp, EmbedderFactory.getProjectEmbedder(), "runtime");
         dumpAnyProject(ideProject);
     }
     
     private void dumpAnyProject(Project p) {
         DependencyResult res = ProjectDependencies.findDependencies(p, ProjectDependencies.newQuery(Scopes.RUNTIME));
+        
+        res.addSourceChangeListener(e -> {});
 
         ObjectMapper mapper = new ObjectMapper();
-        Map<Dependency, Integer> numbers = new HashMap<>();
+        Map<Object, Integer> numbers = new HashMap<>();
         
         int[] counter = { 1 };
-        final Function<Dependency, Integer> idProvider = (dn) -> numbers.computeIfAbsent(dn, (x) -> counter[0]++);
+        final Function<Dependency, Integer> idProvider = (dn) -> {
+            ProjectSpec pspec = dn.getProject();
+            ArtifactSpec art = dn.getArtifact();
+            
+            return numbers.computeIfAbsent(art == null ? pspec : art, (x) -> counter[0]++);
+        };
+        
         JSONArray arr = new JSONArray();
         Queue<Dependency> toProcess = new ArrayDeque<>();
         
@@ -115,13 +103,6 @@ public class DumpJsonAction implements ActionListener {
         Set<ArtifactSpec> processed = new HashSet<>();
         while ((d = toProcess.poll()) != null) {
             JSONObject dep = new JSONObject();
-            try {
-
-                SourceLocation sl = res.getDeclarationRange(d);
-                System.err.println(sl);
-            } catch (IOException ex) {
-                Exceptions.printStackTrace(ex);
-            }
             ArtifactSpec art = d.getArtifact();
             if (!processed.add(art)) {
                 continue;
@@ -139,68 +120,14 @@ public class DumpJsonAction implements ActionListener {
                 }
                 toProcess.addAll(d.getChildren());
             }
-            arr.add(dep);
-        }
-        try {
-            System.err.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(arr));
-            /*
-            System.err.println(arr.toJSONString().replace("[{", "[\n\t{").replace("},{", "},\n\t{").replace("}]", "}\n]"));
-            */
-        } catch (JsonProcessingException ex) {
-            Exceptions.printStackTrace(ex);
-        }
-    }
-    
-    private void directMavenDump(MavenProject mp) {
-        ObjectMapper mapper = new ObjectMapper();
-        Map<DependencyNode, Integer> numbers = new HashMap<>();
-        
-        int[] counter = { 1 };
-        final Function<DependencyNode, Integer> idProvider = (dn) -> numbers.computeIfAbsent(dn, (x) -> counter[0]++);
-        JSONArray arr = new JSONArray();
-        Queue<DependencyNode> toProcess = new ArrayDeque<>();
-        
-        MavenEmbedder embedder = EmbedderFactory.getProjectEmbedder();
-        MavenExecutionRequest req = embedder.createMavenExecutionRequest();
-        req.setPom(mp.getFile());
-        req.setOffline(true);
-        
-        ProjectBuildingRequest configuration = req.getProjectBuildingRequest();
-        configuration.setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
-        configuration.setResolveDependencies(true);
-        
-        DependencyGraphBuilder depBuilder = embedder.lookupComponent(DependencyGraphBuilder.class);
-        DependencyNode n;
-        try {
-            DefaultMaven maven = (DefaultMaven)embedder.getPlexus().lookup(Maven.class);
-            configuration.setRepositorySession(maven.newRepositorySession(req));
-            MavenProject copy = mp.clone();
-            copy.setProjectBuildingRequest(configuration);
-            n = depBuilder.buildDependencyGraph(copy, new ScopeArtifactFilter("runtime"));
-            toProcess.add(n);
-        } catch (ComponentLookupException | DependencyGraphBuilderException ex) {
-            Exceptions.printStackTrace(ex);
-        }
-        
-        DependencyNode d;
-        Set<Artifact> processed = new HashSet<>();
-        while ((d = toProcess.poll()) != null) {
-            JSONObject dep = new JSONObject();
-            Artifact art = d.getArtifact();
-            if (!processed.add(art)) {
-                continue;
-            }
-            dep.put("gav", String.format("%s:%s:%s", art.getGroupId(), art.getArtifactId(), art.getVersion()));
-            dep.put("nodeId", "" + idProvider.apply(d));
-            
-            if (!d.getChildren().isEmpty()) {
-                JSONArray deps = new JSONArray();
-                dep.put("applicationDependencyNodeIds", deps);
-                
-                for (DependencyNode c : d.getChildren()) {
-                    deps.add("" + idProvider.apply(c));
+            try {
+                SourceLocation loc = res.getDeclarationRange(d, null);
+                if (loc != null) {
+                    dep.put("start", "" + loc.getStartOffset());
+                    dep.put("end", "" + loc.getEndOffset());
                 }
-                toProcess.addAll(d.getChildren());
+            } catch (IOException ex) {
+                ex.printStackTrace();
             }
             arr.add(dep);
         }

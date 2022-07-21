@@ -29,7 +29,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -476,10 +475,15 @@ class NbProjectInfoBuilder {
         }
     }
     
-    private static String nonNullString(String s) {
-        return s == null ? "" : s;
+    private static String nonNullString(Object s) {
+        return s == null ? "" : s.toString();
     }
     
+    /**
+     * Walker that collect resolved dependencies. The walker does not work with FLAT list of
+     * dependencies from getAllDependencies, but rather with the dependency tree so it can
+     * discover the dependency structures. 
+     */
     class DependencyWalker {
         final Configuration configuration;
         final boolean ignoreUnresolvable;
@@ -489,8 +493,8 @@ class NbProjectInfoBuilder {
         final Set<ComponentIdentifier> ids;
         final Set<String> unresolvedIds;
         final Map<String, Set<String>> directDependencies;
-        final Map<String, String> projectPaths;
         final Map<String, String> projectIds;
+        final Map<String, String> resolvedVersions;
         
         int depth;
 
@@ -501,8 +505,7 @@ class NbProjectInfoBuilder {
                 Set<ComponentIdentifier> ids, 
                 Set<String> unresolvedIds, 
                 Map<String, Set<String>> directDependencies,
-                Map<String, String> projectPaths,
-                Map<String, String> projectIds) {
+                Map<String, String> projectIds, Map<String, String> resolvedVersions) {
             this.configuration = configuration;
             this.ignoreUnresolvable = ignoreUnresolvable;
             this.unresolvedProblems = unresolvedProblems;
@@ -510,18 +513,14 @@ class NbProjectInfoBuilder {
             this.ids = ids;
             this.unresolvedIds = unresolvedIds;
             this.directDependencies = directDependencies;
-            this.projectPaths = projectPaths;
             this.projectIds = projectIds;
+            this.resolvedVersions = resolvedVersions;
             
             this.configName = configuration.getName();
         }
         
         public void walkResolutionResult(ResolvedComponentResult node) {
-            String nodeIdString = findNodeIdentifier(node.getId());
-            if (nodeIdString == null) {
-                return;
-            }
-            walkChildren(nodeIdString, node.getDependencies(), new HashSet<>());
+            walkChildren(true, "", node.getDependencies(), new HashSet<>());
         }
         
         String findNodeIdentifier(ComponentIdentifier cid) {
@@ -546,7 +545,7 @@ class NbProjectInfoBuilder {
                     aid = project.getName();
                 }
                 String ver = v == null ? "" : v.toString();
-                projectIds.put(absPath, String.format("%s:%s:%s", gid, nonNullString(aid), ver));
+                projectIds.put(absPath, String.format("%s:%s:%s", gid, nonNullString(aid), nonNullString(v)));
                 return "*project:" + absPath;
             } else {
                 return null;
@@ -557,37 +556,47 @@ class NbProjectInfoBuilder {
         
         public void walkResolutionResult(ResolvedDependencyResult node, Set<String> stack) {
             depth++;
-            if (depth > 15) {
-                System.err.println("V");
-            }
             ResolvedComponentResult rcr = node.getSelected();
             String id = findNodeIdentifier(rcr.getId());
             if (!stack.add(id)) {
                 return;
             }
-            walkChildren(id, rcr.getDependencies(), stack);
+            walkChildren(false, id, rcr.getDependencies(), stack);
             stack.remove(id);
             depth--;
         }
         
-        public void walkChildren(String parentId, Collection<? extends DependencyResult> deps, Set<String> stack) {
+        public void walkChildren(boolean root, String parentId, Collection<? extends DependencyResult> deps, Set<String> stack) {
             for (DependencyResult it2 : deps) {
 
                 if (it2 instanceof ResolvedDependencyResult) {
                     ResolvedDependencyResult rdr = (ResolvedDependencyResult) it2;
+                    ComponentIdentifier id = null;
                     if (rdr.getRequested() instanceof ModuleComponentSelector) {
                         ids.add(rdr.getSelected().getId());
                         // do not bother with components that only select a variant, which is itself a component
                         // TODO: represent as a special component type so the IDE shows it, but the IDE knows it is an abstract
                         // intermediate with no artifact(s).
                         if (rdr.getResolvedVariant() == null) {
-                            componentIds.add(rdr.getSelected().getId().toString());
+                            id = rdr.getSelected().getId();
                         } else {
-                            sinceGradle("6.8", () -> {
+                            id = sinceGradle("6.8", () -> {
                                 if (!rdr.getResolvedVariant().getExternalVariant().isPresent()) {
-                                    componentIds.add(rdr.getSelected().getId().toString());
+                                    return rdr.getSelected().getId();
+                                } else {
+                                    return null;
                                 }
                             });
+                        }
+                    }
+                    if (id != null) {
+                        componentIds.add(id.toString());
+                        if (id instanceof ModuleComponentIdentifier) {
+                            ModuleComponentIdentifier mci = (ModuleComponentIdentifier)id;
+                            resolvedVersions.putIfAbsent(
+                                    String.format("%s:%s", mci.getGroup(), nonNullString(mci.getModuleIdentifier().getName())),
+                                    String.format("%s:%s:%s", mci.getGroup(), nonNullString(mci.getModuleIdentifier().getName()), nonNullString(mci.getVersion()))
+                            );
                         }
                     }
                     if (directDependencies.computeIfAbsent(parentId, f -> new HashSet<>()).
@@ -614,7 +623,7 @@ class NbProjectInfoBuilder {
                                 }
                             }
                         }
-                        unresolvedProblems.put(id, ((UnresolvedDependencyResult) it2).getFailure().getMessage());
+                        unresolvedProblems.putIfAbsent(id, ((UnresolvedDependencyResult) it2).getFailure().getMessage());
                     }
                 }
             }
@@ -629,8 +638,6 @@ class NbProjectInfoBuilder {
         Map<String, Set<File>> resolvedJvmArtifacts = new HashMap();
         Set<Configuration> visibleConfigurations = configurationsToSave();
         Map<String, String> projectIds = new HashMap<>();
-        Map<String, String> projectPaths = new HashMap<>();
-        Map<String, Set<String>> directDependencies = new HashMap<>();
 
         // NETBEANS-5846: if this project uses javaPlatform plugin with dependencies enabled, 
         // do not report unresolved problems
@@ -655,9 +662,11 @@ class NbProjectInfoBuilder {
         //visibleConfigurations = visibleConfigurations.findAll() { resolvable(it) }
         visibleConfigurations.forEach(it -> {
             
+            Map<String, Set<String>> directDependencies = new HashMap<>();
             Set<String> componentIds = new HashSet<>();
             Set<String> unresolvedIds = new HashSet<>();
             Set<String> projectNames = new HashSet<>();
+            Map<String, String> resolvedVersions = new HashMap<>();
             long time_inspect_conf = System.currentTimeMillis();
 
             it.getDependencies().withType(ModuleDependency.class).forEach(it2 -> {
@@ -667,14 +676,14 @@ class NbProjectInfoBuilder {
                 String id = group + ":" + name + ":" + version;
                 componentIds.add(id);
             });
+            // TODO: what to do with PROJECT dependencies ?
 
+            String configPrefix = "configuration_" + it.getName() + "_";
             if (resolvable(it)) {
                 try {
-                    DependencyWalker walker = new DependencyWalker(
-                            it, ignoreUnresolvable, unresolvedProblems, componentIds, ids, unresolvedIds, directDependencies, projectPaths, projectIds);
-                    
-                    walker.walkResolutionResult(it.getIncoming().getResolutionResult().getRoot());
-                    
+                    // PENDING: this following code is duplicated in DependencyWalker. Currently IDE uses the old
+                    // information, the DependencyWalker collects just dependency tree(s), which is used marginally (new feature).
+                    // remove the code block in favour to DependencyWalker after stabilization.
                     it.getIncoming().getResolutionResult().getAllDependencies().forEach( it2 -> {
                         if (it2 instanceof ResolvedDependencyResult) {
                             ResolvedDependencyResult rdr = (ResolvedDependencyResult) it2;
@@ -691,7 +700,7 @@ class NbProjectInfoBuilder {
                                             componentIds.add(rdr.getSelected().getId().toString());
                                         }
                                     });
-                                }
+                                } 
                             }
                         }
                         if (it2 instanceof UnresolvedDependencyResult) {
@@ -717,6 +726,15 @@ class NbProjectInfoBuilder {
                             }
                         }
                     });
+                    
+                    // PENDING: collect components separately from the depth search, so existing
+                    // functions are not broken. REMOVE this duplicity after Dependency walker is tested
+                    // to work the same as the original code.
+                    Set<String> componentIds2 = new HashSet<>();
+                    DependencyWalker walker = new DependencyWalker(
+                            it, ignoreUnresolvable, unresolvedProblems, componentIds2, ids, unresolvedIds, directDependencies, projectIds, resolvedVersions);
+
+                    walker.walkResolutionResult(it.getIncoming().getResolutionResult().getRoot());
                 } catch (ResolveException ex) {
                     model.noteProblem(ex);
                 }
@@ -724,9 +742,30 @@ class NbProjectInfoBuilder {
                 unresolvedIds.addAll(componentIds);
                 componentIds.clear();
             }
+
+            Set<String> directChildSpecs = new HashSet<>();
+            it.getDependencies().forEach(d -> {
+                StringBuilder sb = new StringBuilder();
+                String g;
+                String a;
+                if (d instanceof ProjectDependency) {
+                    sb.append("*project:"); // NOI18N
+                    Project other = ((ProjectDependency)d).getDependencyProject();
+                    g = other.getGroup().toString();
+                    a = other.getName();
+                } else {
+                    g = d.getGroup();
+                    a = d.getName();
+                }
+                sb.append(g).append(':').append(a).append(":").append(nonNullString(d.getVersion()));
+                String id = sb.toString();
+                String resolved = resolvedVersions.get(id);
+                directChildSpecs.add(resolved != null ? resolved : id);
+            });
+            model.getInfo().put(configPrefix + "directChildren", directChildSpecs);
+
             String depBase = "dependency_inspect_" + it.getName();
             String depPrefix = depBase + "_";
-            String configPrefix = "configuration_" + it.getName() + "_";
             long time_project_deps = System.currentTimeMillis();
             model.registerPerf(depPrefix + "module", time_project_deps - time_inspect_conf);
             it.getDependencies().withType(ProjectDependency.class).forEach(it2 -> {
@@ -764,7 +803,7 @@ class NbProjectInfoBuilder {
             }
             long time_report = System.currentTimeMillis();
             model.registerPerf(depPrefix + "collect", time_report - time_collect);
-
+            
             model.getInfo().put(configPrefix + "components", componentIds);
             model.getInfo().put(configPrefix + "projects", projectNames);
             model.getInfo().put(configPrefix + "files", fileDeps);
@@ -836,9 +875,6 @@ class NbProjectInfoBuilder {
             model.registerPerf("dependencies_collect", System.currentTimeMillis() - collect_time);
         }
         
-        // project abs path -> file path, possibly reduntant
-        model.getInfo().put("project_paths", projectPaths);
-        
         // project abs path -> project's GAV
         model.getInfo().put("project_ids", projectIds);
 
@@ -906,7 +942,31 @@ class NbProjectInfoBuilder {
                 .flatMap(c -> c.getHierarchy().stream())
                 .collect(Collectors.toSet());
     }
+    
+    private interface ExceptionCallable<T, E extends Throwable> {
+        public T call() throws E;
+    }
 
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> void sneakyThrow(Throwable exception) throws T {
+            throw (T) exception;
+    }        
+    
+    private <T, E extends Throwable> T sinceGradle(String version, ExceptionCallable<T, E> c) {
+        if (gradleVersion.compareTo(VersionNumber.parse(version)) >= 0) {
+            try {
+                return c.call();
+            } catch (RuntimeException | Error e) {
+                throw e;
+            } catch (Throwable t) {
+                sneakyThrow(t);
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
+    
     private void sinceGradle(String version, Runnable r) {
         if (gradleVersion.compareTo(VersionNumber.parse(version)) >= 0) {
             r.run();

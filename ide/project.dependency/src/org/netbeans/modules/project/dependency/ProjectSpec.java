@@ -18,6 +18,7 @@
  */
 package org.netbeans.modules.project.dependency;
 
+import java.util.Objects;
 import org.openide.filesystems.FileObject;
 
 /**
@@ -42,6 +43,28 @@ public final class ProjectSpec {
 
     public FileObject getLocation() {
         return location;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 71 * hash + Objects.hashCode(this.location);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final ProjectSpec other = (ProjectSpec) obj;
+        return Objects.equals(this.location, other.location);
     }
     
     /**

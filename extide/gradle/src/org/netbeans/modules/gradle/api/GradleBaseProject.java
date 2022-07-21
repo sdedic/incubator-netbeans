@@ -275,7 +275,6 @@ public final class GradleBaseProject implements Serializable, ModuleSearchSuppor
      * @param path the module or project for which the direct dependencies should be returned. Pass {@code null} or an
      * empty argument list for this project's direct dependencies.
      * @return direct dependencies, in no particular order.
-     */
     public Collection<? extends GradleDependency> getDirectDependencies(
             @NullAllowed GradleConfiguration config,
             @NullAllowed GradleDependency... path) {
@@ -301,6 +300,7 @@ public final class GradleBaseProject implements Serializable, ModuleSearchSuppor
             return null;
         }
     }
+     */
     
     @Override
     public Set<GradleDependency.ModuleDependency> findModules(String group, String artifact, String version) {
