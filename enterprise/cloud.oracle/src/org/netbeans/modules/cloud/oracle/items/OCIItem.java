@@ -20,6 +20,7 @@ package org.netbeans.modules.cloud.oracle.items;
 
 import java.util.Objects;
 import javax.swing.event.ChangeListener;
+import org.netbeans.modules.cloud.common.explorer.CloudItem;
 import org.openide.util.ChangeSupport;
 
 /**
@@ -27,7 +28,7 @@ import org.openide.util.ChangeSupport;
  * 
  * @author Jan Horvath
  */
-public abstract class OCIItem {
+public abstract class OCIItem implements CloudItem {
     final OCID id;
     final String name;
     String description;

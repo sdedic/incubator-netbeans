@@ -19,12 +19,13 @@
 package org.netbeans.modules.cloud.oracle.items;
 
 import java.util.Objects;
+import org.netbeans.modules.cloud.common.explorer.CloudItemKey;
 
 /**
  *
  * @author Jan Horvath
  */
-public final class OCID  {
+public final class OCID  implements CloudItemKey {
     private final String value;
     private final String path;
 

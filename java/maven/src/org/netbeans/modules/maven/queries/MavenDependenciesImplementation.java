@@ -261,7 +261,7 @@ public class MavenDependenciesImplementation implements ProjectDependenciesImple
         return Dependency.create(aspec, s, ch, n);
     }
     
-    
+
     static boolean dependencyEquals(Dependency dspec, org.apache.maven.model.Dependency mavenD) {
         ArtifactSpec spec = dspec.getArtifact();
         String mavenClass = mavenD.getClassifier();

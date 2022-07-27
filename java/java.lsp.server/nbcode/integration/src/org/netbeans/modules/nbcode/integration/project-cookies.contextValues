@@ -25,3 +25,7 @@
 [org.netbeans.modules.cloud.=]
 org.netbeans.modules.cloud.oracle.devops.BuildPipelineItem
 org.netbeans.modules.cloud.oracle.devops.BuildRunFolderItem
+org.netbeans.modules.cloud.oracle.adm.KnowledgeBaseItem
+org.netbeans.modules.cloud.oracle.adm.VulnerabilityAuditItem
+org.netbeans.modules.cloud.oracle.adm.VulnerabilityItem
+org.netbeans.modules.maven.NbMavenProjectImpl

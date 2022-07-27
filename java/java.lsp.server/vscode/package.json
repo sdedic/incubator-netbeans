@@ -85,12 +85,12 @@
 				}
 			]
 		},
-                "viewsWelcome": [
+		"viewsWelcome": [
 			{
 				"view": "database.connections",
 				"contents": "No Database Connections found.\n[Add a new connection](command:db.add.connection)"
 			}
-                ],
+		],
 		"configuration": {
 			"title": "Java",
 			"properties": {
@@ -479,7 +479,7 @@
 				"command": "db.add.connection",
 				"title": "Add Database Connection",
 				"category": "Database",
-                                "icon": "$(add)"
+				"icon": "$(add)"
 			},
 			{
 				"command": "nbls:Database:netbeans.db.explorer.action.Connect",
@@ -496,22 +496,22 @@
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.CreateBuildRun",
 				"title": "Run",
-                                "icon": "$(run)"
+				"icon": "$(run)"
 			},
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.AddRepository",
 				"title": "Add Repository",
-                                "icon": "$(github-alt)"
+				"icon": "$(github-alt)"
 			},
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.AddToProject",
 				"title": "Add To Project",
-                                "icon": "$(star-empty)"
+				"icon": "$(star-empty)"
 			},
 			{
 				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.CloudRefresh",
 				"title": "Refresh",
-                                "icon": "$(refresh)"
+				"icon": "$(refresh)"
 			},
 			{
 				"command": "nbls:Edit:org.openide.actions.DeleteAction",
@@ -590,6 +590,20 @@
 				"command": "java.select.editor.projects",
 				"title": "Reveal active editor in Projects",
 				"category": "Project"
+			},
+			{
+				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+				"title": "Show in Browser",
+				"category": "oci"
+			},
+			{
+				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction",
+				"title": "Create Knowledge Base",
+				"category": "oci"
+			},
+			{
+				"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+				"title": "Vulnerability Audit"
 			}
 		],
 		"keybindings": [
@@ -624,6 +638,10 @@
 					"command": "java.workspace.new",
 					"when": "nbJavaLSReady && explorerResourceIsFolder",
 					"group": "navigation@3"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+					"when": "nbJavaLSReady && resourceFilename == pom.xml"
 				}
 			],
 			"commandPalette": [
@@ -701,6 +719,18 @@
 				{
 					"command": "java.workspace.configureRunSettings",
 					"when": "false"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+					"when": "false"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction",
+					"when": "false"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+					"when": "false"
 				}
 			],
 			"view/title": [
@@ -731,8 +761,8 @@
 				},
 				{
 					"command": "db.add.connection",
-                                        "when": "view == database.connections",
-                                        "group": "navigation@3"
+					"when": "view == database.connections",
+					"group": "navigation@3"
 				}
 			],
 			"view/item/context": [
@@ -784,6 +814,14 @@
 					"when": "view == foundProjects && viewItem =~ /is:project/"
 				},
 				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+					"when": "view == foundProjects && viewItem =~ /is:project/ && viewItem =~ /org.netbeans.modules.maven.NbMavenProjectImpl/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.RunFileADMAction",
+					"when": "view == foundProjects && viewItem =~ /is:file/ && resourceFilename == pom.xml"
+				},
+				{
 					"command": "java.local.db.set.preferred.connection",
 					"when": "viewItem =~ /class:org.netbeans.api.db.explorer.DatabaseConnection/"
 				},
@@ -802,27 +840,43 @@
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.AddRepository",
 					"when": "viewItem =~ /class:oracle.devops.DevopsProjectItem/",
-                                        "group": "inline@12"
+					"group": "inline@12"
 				},
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.CreateBuildRun",
 					"when": "viewItem =~ /class:oracle.devops.BuildPipelineItem/",
-                                        "group": "inline@12"
+					"group": "inline@12"
 				},
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.AddToProject",
 					"when": "viewItem =~ /class:oracle/",
-                                        "group": "inline@14"
+					"group": "inline@14"
 				},
 				{
 					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.actions.CloudRefresh",
 					"when": "viewItem =~ /class:oracle/",
-                                        "group": "inline@13"
+					"group": "inline@13"
 				},
 				{
 					"command": "java.workspace.configureRunSettings",
 					"when": "view == run-config && viewItem == configureRunSettings",
 					"group": "inline@1"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+					"when": "viewItem =~ /class:oracle.adm.VulnerabilityAuditItem/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+					"when": "viewItem =~ /class:oracle.adm.VulnerabilityItem/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.ShowInBrowserAction",
+					"when": "viewItem =~ /class:oracle.adm.KnowledgeBaseItem/"
+				},
+				{
+					"command": "nbls:Tools:org.netbeans.modules.cloud.oracle.adm.CreateKnowledgeBaseAction",
+					"when": "viewItem =~ /class:oracle.compartment.CompartmentItem/"
 				}
 			]
 		},
@@ -938,6 +992,24 @@
 				"codeicon": "file-binary"
 			},
 			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/audit_bad.png",
+				"codeicon": "error",
+				"color": "charts.red"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/audit_good.png",
+				"codeicon": "pass",
+				"color": "charts.green"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/bug.png",
+				"codeicon": "bug"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/knowledgeBase.png",
+				"codeicon": "book"
+			},
+			{
 				"uriExpression": "nbres:/org/netbeans/modules/cloud/common/explorer/resources/defaultFolder.svg",
 				"codeicon": "file-submodule"
 			},
@@ -949,33 +1021,33 @@
 				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/deploy_artifact.svg",
 				"codeicon": "file-binary"
 			},
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/green_dot.svg",
-                                "codeicon": "pass",
-                                "color": "charts.green"
-                        },
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/red_dot.svg",
-                                "codeicon": "error",
-                                "color": "charts.red"
-                        },
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/db/resources/connection_nbcode.svg",
-                                "codeicon": "database"
-                        },
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/db/resources/connectionDisconnected_nbcode.svg",
-                                "codeicon": "debug-disconnect"
-                        },
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/db/resources/folder_nbcode.svg",
-                                "codeicon": ""
-                        },
-                        {
-                                "uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/yellow_dot.svg",
-                                "codeicon": "circle-large-outline",
-                                "color": "charts.yellow"
-                        }
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/green_dot.svg",
+				"codeicon": "pass",
+				"color": "charts.green"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/red_dot.svg",
+				"codeicon": "error",
+				"color": "charts.red"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/db/resources/connection_nbcode.svg",
+				"codeicon": "database"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/db/resources/connectionDisconnected_nbcode.svg",
+				"codeicon": "debug-disconnect"
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/db/resources/folder_nbcode.svg",
+				"codeicon": ""
+			},
+			{
+				"uriExpression": "nbres:/org/netbeans/modules/cloud/oracle/resources/yellow_dot.svg",
+				"codeicon": "circle-large-outline",
+				"color": "charts.yellow"
+			}
 		],
 		"jsonValidation": [
 			{
