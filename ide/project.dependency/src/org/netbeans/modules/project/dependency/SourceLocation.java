@@ -18,6 +18,7 @@
  */
 package org.netbeans.modules.project.dependency;
 
+import org.netbeans.api.annotations.common.CheckForNull;
 import org.openide.filesystems.FileObject;
 
 /**
@@ -32,26 +33,41 @@ import org.openide.filesystems.FileObject;
  * libraries. In that case, when the API is queried for the dependency declaration source,
  * it will return the direct dependence that introduced the dependency in question from {@link #getImpliedBy}
  * and its location range.
+ * <p/>
+ * The SourceLocation can identify another artifact that contains the actual declaration. For implied
+ * artifacts ({@link #getImpliedBy()}{@code != null}), the artifact identifies the artifact that declares
+ * the dependnecy. If the dependency specification is split, i.e. into a BOM project and the
+ * actual project where the dependency is used, for parts defined by the BOM the origin artifact identifies
+ * the BOM.
  * 
  * @author sdedic
  */
 public final class SourceLocation {
+    private final ArtifactSpec origin;
     private final FileObject file;
     private final int startOffset;
     private final int endOffset;
     private final Object impliedBy;
-
+    
     public SourceLocation(FileObject file, int startOffset, int endOffset, Object impliedBy) {
+        this(file, startOffset, endOffset, null, impliedBy);
+    }
+
+    public SourceLocation(FileObject file, int startOffset, int endOffset, ArtifactSpec origin, Object impliedBy) {
         this.file = file;
         this.startOffset = startOffset;
         this.endOffset = endOffset;
         this.impliedBy = impliedBy;
+        this.origin = origin;
     }
 
     /**
+     * Idnntifies the source file. The file can be {@code null], if the location is not located inside the project, such as
+     * version declared in a dpeendency management of a parent POM.
+     * 
      * @return Returns the file.
      */
-    public FileObject getFile() {
+    public @CheckForNull FileObject getFile() {
         return file;
     }
 
@@ -101,5 +117,14 @@ public final class SourceLocation {
      */
     public boolean isEmpty() {
         return startOffset >= endOffset;
+    }
+
+    /**
+     * Artifact outside the project whose source contains the declaration. {@code null} for
+     * locations inside the project itself.
+     * @return artifact owning the source.
+     */
+    public ArtifactSpec getOrigin() {
+        return origin;
     }
 }

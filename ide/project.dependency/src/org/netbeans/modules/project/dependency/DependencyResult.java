@@ -21,6 +21,8 @@ package org.netbeans.modules.project.dependency;
 import java.io.IOException;
 import java.util.Collection;
 import javax.swing.event.ChangeListener;
+import org.netbeans.api.annotations.common.CheckForNull;
+import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.api.project.Project;
 import org.openide.util.Lookup;
 
@@ -69,11 +71,37 @@ public interface DependencyResult extends Lookup.Provider {
      * @param l listener
      */
     public void removeChangeListener(ChangeListener l);
+    
+    /**
+     * Registers a listener that gets notified if the source locations change.
+     * @param l listener
+     */
+    public void addSourceChangeListener(ChangeListener l);
+    
+    /**
+     * 
+     * @param l 
+     */
+    public void removeSourceChangeListener(ChangeListener l);
+    
+    public static final String PART_NAME = "name"; // NOI18N
+    public static final String PART_GROUP = "group"; // NOI18N
+    public static final String PART_VERSON = "version"; // NOI18N
+    public static final String PART_SCOPE = "scope"; // NOI18N
+    
+    /**
+     * A special part that locates a location appropriate for the surrounding
+     * container. For example {@code dependencies} element in Maven or {@code dependencies}
+     * block in a gradle script.
+     */
+    public static final String PART_CONTAINER = "container"; // NOI18N
 
     /**
      * Attempts to find location where this dependency is declared.
      * @param d
-     * @return 
+     * @param part a specific part that should be located in the text. 
+     * @return the location for the dependency or its part; {@code null} if the
+     * source location can not be determined.
      */
-    public SourceLocation getDeclarationRange(Dependency d) throws IOException;
+    public @CheckForNull SourceLocation getDeclarationRange(@NonNull Dependency d, String part) throws IOException;
 }
