@@ -24,16 +24,28 @@ import java.util.Set;
 import org.netbeans.modules.gradle.api.BuildPropertiesSupport;
 import org.netbeans.modules.gradle.spi.GradleFiles;
 import org.netbeans.modules.gradle.spi.ProjectInfoExtractor;
+import org.openide.util.lookup.ServiceProvider;
 
 /**
  *
  * @author sdedic
  */
+@ServiceProvider(service = ProjectInfoExtractor.class)
 public class ExtensionPropertiesExtractor implements ProjectInfoExtractor {
 
     @Override
     public Result fallback(GradleFiles files) {
-        return null;
+        return new Result() {
+            @Override
+            public Set getExtract() {
+                return Collections.emptySet();
+            }
+
+            @Override
+            public Set<String> getProblems() {
+                return Collections.emptySet();
+            }
+        };
     }
 
     @Override

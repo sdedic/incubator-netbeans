@@ -38,9 +38,6 @@ import org.netbeans.api.project.Project;
 import org.netbeans.modules.gradle.GradleModuleFileCache21;
 import org.netbeans.modules.gradle.cache.SubProjectDiskCache;
 import org.netbeans.modules.gradle.cache.SubProjectDiskCache.SubProjectInfo;
-import org.netbeans.modules.gradle.loaders.BaseApiAccessor;
-import org.netbeans.modules.gradle.loaders.BuildPropertiesImplementation;
-import org.openide.util.Exceptions;
 import org.openide.util.TopologicalSortException;
 import org.openide.util.Utilities;
 
@@ -338,21 +335,28 @@ public final class GradleBaseProject implements Serializable, ModuleSearchSuppor
         Map<String, String> taskNamesAndPaths = new HashMap<>();
         
         while ((taskPath = toProcess.poll()) != null) {
-            if (!paths.add(taskPath)) {
+            if (taskPath.equals("") || !paths.add(taskPath)) {
                 continue;
             }
             int lastColon = taskPath.lastIndexOf(':');
-            String p = taskPath.substring(0, lastColon);
-            String n = p.substring(lastColon + 1);
+            String p = taskPath.substring(0, lastColon + 1);
+            String n = taskPath.substring(lastColon + 1);
             if (path.equals(p)) {
-                taskNamesAndPaths.put(p, n);
-                toProcess.addAll(taskDependencies.getOrDefault(n, Collections.emptyList()));
+                // taskNamesAndPaths only receives tasks from this project.
+                taskNamesAndPaths.put(taskPath, n);
             }
+            toProcess.addAll(taskDependencies.getOrDefault(n, Collections.emptyList()));
         }
         
         Map<String, List<String>> edges = new HashMap<>();
-        for (String tn : taskNamesAndPaths.values()) {
-            edges.put(path + ":" + tn, taskDependencies.getOrDefault(tn, Collections.emptyList()));
+        for (String tn : taskNamesAndPaths.keySet()) {
+            String sn = taskNamesAndPaths.get(tn);
+            for (String pred : taskDependencies.getOrDefault(sn, Collections.emptyList())) {
+                if (pred.isEmpty()) {
+                    continue;
+                }
+                edges.computeIfAbsent(pred, (k) -> new ArrayList<>()).add(tn);
+            }
         }
         List<String> orderedTasks;
         
@@ -568,16 +572,5 @@ public final class GradleBaseProject implements Serializable, ModuleSearchSuppor
     @Override
     public String toString() {
         return "GradleBaseProject{" + "name=" + name + ", projectDir=" + projectDir + ", plugins=" + plugins + '}';
-    }
-
-    static {
-        BaseApiAccessor.setInstance(new GradleBaseProject.BaseAccessorImpl());
-    }
-    
-    static class BaseAccessorImpl extends BaseApiAccessor {
-        @Override
-        public BuildPropertiesSupport createExtensionProperties(BuildPropertiesImplementation impl) {
-            return new BuildPropertiesSupport(impl);
-        }
     }
 }

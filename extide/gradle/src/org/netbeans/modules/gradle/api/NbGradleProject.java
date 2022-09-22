@@ -202,6 +202,10 @@ public final class NbGradleProject {
     public <T> T projectLookup(Class<T> clazz) {
         return project.getGradleProject().getLookup().lookup(clazz);
     }
+    
+    public <T> Collection<? extends T>  projectLookupAll(Class<T> clazz) {
+        return project.getGradleProject().getLookup().lookupAll(clazz);   
+    }
 
     /**
      * Return the actual Quality information on the currently loaded Project.

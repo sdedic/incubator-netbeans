@@ -18,6 +18,8 @@
  */
 package org.netbeans.modules.gradle.api;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.netbeans.api.annotations.common.CheckForNull;
 import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.api.project.Project;
@@ -28,14 +30,15 @@ import org.netbeans.modules.gradle.loaders.BuildPropertiesImplementation;
  * @author sdedic
  */
 public final class BuildPropertiesSupport {
-    private final BuildPropertiesImplementation impl;
+    private final List<BuildPropertiesImplementation> impls;
 
-    BuildPropertiesSupport(BuildPropertiesImplementation impl) {
-        this.impl = impl;
+    BuildPropertiesSupport(List<BuildPropertiesImplementation> impls) {
+        this.impls = impls;
     }
    
     public static BuildPropertiesSupport get(Project p) {
-        return p.getLookup().lookup(BuildPropertiesSupport.class);
+        List<BuildPropertiesImplementation> impls = new ArrayList<>(NbGradleProject.get(p).projectLookupAll(BuildPropertiesImplementation.class));
+        return new BuildPropertiesSupport(impls);
     }
     
     /**
@@ -51,15 +54,27 @@ public final class BuildPropertiesSupport {
      * This method only supports properties in singleton objects, no lists or map item access
      * is (currently).
      * 
-     * @param propertyPath
+     * @param propertyPath path to the property
      * @return Property instance or {@code null}
      */
     public Property findExtensionProperty(String extensionName, String propertyPath) {
-        return impl.findExtensionProperty(extensionName, propertyPath);
+        for (BuildPropertiesImplementation impl : impls) {
+            Property p = impl.findExtensionProperty(extensionName, propertyPath);
+            if (p != null) {
+                return p;
+            }
+        }
+        return null;
     }
     
     public Property findTaskProperty(String extensionName, String propertyPath) {
-        return impl.findExtensionProperty(extensionName, propertyPath);
+        for (BuildPropertiesImplementation impl : impls) {
+            Property p = impl.findTaskProperty(extensionName, propertyPath);
+            if (p != null) {
+                return p;
+            }
+        }
+        return null;
     }
     
     public enum PropertyKind {

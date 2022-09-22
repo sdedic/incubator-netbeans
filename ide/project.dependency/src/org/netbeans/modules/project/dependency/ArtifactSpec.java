@@ -288,7 +288,7 @@ public final class ArtifactSpec<T> {
     public static <V> ArtifactSpec<V> createVersionSpec(
             @NullAllowed String groupId, @NonNull String artifactId, 
             @NullAllowed String type, @NullAllowed String classifier, 
-            @NonNull String versionSpec, boolean optional, @NullAllowed FileObject localFile, @NonNull V data) {
+            @NullAllowed String versionSpec, boolean optional, @NullAllowed FileObject localFile, @NonNull V data) {
         URL u = localFile == null ? null : URLMapper.findURL(localFile, URLMapper.EXTERNAL);
         URI uri = null;
         if (u != null) {
@@ -302,9 +302,9 @@ public final class ArtifactSpec<T> {
     }
 
     public static <V> ArtifactSpec<V> createSnapshotSpec(
-            @NonNull String groupId, @NonNull String artifactId, 
+            @NullAllowed String groupId, @NullAllowed String artifactId, 
             @NullAllowed String type, @NullAllowed String classifier, 
-            @NonNull String versionSpec, boolean optional, @NullAllowed FileObject localFile, @NonNull V data) {
+            @NullAllowed String versionSpec, boolean optional, @NullAllowed FileObject localFile, @NonNull V data) {
         URI uri = null;
         if (localFile != null) {
             URL u = URLMapper.findURL(localFile, URLMapper.EXTERNAL);

@@ -37,6 +37,7 @@ import java.util.Arrays;
 import static java.util.Arrays.asList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -46,6 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.codehaus.groovy.runtime.InvokerHelper;
@@ -59,6 +61,8 @@ import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.FileCollectionDependency;
 import org.gradle.api.artifacts.ModuleDependency;
 import org.gradle.api.artifacts.ProjectDependency;
+import org.gradle.api.artifacts.PublishArtifact;
+import org.gradle.api.artifacts.PublishArtifactSet;
 import org.gradle.api.artifacts.ResolveException;
 import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.ResolvedDependency;
@@ -198,6 +202,7 @@ class NbProjectInfoBuilder {
         runAndRegisterPerf(model, "detectPlugins2", this::detectAdditionalPlugins);
         runAndRegisterPerf(model, "taskDependencies", this::detectTaskDependencies);
         runAndRegisterPerf(model, "taskProperties", this::detectTaskProperties);
+        runAndRegisterPerf(model, "artifacts", this::detectConfigurationArtifacts);
         return model;
     }
 
@@ -264,8 +269,44 @@ class NbProjectInfoBuilder {
         return deps.stream().map(Task::getPath).collect(Collectors.joining(","));
     }
     
+    private void detectConfigurationArtifacts(NbProjectInfoModel model) {
+        List<Configuration> configs = project.getConfigurations()
+            .stream()
+            .filter(Configuration::isCanBeConsumed)
+            .filter(c -> !c.isCanBeResolved())
+            .sorted(Comparator.comparing(Configuration::getName))
+            .collect(Collectors.toList());
+        Map<String, Object> data = new HashMap<>();
+        for (Configuration c : configs) {
+            PublishArtifactSet publishSet = c.getAllArtifacts();
+            if (publishSet.isEmpty()) {
+                continue;
+            }
+            Map<String, Object> confData = new HashMap<>();
+            LOG.lifecycle("Configuration {} artifacts:", c.getName());
+            for (PublishArtifact a : publishSet) {
+                Map<String, String> artData = new HashMap<>();
+                artData.put("name", a.getName());
+                artData.put("classifier", a.getClassifier());
+                artData.put("extension", a.getExtension());
+                artData.put("type", a.getType());
+                
+                File f = a.getFile();
+                LOG.info("\t{}: name: {}, type: {}, classifier: {}, extension: {}", 
+                        f.getPath(), a.getName(), a.getType(), a.getClassifier(), a.getExtension());
+                Set<? extends Task> tasks = a.getBuildDependencies().getDependencies(null);
+                String taskList = tasks.stream().map(t -> t.getName()).collect(Collectors.joining(","));
+                artData.put("buildDeps", taskList);
+                LOG.info("\tbuilt by: {}", taskList);
+                confData.put(f.getPath(), artData);
+            }
+            data.put(c.getName(), confData);
+        }
+        model.getInfo().put("configurationArtifacts", data);
+    }
+    
     private void detectAdditionalPlugins(NbProjectInfoModel model) {
-        PluginManagerInternal pmi;
+        final PluginManagerInternal pmi;
         PluginRegistry reg;
         if (project.getPluginManager() instanceof PluginManagerInternal) {
             pmi = (PluginManagerInternal)project.getPluginManager();
@@ -282,7 +323,8 @@ class NbProjectInfoBuilder {
         
         project.getPlugins().matching((Plugin p) -> {
             for (Class c = p.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
-                Optional<PluginId> id = pmi.findPluginIdForClass(c);
+                Class fc = c;
+                Optional<PluginId> id = sinceGradleOrDefault("7.1", () -> pmi.findPluginIdForClass(fc), Optional::empty);
                 if (id.isEmpty() && reg != null) {
                     id = reg.findPluginForClass(c);
                 }
@@ -1400,7 +1442,7 @@ class NbProjectInfoBuilder {
             throw (T) exception;
     }        
     
-    private <T, E extends Throwable> T sinceGradle(String version, ExceptionCallable<T, E> c) {
+    private <T, E extends Throwable> T sinceGradleOrDefault(String version, ExceptionCallable<T, E> c, Supplier<T> def) {
         if (gradleVersion.compareTo(VersionNumber.parse(version)) >= 0) {
             try {
                 return c.call();
@@ -1411,8 +1453,12 @@ class NbProjectInfoBuilder {
                 return null;
             }
         } else {
-            return null;
+            return def.get();
         }
+    }
+    
+    private <T, E extends Throwable> T sinceGradle(String version, ExceptionCallable<T, E> c) {
+        return sinceGradleOrDefault(version, c, null);
     }
     
     private void sinceGradle(String version, Runnable r) {
