@@ -26,8 +26,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectActionContext;
@@ -46,16 +49,23 @@ import org.netbeans.modules.project.dependency.spi.ProjectArtifactsImplementatio
 import org.netbeans.spi.project.ActionProvider;
 import org.netbeans.spi.project.ProjectServiceProvider;
 import org.openide.util.Lookup;
+import org.openide.util.RequestProcessor;
 import org.openide.util.WeakListeners;
 
 /**
- *
+ * This query implementation handles artifacts produced by jar-type and specifically shadowJar tasks. Outputs from
+ * general JAR tasks (if they are included in build sequence) are reported as artifacts type "jar" with a classifier
+ * from the task. shadowJar is handled specifically: if present, its -all jar gets an additional {@link ArtifactSpec#TAG_SHADED}
+ * tag to signal it is a bundle, and the original jar gets {@link ArtifactSpec#TAG_BASE}.
+ * 
+ * 
  * @author sdedic
  */
 @ProjectServiceProvider(service = ProjectArtifactsImplementation.class,  projectType = NbGradleProject.GRADLE_PROJECT_TYPE)
 public class GradleJarArtifacts implements ProjectArtifactsImplementation<GradleJarArtifacts.Result> {
+    private static final RequestProcessor GRADLE_ARTIFACTS_RP = new RequestProcessor(GradleJarArtifacts.class);
     private final Project   project;
-
+    
     public GradleJarArtifacts(Project project) {
         this.project = project;
     }
@@ -72,14 +82,10 @@ public class GradleJarArtifacts implements ProjectArtifactsImplementation<Gradle
         }
         
         if (!(query.getArtifactType() == null || query.getArtifactType().equals(ProjectArtifactsQuery.Filter.TYPE_ALL))) {
-            if ("jar".equals(query.getArtifactType())) {
+            if (!"jar".equals(query.getArtifactType())) {
                 return null;
             }
         }
-        if (!(query.getClassifier() == null || query.getClassifier().equals(ProjectArtifactsQuery.Filter.CLASSIFIER_ANY))) {
-            return null;
-        }
-        
         return new Result(project, query, proj);
     }
 
@@ -109,12 +115,16 @@ public class GradleJarArtifacts implements ProjectArtifactsImplementation<Gradle
     }
     
     static class Result implements PropertyChangeListener {
+        private static final List<ArtifactSpec> PENDING = new ArrayList<>();
+        
         private final Project project;
         private final ProjectArtifactsQuery.Filter filter;
         private final NbGradleProject gradleProject;
         private final List<String> buildTasks;
         private List<ChangeListener> listeners;
         private List<ArtifactSpec> artifacts;
+
+        private RequestProcessor.Task refreshTask;
 
         public Result(Project project, ProjectArtifactsQuery.Filter filter, NbGradleProject gradleProject) {
             this.project = project;
@@ -133,7 +143,51 @@ public class GradleJarArtifacts implements ProjectArtifactsImplementation<Gradle
                     cfg = (GradleExecConfiguration)pac.getConfiguration();
                 }
             }
+            String fAction = action;
             ActionMapping mapping = RunUtils.findActionMapping(project, action, cfg);
+            if (mapping == null) {
+                mapping = new ActionMapping() {
+                    @Override
+                    public String getName() {
+                        return fAction;
+                    }
+
+                    @Override
+                    public String getDisplayName() {
+                        return fAction;
+                    }
+
+                    @Override
+                    public String getArgs() {
+                        return fAction;
+                    }
+
+                    @Override
+                    public ActionMapping.ReloadRule getReloadRule() {
+                        return ActionMapping.ReloadRule.DEFAULT;
+                    }
+
+                    @Override
+                    public String getReloadArgs() {
+                        return "";
+                    }
+
+                    @Override
+                    public boolean isApplicable(Set<String> plugins) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean isRepeatable() {
+                        return false;
+                    }
+
+                    @Override
+                    public int compareTo(ActionMapping o) {
+                        return -1;
+                    }
+                };
+            }
             final String[] args = RunUtils.evaluateActionArgs(project, action, mapping.getArgs(), lkp);
             RunConfig rc = RunUtils.createRunConfig(project, action, "Searching for artifacts", Lookup.EMPTY, cfg, Collections.emptySet(), args);
             buildTasks = new ArrayList<>(rc.getCommandLine().getTasks());
@@ -157,38 +211,102 @@ public class GradleJarArtifacts implements ProjectArtifactsImplementation<Gradle
         
         public List<ArtifactSpec> getArtifacts() {
             List<ArtifactSpec> as = this.artifacts;
-            if (as != null) {
+            if (as != null && as != PENDING) {
                 return as;
             }
-            as = update();
+            as = createArtifactList();
             synchronized (this) {
-                if (this.artifacts == null) {
+                if (this.artifacts == null || this.artifacts == PENDING) {
                     this.artifacts = as;
                 }
             }
             return as;
         }
         
-        public List<ArtifactSpec> update() {
+        private void update(List<ArtifactSpec> oldCopy) {
+            List<ArtifactSpec> specs = createArtifactList();
+            ChangeListener[] ll;
+            synchronized (this) {
+                if (artifacts == null) {
+                    artifacts = specs;
+                    return;
+                }
+                if (artifacts == PENDING) {
+                    artifacts = specs;
+                }
+                if (specs.equals(oldCopy)) {
+                    return;
+                } else {
+                    ll = listeners.toArray(new ChangeListener[listeners.size()]);
+                }
+            }
+            ChangeEvent e = new ChangeEvent(this);
+            for (ChangeListener l : ll) {
+                l.stateChanged(e);
+            }
+        }
+        
+        private List<ArtifactSpec> createArtifactList() {
             GradleBaseProject gbp = GradleBaseProject.get(project);
             Set<String> allTaskNames = new HashSet<>();
             for (String taskName : buildTasks) {
                 GradleTask gt = gbp.getTaskByName(taskName);
-                for (GradleTask dep : gbp.getTaskPredecessors(gt)) {
-                    allTaskNames.add(dep.getName());
+                if (gt == null) {
+                    continue;
+                }
+                for (GradleTask dep : gbp.getTaskPredecessors(gt, false)) {
+                    if (gbp.isTaskInstanceOf(dep.getName(), "org.gradle.jvm.tasks.Jar")) {
+                        allTaskNames.add(dep.getName());
+                    }
                 }
             }
             
-            List<ArtifactSpec> result = new ArrayList<>();
-            // if there's a JAR task, let's inspect the details; otherwise we don't have an artifact (?)
-            if (allTaskNames.contains("jar")) {
-                addJarArtifacts(gbp, result, false);
+            Set<ArtifactSpec> result = new LinkedHashSet<>();
+            for (String name : allTaskNames) {
+                if (name.equals("shadowJar")) {
+                    addShadowJarArtifacts(gbp, result);
+                } else {
+                    addJarArtifacts(name, gbp, result);
+                }
             }
             
-            return result;
+            return new ArrayList<>(result);
         }
         
-        private void addJarArtifacts(GradleBaseProject gbp, List<ArtifactSpec> results, boolean annotateWithBase) {
+        private void addShadowJarArtifacts(GradleBaseProject gbp, Collection<ArtifactSpec> results) {
+            boolean addShadow = false;
+            boolean addJar = true;
+            if (ProjectArtifactsQuery.Filter.CLASSIFIER_ANY.equals(filter.getClassifier()) || "all".equals(filter.getClassifier())) {
+                addShadow = true;
+            } else {
+                if (filter.getClassifier() == null) {
+                    // regular output even in shadowJar presence is the classes jar
+                    addShadow = false;
+                    if (filter.hasTag(ArtifactSpec.TAG_SHADED)) {
+                        // ... but not if shaded was explicitly requested.
+                        addShadow = true;
+                        addJar = false;
+                    }
+                    if (filter.hasTag(ArtifactSpec.TAG_BASE)) {
+                        addJar = true;
+                    }
+                }
+            }
+            if (addShadow) {
+                ArtifactSpec.Builder b = artifactBuilder("shadowJar", gbp);
+                if (b != null) {
+                    results.add(b.tag(ArtifactSpec.TAG_SHADED).build());
+                }
+            }
+            if (addJar) {
+                ArtifactSpec.Builder b = artifactBuilder("jar", gbp);
+                if (b != null) {
+                    results.add(b.tag(ArtifactSpec.TAG_BASE).build());
+                }
+            }
+        }
+        
+        private ArtifactSpec.Builder artifactBuilder(String task, GradleBaseProject gbp) {
             String name = gbp.getName();
             String group = gbp.getGroup();
             String version = gbp.isVersionSpecified() ? gbp.getVersion() : null;
@@ -201,11 +319,11 @@ public class GradleJarArtifacts implements ProjectArtifactsImplementation<Gradle
             
             BuildPropertiesSupport props = BuildPropertiesSupport.get(project);
             Property p;
-            p = props.findTaskProperty("jar", "archiveFile");
+            p = props.findTaskProperty(task, "archiveFile");
             if (p != null && p.getStringValue() != null) {
                 path = Paths.get(p.getStringValue());
             } else {
-                p = props.findTaskProperty("jar", "archiveFileName");
+                p = props.findTaskProperty(task, "archiveFileName");
                 if (p != null && p.getStringValue() != null) {
                     filename = p.getStringValue();
                 } else {
@@ -216,7 +334,7 @@ public class GradleJarArtifacts implements ProjectArtifactsImplementation<Gradle
                     }
                 }
 
-                p = props.findTaskProperty("jar", "destinationDirectory");
+                p = props.findTaskProperty(task, "destinationDirectory");
                 if (p != null && p.getStringValue() != null) {
                     dir = p.getStringValue();
                 }
@@ -228,11 +346,11 @@ public class GradleJarArtifacts implements ProjectArtifactsImplementation<Gradle
                 }
             }
             
-            p = props.findTaskProperty("jar", "archiveAppendix");
+            p = props.findTaskProperty(task, "archiveAppendix");
             if (p != null && p.getStringValue() != null) {
                 appendix = p.getStringValue();
             }
-            p = props.findTaskProperty("jar", "archiveClassifier");
+            p = props.findTaskProperty(task, "archiveClassifier");
             if (p != null && p.getStringValue() != null) {
                 classifier = p.getStringValue();
                 if (classifier.isEmpty()) {
@@ -246,15 +364,49 @@ public class GradleJarArtifacts implements ProjectArtifactsImplementation<Gradle
             if (path != null) {
                 b.location(path.toUri());
             }
-            if (annotateWithBase) {
-                
-            }
-            results.add(b.build());
+            return b;
         }
         
-
+        private void addJarArtifacts(String name, GradleBaseProject gbp, Collection<ArtifactSpec> results) {
+            ArtifactSpec.Builder b = artifactBuilder(name, gbp);
+            if (b == null) {
+                return;
+            }
+            ArtifactSpec a = b.build();
+            if (ProjectArtifactsQuery.Filter.CLASSIFIER_ANY.equals(filter.getClassifier()) ||
+                Objects.equals(filter.getClassifier(), a.getClassifier())) {
+                results.add(a);
+            }
+        }
+        
         @Override
         public void propertyChange(PropertyChangeEvent evt) {
+            if (!NbGradleProject.PROP_PROJECT_INFO.equals(evt.getPropertyName())) {
+                return;
+            }
+            ChangeListener[] ll;
+            boolean wasInitialized;
+            
+            synchronized (this) {
+                wasInitialized = artifacts != null;
+                List<ArtifactSpec> copy = this.artifacts;
+                artifacts = PENDING;
+                if (listeners == null && listeners.isEmpty()) {
+                    return;
+                }
+                if (refreshTask != null) {
+                    refreshTask.cancel();
+                }
+                if (wasInitialized) {
+                    refreshTask = GRADLE_ARTIFACTS_RP.post(() -> update(copy));
+                    return;
+                }
+                ll = listeners.toArray(new ChangeListener[listeners.size()]);
+            }
+            ChangeEvent e = new ChangeEvent(this);
+            for (ChangeListener l : ll) {
+                l.stateChanged(e);
+            }
         }
     }
 }

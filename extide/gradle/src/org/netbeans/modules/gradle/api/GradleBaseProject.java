@@ -82,12 +82,13 @@ public final class GradleBaseProject implements Serializable, ModuleSearchSuppor
     GradleDependency projectDependencyNode;
     Set<GradleReport> problems = Collections.emptySet();
     Map<String, List<String>> taskDependencies = new HashMap<>();
+    Map<String, Set<String>> taskTypes = new HashMap<>();
     
     // @GuardedBy(this)
     /**
      * Lazy-computed list of tasks mapped to either tasksByName or created descriptions.
      */
-    private transient Map<String, List<GradleTask>> taskDependenciesResolved = new HashMap<>();
+    private transient Map<String, List<GradleTask>> taskDeepDependencies = new HashMap<>();
 
     transient Boolean resolved = null;
 
@@ -284,56 +285,34 @@ public final class GradleBaseProject implements Serializable, ModuleSearchSuppor
     }
     
     /**
-     * Returns immediate dependencies of a Task. In a case that Gradle declares dependency on
-     * a task from another project (different {@link GradleTask#getPath} or a task that is not known
-     * in {@link #getTasks()}, a {@link GradleTask} descriptor with no group or display name can
-     * be included.
-     * Return empty list for tasks that are not registered with {@link #getTasks}.
+     * For a given task, lists all predecessors of the task within the current project.
+     * If tasks from other projects are referenced, they are returned as mock objects,
+     * that have no group and no description and no dependencies.
+     * <p>
+     * The result is partially sorted so that dependencies always precede the dependent
+     * task.
      * 
-     * @param t task
-     * @return the dependencies
+     * @param gt gradle task to inspect
+     * @param directs if true, only direct predecessors are returned
+     * @return list of predecessor tasks.
      */
-    public List<GradleTask> getTaskDependencies(GradleTask t) {
-        if (tasksByName.get(t.getName()) == null) {
-            return Collections.emptyList();
-        }
-        List<String> taskPaths = taskDependencies.get(t.getName());
-        List<GradleTask> result;
-        
-        synchronized (this) {
-            result = taskDependenciesResolved.get(t.getName());
-            if (result != null) {
-                return result;
-            }
-        }
-        result = new ArrayList<>();
-        for (String s : taskPaths) {
-            int lastColon = s.lastIndexOf(':');
-            String p = s.substring(0, lastColon);
-            String n = p.substring(lastColon + 1);
-            if (path.equals(p)) {
-                GradleTask gr = getTaskByName(n);
-                if (gr != null) {
-                    result.add(gr);
-                    continue;
+    public List<GradleTask> getTaskPredecessors(GradleTask gt, boolean directs) {
+        // do not cache direct dependencies, they're cheap.
+        if (!directs) {
+            synchronized (this) {
+                List<GradleTask> cached = taskDeepDependencies.get(gt.getName());
+                if (cached != null) {
+                    return cached;
                 }
             }
-            result.add(new GradleTask(p, null, n, null));
         }
-        synchronized (this) {
-            taskDependenciesResolved.putIfAbsent(t.getName(), Collections.unmodifiableList(result));
-        }
-        return result;
-    }
-
-    public List<GradleTask> getTaskPredecessors(GradleTask gt) {
         Set<String> paths = new HashSet<>();
         Queue<String> toProcess = new ArrayDeque<>();
         toProcess.add(gt.getPath());
         
         String taskPath;
         Map<String, String> taskNamesAndPaths = new HashMap<>();
-        
+        boolean first = true;
         while ((taskPath = toProcess.poll()) != null) {
             if (taskPath.equals("") || !paths.add(taskPath)) {
                 continue;
@@ -345,7 +324,11 @@ public final class GradleBaseProject implements Serializable, ModuleSearchSuppor
                 // taskNamesAndPaths only receives tasks from this project.
                 taskNamesAndPaths.put(taskPath, n);
             }
-            toProcess.addAll(taskDependencies.getOrDefault(n, Collections.emptyList()));
+            if (!directs || first) {
+                // if directs, allow just the 1st level to be added to toProcess.
+                toProcess.addAll(taskDependencies.getOrDefault(n, Collections.emptyList()));
+            }
+            first = false;
         }
         
         Map<String, List<String>> edges = new HashMap<>();
@@ -375,7 +358,25 @@ public final class GradleBaseProject implements Serializable, ModuleSearchSuppor
                 result.add(new GradleTask(p, null, n, null));
             }
         }
+        if (!directs) {
+            synchronized (this) {
+                taskDeepDependencies.putIfAbsent(gt.getName(), result);
+            }
+        }
         return result;
+    }
+    
+    /**
+     * Determines if a task is a subtype of a certain Gradle type. 
+     * User-defined tasks may define different names, but the can be identified
+     * by the gradle type they extend or implement.
+     * Use fully qualified API class names for {@code gradleFQN} parameter.
+     * @param gradleFQN the fully qualified type name
+     * @return true, if the task type matches.
+     */
+    public boolean isTaskInstanceOf(String name, String gradleFQN) {
+        Set s = taskTypes.get(name);
+        return s == null ? false : s.contains(gradleFQN);
     }
 
     public Map<String, GradleConfiguration> getConfigurations() {

@@ -137,7 +137,9 @@ class GradleBaseProjectBuilder implements ProjectInfoExtractor.Result {
         for (String tn : prj.getTaskNames()) {
             Map<String, String> tinfo = (Map<String, String>)taskInfos.get(tn);
             if (tinfo != null) {
-                prj.taskDependencies.put(tn, Arrays.asList(tinfo.getOrDefault("taskDependencies", "").split(",")));
+                prj.taskDependencies.put(tn, Arrays.asList(tinfo.getOrDefault("taskDependencies", "").split(","))); // NOI18N
+                Set<String> inherited = new LinkedHashSet<>(Arrays.asList(tinfo.getOrDefault("inherits", "").split(","))); // NOI18N
+                prj.taskTypes.put(tn, inherited);
             }
         }
     }

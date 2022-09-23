@@ -184,6 +184,11 @@ public final class ProjectArtifactsQuery {
                 if (this.artifacts != null && this.artifacts.equals(specs)) {
                     return copy;
                 }
+                if (this.artifacts == null) {
+                    // still unitialized, will not fire events
+                    this.artifacts = copy;
+                    return copy;
+                }
                 this.artifacts = copy;
                 if (listeners.isEmpty()) {
                     return copy;

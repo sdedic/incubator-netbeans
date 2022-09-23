@@ -203,6 +203,7 @@ class NbProjectInfoBuilder {
         runAndRegisterPerf(model, "taskDependencies", this::detectTaskDependencies);
         runAndRegisterPerf(model, "taskProperties", this::detectTaskProperties);
         runAndRegisterPerf(model, "artifacts", this::detectConfigurationArtifacts);
+        storeGlobalTypes(model);
         return model;
     }
 
@@ -223,6 +224,25 @@ class NbProjectInfoBuilder {
         model.getInfo().put("license", license);
     }
     
+    private void addTypes(Class c, Set<Class> types) {
+        if (c == null || !types.add(c)) {
+            return;
+        }
+        if (c.getSuperclass() != Object.class) {
+            addTypes(c.getSuperclass(), types);
+        }
+        for (Class i : c.getInterfaces()) {
+            addTypes(i, types);
+        }
+    }
+    
+    private String getTaskInheritance(Task t) {
+        Class nonDecorated = findNonDecoratedClass(t.getClass());
+        Set<Class> classes = new HashSet<>();
+        addTypes(nonDecorated, classes);
+        return classes.stream().map(Class::getName).sorted().collect(Collectors.joining(","));
+    }
+    
     private void detectTaskProperties(NbProjectInfoModel model) {
         Map<String, Object> taskProperties = new HashMap<>();
         Map<String, String> taskPropertyTypes = new HashMap<>();
@@ -234,11 +254,11 @@ class NbProjectInfoBuilder {
             Class nonDecorated = findNonDecoratedClass(taskClass);
             
             taskPropertyTypes.put(task.getName(), nonDecorated.getName());
-            inspectObjectAndValues(taskClass, task, task.getName() + ".", globalTypes, taskPropertyTypes, taskProperties);
+            inspectObjectAndValues(taskClass, task, task.getName() + ".", globalTypes, taskPropertyTypes, taskProperties); // NOI18N
         }
         
-        model.getInfo().put("taskProperties", taskProperties);
-        model.getInfo().put("taskPropertyTypes", taskPropertyTypes);
+        model.getInfo().put("taskProperties", taskProperties); // NOI18N
+        model.getInfo().put("taskPropertyTypes", taskPropertyTypes); // NOI18N
     }
     
     private void detectTaskDependencies(NbProjectInfoModel model) {
@@ -248,17 +268,22 @@ class NbProjectInfoBuilder {
         for (String s : taskList.keySet()) {
             Task task = taskList.get(s);
             Map<String, String> taskInfo = new HashMap<>();
-            taskInfo.put("type", task.getClass().getName());
-            taskInfo.put("name", task.getPath());
-            taskInfo.put("enabled", Boolean.toString(task.getEnabled()));
-            taskInfo.put("mustRunAfter", dependenciesAsString(task, task.getMustRunAfter()));
-            taskInfo.put("shouldRunAfter", dependenciesAsString(task, task.getShouldRunAfter()));
-            taskInfo.put("taskDependencies", dependenciesAsString(task, task.getTaskDependencies()));
+            taskInfo.put("name", task.getPath()); // NOI18N
+            taskInfo.put("enabled", Boolean.toString(task.getEnabled())); // NOI18N
+            taskInfo.put("mustRunAfter", dependenciesAsString(task, task.getMustRunAfter())); // NOI18N
+            taskInfo.put("shouldRunAfter", dependenciesAsString(task, task.getShouldRunAfter())); // NOI18N
+            taskInfo.put("taskDependencies", dependenciesAsString(task, task.getTaskDependencies())); // NOI18N
             
+            Class taskClass = task.getClass();
+            Class nonDecorated = findNonDecoratedClass(taskClass);
+            
+            taskInfo.put("type", nonDecorated.getName()); // NOI18N
+            taskInfo.put("inherits", getTaskInheritance(task)); // NOI18N
+
             tasks.put(task.getName(), taskInfo);
         }
         
-        model.getInfo().put("taskDetails", tasks);
+        model.getInfo().put("taskDetails", tasks); // NOI18N
     }
     
     private String dependenciesAsString(Task t, TaskDependency td) {
@@ -286,23 +311,23 @@ class NbProjectInfoBuilder {
             LOG.lifecycle("Configuration {} artifacts:", c.getName());
             for (PublishArtifact a : publishSet) {
                 Map<String, String> artData = new HashMap<>();
-                artData.put("name", a.getName());
-                artData.put("classifier", a.getClassifier());
-                artData.put("extension", a.getExtension());
-                artData.put("type", a.getType());
+                artData.put("name", a.getName()); // NOI18N
+                artData.put("classifier", a.getClassifier()); // NOI18N
+                artData.put("extension", a.getExtension()); // NOI18N
+                artData.put("type", a.getType()); // NOI18N
                 
                 File f = a.getFile();
                 LOG.info("\t{}: name: {}, type: {}, classifier: {}, extension: {}", 
                         f.getPath(), a.getName(), a.getType(), a.getClassifier(), a.getExtension());
                 Set<? extends Task> tasks = a.getBuildDependencies().getDependencies(null);
                 String taskList = tasks.stream().map(t -> t.getName()).collect(Collectors.joining(","));
-                artData.put("buildDeps", taskList);
-                LOG.info("\tbuilt by: {}", taskList);
+                artData.put("buildDeps", taskList); // NOI18N
+                LOG.info("\tbuilt by: {}", taskList); // NOI18N
                 confData.put(f.getPath(), artData);
             }
             data.put(c.getName(), confData);
         }
-        model.getInfo().put("configurationArtifacts", data);
+        model.getInfo().put("configurationArtifacts", data); // NOI18N
     }
     
     private void detectAdditionalPlugins(NbProjectInfoModel model) {
@@ -324,7 +349,8 @@ class NbProjectInfoBuilder {
         project.getPlugins().matching((Plugin p) -> {
             for (Class c = p.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
                 Class fc = c;
-                Optional<PluginId> id = sinceGradleOrDefault("7.1", () -> pmi.findPluginIdForClass(fc), Optional::empty);
+                // with Gradle 7.1+, plugins can be better enumerated. Prior to 7.1 I can only get IDs for registry-supplied plugins.
+                Optional<PluginId> id = sinceGradleOrDefault("7.1", () -> pmi.findPluginIdForClass(fc), Optional::empty); // NOI18N
                 if (id.isEmpty() && reg != null) {
                     id = reg.findPluginForClass(c);
                 }
@@ -335,9 +361,9 @@ class NbProjectInfoBuilder {
                 }
             }
             return false;
-        }).toArray(); // force iteration :)
-        
-        ((Collection)model.getInfo().get("plugins")).addAll(plugins);
+        }).toArray(); // force iteration, gradle is lazier than I :)
+        // rely on Set to avoid duplicities.
+        ((Set)model.getInfo().get("plugins")).addAll(plugins); // NOI18N
     }
     
     private void runAndRegisterPerf(NbProjectInfoModel model, String s, Consumer<NbProjectInfoModel> r) {
@@ -354,6 +380,10 @@ class NbProjectInfoBuilder {
         }
     }
     
+    private void storeGlobalTypes(NbProjectInfoModel model) {
+        model.getInfo().put("extensions.globalTypes", globalTypes); // NOI18N
+    }
+    
     private void detectExtensions(NbProjectInfoModel model) {
         StringBuilder sb = new StringBuilder();
         for (String s : IGNORED_SYSTEM_CLASSES_REGEXP) {
@@ -365,7 +395,6 @@ class NbProjectInfoBuilder {
         ignoreClassesPattern = Pattern.compile(sb.toString());
 
         inspectExtensions("", project.getExtensions());
-        model.getInfo().put("extensions.globalTypes", globalTypes); // NOI18N
         model.getInfo().put("extensions.propertyTypes", propertyTypes); // NOI18N
         model.getInfo().put("extensions.propertyValues", values); // NOI18N
     }
@@ -389,6 +418,9 @@ class NbProjectInfoBuilder {
             "didWork"
     ));
     
+    /**
+     * Classes that are ignored during value/type introspection. 
+     */
     private static final String[] IGNORED_SYSTEM_CLASSES_REGEXP = {
             "java\\..*",
             "org\\.gradle\\.api\\.file\\..*",
@@ -640,9 +672,11 @@ class NbProjectInfoBuilder {
     Map<String, Object> values = new HashMap<>();
 
     /**
-     * Inspects one extension
-     * @param prefix prefix for the extension
-     * @param container 
+     * Inspects extension container on an object. The prefix should be name of the object, including "." delimiter, will be used
+     * to prefix all properties found.
+     * 
+     * @param prefix prefix for the extension, including "." tail delimiter
+     * @param container extension container to enumerate.
      */
     private void inspectExtensions(String prefix, ExtensionContainer container) {
         for (ExtensionSchema es : container.getExtensionsSchema().getElements()) {

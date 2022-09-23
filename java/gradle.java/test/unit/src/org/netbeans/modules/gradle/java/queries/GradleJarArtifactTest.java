@@ -19,9 +19,18 @@
 package org.netbeans.modules.gradle.java.queries;
 
 import java.io.File;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import static junit.framework.TestCase.assertNotNull;
 import org.netbeans.api.project.Project;
+import org.netbeans.api.project.ProjectActionContext;
 import org.netbeans.api.project.ProjectManager;
 import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.junit.NbTestCase;
@@ -31,6 +40,7 @@ import org.netbeans.modules.gradle.options.GradleExperimentalSettings;
 import org.netbeans.modules.project.dependency.ArtifactSpec;
 import org.netbeans.modules.project.dependency.ProjectArtifactsQuery;
 import org.netbeans.modules.project.dependency.ProjectArtifactsQuery.ArtifactsResult;
+import org.netbeans.spi.project.ActionProvider;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.modules.DummyInstalledFileLocator;
@@ -95,5 +105,180 @@ public class GradleJarArtifactTest extends NbTestCase {
         List<ArtifactSpec> specs = res.getArtifacts();
         assertNotNull(specs);
         assertEquals(1, specs.size());
+        
+        ArtifactSpec art = specs.get(0);
+        assertEquals("jar", art.getType());
+        assertEquals("simple1", art.getArtifactId());
+        assertEquals("", art.getGroupId());
+        assertNull(art.getVersionSpec());
+        assertNull(art.getClassifier());
+    }
+    
+    public void testPickClassesAsDefault() throws Exception {
+        Project p = makeProject("artifacts/withTests");
+        ArtifactsResult res = ProjectArtifactsQuery.findArtifacts(p, ProjectArtifactsQuery.newQuery(null));
+        List<ArtifactSpec> specs = res.getArtifacts();
+        assertNotNull(specs);
+        assertEquals(1, specs.size());
+        
+        ArtifactSpec art = specs.get(0);
+        assertEquals("jar", art.getType());
+        assertEquals("withTests", art.getArtifactId());
+        assertEquals("", art.getGroupId());
+        assertNull(art.getVersionSpec());
+        assertNull(art.getClassifier());
+    }
+
+    public void testSelectTestsAndSources() throws Exception {
+        Project p = makeProject("artifacts/withTests");
+        ArtifactsResult res = ProjectArtifactsQuery.findArtifacts(p, ProjectArtifactsQuery.newQuery(null, ArtifactSpec.CLASSIFIER_TESTS, null));
+        List<ArtifactSpec> specs = res.getArtifacts();
+        assertNotNull(specs);
+        assertEquals(1, specs.size());
+        
+        ArtifactSpec art = specs.get(0);
+        assertEquals("jar", art.getType());
+        assertEquals("withTests", art.getArtifactId());
+        assertEquals("", art.getGroupId());
+        assertNull(art.getVersionSpec());
+        assertEquals("tests", art.getClassifier());
+        
+        res = ProjectArtifactsQuery.findArtifacts(p, ProjectArtifactsQuery.newQuery(null, ArtifactSpec.CLASSIFIER_TEST_SOURCES, null));
+        specs = res.getArtifacts();
+        art = specs.get(0);
+        assertEquals("jar", art.getType());
+        assertEquals("withTests", art.getArtifactId());
+        assertEquals("", art.getGroupId());
+        assertNull(art.getVersionSpec());
+        assertEquals("test-sources", art.getClassifier());
+    }
+    
+    public void testProvideAllArtifacts() throws Exception {
+        Project p = makeProject("artifacts/withTests");
+        ArtifactsResult res = ProjectArtifactsQuery.findArtifacts(p, ProjectArtifactsQuery.newQuery(null, ProjectArtifactsQuery.Filter.CLASSIFIER_ANY, null));
+        List<ArtifactSpec> specs = res.getArtifacts();
+        assertNotNull(specs); 
+        assertEquals(3, specs.size());
+        int found = 0;
+        int foundSources = 0;
+        int foundTestSources = 0;
+        
+        for (ArtifactSpec a : specs) {
+            assertEquals("withTests", a.getArtifactId());
+            assertEquals("", a.getGroupId());
+            if (null == a.getClassifier()) {
+                found++;
+            } else if ("tests".equals(a.getClassifier())) {
+                foundSources++;
+            } else if ("test-sources".equals(a.getClassifier())) {
+                foundTestSources++;
+            }
+            URI loc = a.getLocation();
+            assertNotNull(loc);
+            String path = loc.getPath();
+            int slash = path.lastIndexOf('/');
+            String name = path.substring(slash + 1);
+            assertEquals("withTests" + (a.getClassifier() == null ? "" : "-" + a.getClassifier()) + ".jar", name);
+        }
+        assertEquals(1, found);
+        assertEquals(1, foundSources);
+        assertEquals(1, foundTestSources);
+    }
+    
+    public void testNoJarsInDifferentType() throws Exception {
+        Project p = makeProject("artifacts/withTests");
+        ArtifactsResult res = ProjectArtifactsQuery.findArtifacts(p, ProjectArtifactsQuery.newQuery("executable", ProjectArtifactsQuery.Filter.CLASSIFIER_ANY, null));
+        List<ArtifactSpec> specs = res.getArtifacts();
+        assertNotNull(specs); 
+        assertEquals(Collections.emptyList(), specs);
+    }
+    
+    /**
+     * Checks that if a task is not included in the build sequence, its artifact is not reported. Here
+     * the 'testSources' task is included in the complete build, but not in 'test' task predecessors.
+     */
+    public void testNotIncludedTaskArtifactMissing() throws Exception {
+        Project p = makeProject("artifacts/withTests");
+        ArtifactsResult res = ProjectArtifactsQuery.findArtifacts(p, 
+                ProjectArtifactsQuery.newQuery(null, ProjectArtifactsQuery.Filter.CLASSIFIER_ANY, 
+                    ProjectActionContext.newBuilder(p).forProjectAction(ActionProvider.COMMAND_TEST).context()
+        ));
+        List<ArtifactSpec> specs = res.getArtifacts();
+        assertNotNull(specs); 
+        // only testJar is explicitly built
+        assertEquals(1, specs.size());
+        
+        ArtifactSpec art = specs.get(0);
+        assertEquals("jar", art.getType());
+        assertEquals("withTests", art.getArtifactId());
+        assertEquals("", art.getGroupId());
+        assertNull(art.getVersionSpec());
+        assertEquals("tests", art.getClassifier());
+    }
+
+    /**
+     * In the 'assemble' sequence, jar is present, but the 'testJar' is not.
+     */
+    public void testNotIncludedTaskArtifactMissing2() throws Exception {
+        Project p = makeProject("artifacts/withTests");
+        ArtifactsResult res = ProjectArtifactsQuery.findArtifacts(p, 
+                ProjectArtifactsQuery.newQuery(null, ProjectArtifactsQuery.Filter.CLASSIFIER_ANY, 
+                    ProjectActionContext.newBuilder(p).forProjectAction("assemble").context()
+        ));
+        List<ArtifactSpec> specs = res.getArtifacts();
+        assertNotNull(specs); 
+        // only testJar is explicitly built
+        assertEquals(1, specs.size());
+        
+        ArtifactSpec art = specs.get(0);
+        assertEquals("jar", art.getType());
+        assertEquals("withTests", art.getArtifactId());
+        assertEquals("", art.getGroupId());
+        assertNull(art.getVersionSpec());
+        assertNull(art.getClassifier());
+    }
+    
+    /**
+     * Checks that when the buildscript changes, the project eventually reloads and the
+     * computed result fires and changes contents.
+     * @throws Exception 
+     */
+    public void testGradleBuildchanged() throws Exception {
+        clearWorkDir();
+        Project p = makeProject("artifacts/withTests");
+        ArtifactsResult res = ProjectArtifactsQuery.findArtifacts(p, 
+                ProjectArtifactsQuery.newQuery(null, ArtifactSpec.CLASSIFIER_SOURCES, 
+                    ProjectActionContext.newBuilder(p).forProjectAction("assemble").context()
+        ));
+        AtomicInteger numberOfEvents = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(1);
+        res.addChangeListener((e) -> {
+            numberOfEvents.incrementAndGet();
+            latch.countDown();
+        });
+        
+        List<ArtifactSpec> specs = res.getArtifacts();
+        assertNotNull(specs); 
+        // only testJar is explicitly built
+        assertEquals(0, specs.size());
+        
+        NbGradleProject project = NbGradleProject.get(p);
+        File buildscript = project.getGradleFiles().getBuildScript();
+        Files.write(buildscript.toPath(), 
+                Arrays.asList(
+                    "",
+                    "",
+                    "task sourcesJar(type: Jar) {",
+                    "    classifier = 'sources'",
+                    "    from sourceSets.main.allSource",
+                    "}",
+                    "assemble.dependsOn sourcesJar"
+                ),
+                StandardOpenOption.APPEND);
+        // force refresh - project is not opened.
+        project.toQuality("refresh", NbGradleProject.Quality.FULL, true).toCompletableFuture().get();
+        
+        assertTrue(latch.await(3, TimeUnit.SECONDS));
+        assertEquals(1, numberOfEvents.get());
     }
 }
