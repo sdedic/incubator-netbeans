@@ -53,6 +53,7 @@ args=""
 
 prefixcp=""
 postfixcp=""
+extraclusters=""
 
 updater_class=org.netbeans.updater.UpdaterFrame
 
@@ -67,12 +68,14 @@ while [ $# -gt 0 ] ; do
 Usage: $0 {options} arguments
 
 General options:
-  --help                show this help 
-  --jdkhome <path>      path to Java(TM) 2 SDK, Standard Edition
-  -J<jvm_option>        pass <jvm_option> to JVM
+  --help                    show this help 
+  --jdkhome <path>          path to Java(TM) 2 SDK, Standard Edition
+  -J<jvm_option>            pass <jvm_option> to JVM
 
-  --cp:p <classpath>    prepend <classpath> to classpath
-  --cp:a <classpath>    append <classpath> to classpath
+  --cp:p <classpath>        prepend <classpath> to classpath
+  --cp:a <classpath>        append <classpath> to classpath
+
+  --add-clusters <pathlist> include additional clusters
 EOF
             # go on and print IDE options as well
         args="$args --help"
@@ -112,6 +115,12 @@ EOF
             shift;
             if [ $# -gt 0 ] ; then
                 clusters="$1"
+            fi
+            ;;
+        --add-clusters)
+            shift;
+            if [ $# -gt 0 ] ; then
+                extraclusters="$1"
             fi
             ;;
         -psn*)
@@ -192,6 +201,9 @@ fi
 # rename old heap dump to .old
 mv "${userdir}/var/log/heapdump.hprof" "${userdir}/var/log/heapdump.hprof.old" > /dev/null 2>&1
 
+if [ ! -z "$extraclusters" ] ; then
+    clusters="${clusters}:${extraclusters}"
+fi
 jargs_without_clusters="$jargs -Djava.security.manager=allow"
 jargs="-Dnetbeans.dirs=\"${clusters}\" $jargs_without_clusters"
 
