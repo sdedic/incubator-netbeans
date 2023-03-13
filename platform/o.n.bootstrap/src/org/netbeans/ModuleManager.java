@@ -1680,7 +1680,8 @@ public final class ModuleManager extends Modules {
             }
             if (m.isEnabled()) throw new IllegalModuleException(IllegalModuleException.Reason.SIMULATE_ENABLE_ALREADY, m);
             if (!m.isValid()) throw new IllegalModuleException(IllegalModuleException.Reason.SIMULATE_ENABLE_INVALID, m);
-            maybeAddToEnableList(willEnable, modules, m, true);
+            addedBecauseOfDependent = null;
+            maybeAddToEnableList(willEnable, modules, m, true, null);
         }
         // XXX clumsy but should work:
         Set<Module> stillDisabled = new HashSet<Module>(this.modules);
@@ -1742,7 +1743,11 @@ public final class ModuleManager extends Modules {
         return false;
     }
     
-    private void maybeAddToEnableList(Set<Module> willEnable, Set<Module> mightEnable, Module m, boolean okToFail) {
+    private Module addedBecauseOfDependent;
+    private boolean eagerActivation;
+    private Set<Module> reported = new HashSet<>();
+    
+    private void maybeAddToEnableList(Set<Module> willEnable, Set<Module> mightEnable, Module m, boolean okToFail, String reason) {
         if (! missingDependencies(m).isEmpty()) {
             if (!okToFail) {
                 Util.err.warning("Module " + m + " had unexpected problems: " + missingDependencies(m));
@@ -1751,72 +1756,93 @@ public final class ModuleManager extends Modules {
             // Cannot satisfy its dependencies, exclude it.
             return;
         }
+        if (reported.add(m)) {
+            if (addedBecauseOfDependent == null) {
+                System.err.println("DEP: \"" + m.getCodeNameBase() + '"' + (eagerActivation ? "[color=cornsilk]" : ""));
+            } else if (!addedBecauseOfDependent.getCodeNameBase().equals(m.getCodeNameBase())) {
+                System.err.println("DEP: \"" + addedBecauseOfDependent.getCodeNameBase() + "\" "+ "->\""  
+                        + (reason != null ? "[label=\"" + reason + "\"]" : "")
+                        + " " + m.getCodeNameBase() + '"');
+            }
+        }
         if (!willEnable.add(m)) {
             // Already there, done.
             return;
         }
-        // need to register fragments eagerly, so they are available during
-        // dependency sort
-        Module host = attachModuleFragment(m);
-        if (host != null && !host.isEnabled()) {
-            maybeAddToEnableList(willEnable, mightEnable, host, okToFail);
-        }
-        // Also add anything it depends on, if not already there,
-        // or already enabled.
-        for (Dependency dep : m.getDependenciesArray()) {
-            if (dep.getType() == Dependency.TYPE_MODULE) {
-                String codeNameBase = (String)Util.parseCodeName(dep.getName())[0];
-                Module other = get(codeNameBase);
-                // Should never happen:
-                if (other == null) throw new IllegalStateException("Should have found module: " + codeNameBase); // NOI18N
-                if (! other.isEnabled()) {
-                    maybeAddToEnableList(willEnable, mightEnable, other, false);
-                }
-            } else if (
-                dep.getType() == Dependency.TYPE_REQUIRES || 
-                dep.getType() == Dependency.TYPE_NEEDS ||
-                dep.getType() == Dependency.TYPE_RECOMMENDS
-            ) {
-                Set<Module> providers = getProvidersOf().get(dep.getName());
-                if (providers == null) {
-                    assert dep.getType() == Dependency.TYPE_RECOMMENDS : "Should have found a provider of " + dep;
-                    continue;
-                }
-                // First check if >= 1 is already enabled or will be soon. If so, great.
-                boolean foundOne = false;
-                for (Module other : providers) {
-                    if (other.isEnabled() ||
-                            (other.getProblems().isEmpty() && mightEnable.contains(other))) {
-                        foundOne = true;
-                        break;
-                    }
-                }
-                if (foundOne) {
-                    // OK, we are satisfied.
-                    continue;
-                }
-                // All disabled. So add them all to the enable list.
-                for (Module other : providers) {
-                    // It is OK if one of them fails.
-                    maybeAddToEnableList(willEnable, mightEnable, other, true);
-                    // But we still check to ensure that at least one did not!
-                    if (!foundOne && willEnable.contains(other)) {
-                        foundOne = true;
-                        // and continue with the others, try to add them too...
-                    }
-                }
-                // Logic is that missingDependencies(m) should contain dep in this case.
-                assert foundOne || dep.getType() == Dependency.TYPE_RECOMMENDS : "Should have found a nonproblematic provider of " + dep + " among " + providers + " with willEnable=" + willEnable + " mightEnable=" + mightEnable;
+        Module outer = addedBecauseOfDependent;
+        boolean outerEagerActivatioon = eagerActivation;
+        Set<Module> outerReported = reported;
+        try {
+            reported = new HashSet<>();
+            addedBecauseOfDependent = m;
+            // need to register fragments eagerly, so they are available during
+            // dependency sort
+            Module host = attachModuleFragment(m);
+            if (host != null && !host.isEnabled()) {
+                maybeAddToEnableList(willEnable, mightEnable, host, okToFail, "Fragment host");
             }
-            // else some other kind of dependency that does not concern us
-        }
-        Collection<Module> frags = getAttachedFragments(m);
-        for (Module fragMod : frags) {
-            // do not enable regular fragments unless eager: if something depends on a fragment, it will 
-            // enable the fragment along with normal dependencies.
-            if (fragMod.isEager()) {
-                maybeAddToEnableList(willEnable, mightEnable, fragMod, fragMod.isAutoload() || fragMod.isEager());
+            
+            // Also add anything it depends on, if not already there,
+            // or already enabled.
+            for (Dependency dep : m.getDependenciesArray()) {
+                if (dep.getType() == Dependency.TYPE_MODULE) {
+                    String codeNameBase = (String)Util.parseCodeName(dep.getName())[0];
+                    Module other = get(codeNameBase);
+                    // Should never happen:
+                    if (other == null) throw new IllegalStateException("Should have found module: " + codeNameBase); // NOI18N
+                    if (! other.isEnabled()) {
+                        maybeAddToEnableList(willEnable, mightEnable, other, false, null);
+                    }
+                } else if (
+                    dep.getType() == Dependency.TYPE_REQUIRES || 
+                    dep.getType() == Dependency.TYPE_NEEDS ||
+                    dep.getType() == Dependency.TYPE_RECOMMENDS
+                ) {
+                    Set<Module> providers = getProvidersOf().get(dep.getName());
+                    if (providers == null) {
+                        assert dep.getType() == Dependency.TYPE_RECOMMENDS : "Should have found a provider of " + dep;
+                        continue;
+                    }
+                    // First check if >= 1 is already enabled or will be soon. If so, great.
+                    boolean foundOne = false;
+                    for (Module other : providers) {
+                        if (other.isEnabled() ||
+                                (other.getProblems().isEmpty() && mightEnable.contains(other))) {
+                            foundOne = true;
+                            break;
+                        }
+                    }
+                    if (foundOne) {
+                        // OK, we are satisfied.
+                        continue;
+                    }
+                    // All disabled. So add them all to the enable list.
+                    for (Module other : providers) {
+                        // It is OK if one of them fails.
+                        maybeAddToEnableList(willEnable, mightEnable, other, true, (dep.getName().startsWith("cnb.") ? null : "Provides " + dep.getName()));
+                        // But we still check to ensure that at least one did not!
+                        if (!foundOne && willEnable.contains(other)) {
+                            foundOne = true;
+                            // and continue with the others, try to add them too...
+                        }
+                    }
+                    // Logic is that missingDependencies(m) should contain dep in this case.
+                    assert foundOne || dep.getType() == Dependency.TYPE_RECOMMENDS : "Should have found a nonproblematic provider of " + dep + " among " + providers + " with willEnable=" + willEnable + " mightEnable=" + mightEnable;
+                }
+                // else some other kind of dependency that does not concern us
             }
+            Collection<Module> frags = getAttachedFragments(m);
+            for (Module fragMod : frags) {
+                // do not enable regular fragments unless eager: if something depends on a fragment, it will 
+                // enable the fragment along with normal dependencies.
+                if (fragMod.isEager()) {
+                    maybeAddToEnableList(willEnable, mightEnable, fragMod, fragMod.isAutoload() || fragMod.isEager(), "Fragment");
+                }
+            }
+        } finally {
+            reported = outerReported;
+            addedBecauseOfDependent = outer;
+            eagerActivation = outerEagerActivatioon;
         }
     }
     private boolean searchForPossibleEager(Set<Module> willEnable, Set<Module> stillDisabled, Set<Module> mightEnable) {
@@ -1849,7 +1875,12 @@ public final class ModuleManager extends Modules {
                     // Go for it!
                     found = true;
                     it.remove();
-                    maybeAddToEnableList(willEnable, mightEnable, m, false);
+                    eagerActivation = true;
+                    try {
+                        maybeAddToEnableList(willEnable, mightEnable, m, false, "Eager");
+                    } finally {
+                        eagerActivation = false;
+                    }
                 }
             }
         }
