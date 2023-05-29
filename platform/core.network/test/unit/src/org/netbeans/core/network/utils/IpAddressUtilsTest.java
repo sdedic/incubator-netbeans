@@ -13,6 +13,7 @@
  */
 package org.netbeans.core.network.utils;
 
+import org.netbeans.network.api.IpTypePreference;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.concurrent.TimeoutException;
@@ -68,20 +69,20 @@ public class IpAddressUtilsTest {
 
         InetAddress[] addrInput = new InetAddress[]{ipv4Addr, ipv6Addr};
         fakeDns.addForwardResolution("test1", addrInput);
-        InetAddress[] addresses2 = IpAddressUtils.nameResolveArr("test1", 1000, IpAddressUtils.IpTypePreference.ANY_IPV4_PREF);
+        InetAddress[] addresses2 = IpAddressUtils.nameResolveArr("test1", 1000, IpTypePreference.ANY_IPV4_PREF);
         assertArrayEquals(addrInput, addresses2);
-        InetAddress[] addresses3 = IpAddressUtils.nameResolveArr("test1", 1000, IpAddressUtils.IpTypePreference.ANY_IPV6_PREF);
+        InetAddress[] addresses3 = IpAddressUtils.nameResolveArr("test1", 1000, IpTypePreference.ANY_IPV6_PREF);
         assertArrayEquals(new InetAddress[]{ipv6Addr, ipv4Addr}, addresses3);
-        InetAddress[] addresses4 = IpAddressUtils.nameResolveArr("test1", 1000, IpAddressUtils.IpTypePreference.IPV4_ONLY);
+        InetAddress[] addresses4 = IpAddressUtils.nameResolveArr("test1", 1000, IpTypePreference.IPV4_ONLY);
         assertArrayEquals(new InetAddress[]{ipv4Addr}, addresses4);
-        InetAddress[] addresses5 = IpAddressUtils.nameResolveArr("test1", 1000, IpAddressUtils.IpTypePreference.IPV6_ONLY);
+        InetAddress[] addresses5 = IpAddressUtils.nameResolveArr("test1", 1000, IpTypePreference.IPV6_ONLY);
         assertArrayEquals(new InetAddress[]{ipv6Addr}, addresses5);
         
         
         fakeDns.delayAnsweringBy(4000);
         fakeDns.addForwardResolution("test2", addrInput);
         try {
-            InetAddress[] addresses6 = IpAddressUtils.nameResolveArr("test2", 1000, IpAddressUtils.IpTypePreference.ANY_IPV4_PREF);
+            InetAddress[] addresses6 = IpAddressUtils.nameResolveArr("test2", 1000, IpTypePreference.ANY_IPV4_PREF);
             fail("This should have timed out");
         } catch (TimeoutException ex) {
         }

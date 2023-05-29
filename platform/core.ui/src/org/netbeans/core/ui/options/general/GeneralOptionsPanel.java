@@ -69,6 +69,7 @@ public class GeneralOptionsPanel extends JPanel implements ActionListener {
 
     private final Icon PROXY_TEST_OK = ImageUtilities.loadImageIcon("org/netbeans/core/ui/options/general/ok_16.png", false);
     private final Icon PROXY_TEST_ERROR = ImageUtilities.loadImageIcon("org/netbeans/core/ui/options/general/error_16.png", false);
+    private final RequestProcessor RELOADER_RP = new RequestProcessor(GeneralOptionsPanel.class);
     
     /** 
      * Creates new form GeneralOptionsPanel. 
@@ -504,8 +505,13 @@ private void bMoreProxyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
     }//GEN-LAST:event_lblLearnMoreMousePressed
 
     private void bReloadProxyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_bReloadProxyActionPerformed
-        ProxySettings.reload();
-        rbUseSystemProxy.setToolTipText(getUseSystemProxyToolTip());
+        bReloadProxy.setEnabled(false);
+        RELOADER_RP.post(() -> {
+            ProxySettings.reload();
+            rbUseSystemProxy.setToolTipText(getUseSystemProxyToolTip());
+        }).addTaskListener((e) -> {
+            bReloadProxy.setEnabled(true);
+        });
     }//GEN-LAST:event_bReloadProxyActionPerformed
 
     private void bTestConnectionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_bTestConnectionActionPerformed

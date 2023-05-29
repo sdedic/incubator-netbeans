@@ -13,6 +13,7 @@
  */
 package org.netbeans.core.network.utils;
 
+import org.netbeans.network.api.IpTypePreference;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -44,38 +45,38 @@ public class LocalAddressUtilsTest {
 
     @Test
     public void testGetLocalHostAddresses() throws Exception {
-        InetAddress[] result = LocalAddressUtils.getLocalHostAddresses(IpAddressUtils.IpTypePreference.IPV4_ONLY);
+        InetAddress[] result = LocalAddressUtils.getLocalHostAddresses(IpTypePreference.IPV4_ONLY);
         assertNotNull(result);
     }
 
 
     @Test
     public void testGetPrioritizedLocalHostAddresses() {
-        List<InetAddress> result = LocalAddressUtils.getPrioritizedLocalHostAddresses(IpAddressUtils.IpTypePreference.IPV4_ONLY);
+        List<InetAddress> result = LocalAddressUtils.getPrioritizedLocalHostAddresses(IpTypePreference.IPV4_ONLY);
         assertNotNull(result);
     }
 
     @Test
     public void testGetMostLikelyLocalInetAddresses() {
-        InetAddress[] result = LocalAddressUtils.getMostLikelyLocalInetAddresses(IpAddressUtils.IpTypePreference.IPV4_ONLY);
+        InetAddress[] result = LocalAddressUtils.getMostLikelyLocalInetAddresses(IpTypePreference.IPV4_ONLY);
         assertNotNull(result);
     }
 
     @Test
     public void testGetMostLikelyLocalInetAddress() {
-        InetAddress result = LocalAddressUtils.getMostLikelyLocalInetAddress(IpAddressUtils.IpTypePreference.IPV4_ONLY);
+        InetAddress result = LocalAddressUtils.getMostLikelyLocalInetAddress(IpTypePreference.IPV4_ONLY);
         assertNotNull(result);
     }
 
     @Test
     public void testGetLoopbackAddress() {
-        InetAddress inetAddress = LocalAddressUtils.getLoopbackAddress(IpAddressUtils.IpTypePreference.IPV4_ONLY);
+        InetAddress inetAddress = LocalAddressUtils.getLoopbackAddress(IpTypePreference.IPV4_ONLY);
         assertEquals("local-ipv4-dummy", inetAddress.getHostName());
         assertEquals("127.0.0.1", inetAddress.getHostAddress());
-        inetAddress = LocalAddressUtils.getLoopbackAddress(IpAddressUtils.IpTypePreference.IPV6_ONLY);
+        inetAddress = LocalAddressUtils.getLoopbackAddress(IpTypePreference.IPV6_ONLY);
         assertEquals("local-ipv6-dummy", inetAddress.getHostName());
         assertEquals("0:0:0:0:0:0:0:1", inetAddress.getHostAddress());
-        inetAddress = LocalAddressUtils.getLoopbackAddress(IpAddressUtils.IpTypePreference.ANY_JDK_PREF);
+        inetAddress = LocalAddressUtils.getLoopbackAddress(IpTypePreference.ANY_JDK_PREF);
         assertEquals("local-ipv4-dummy", inetAddress.getHostName());
         assertEquals("127.0.0.1", inetAddress.getHostAddress());
     }
@@ -83,7 +84,7 @@ public class LocalAddressUtilsTest {
 
     @Test
     public void testIsSoftwareVirtualAdapter() throws SocketException {
-        InetAddress inetAddress = LocalAddressUtils.getLoopbackAddress(IpAddressUtils.IpTypePreference.ANY_IPV4_PREF);
+        InetAddress inetAddress = LocalAddressUtils.getLoopbackAddress(IpTypePreference.ANY_IPV4_PREF);
         NetworkInterface networkInterface = NetworkInterface.getByInetAddress(inetAddress);
         assertFalse(LocalAddressUtils.isSoftwareVirtualAdapter(networkInterface));
     }

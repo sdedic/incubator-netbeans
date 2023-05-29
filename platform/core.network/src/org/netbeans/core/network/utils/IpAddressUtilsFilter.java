@@ -18,6 +18,7 @@
  */
 package org.netbeans.core.network.utils;
 
+import org.netbeans.network.api.IpTypePreference;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -47,19 +48,19 @@ class IpAddressUtilsFilter {
     }
     private IpAddressUtilsFilter() {}
     
-    protected static InetAddress pickInetAddress(Iterable<InetAddress> sortedList, IpAddressUtils.IpTypePreference ipTypePref) {
-        IpAddressUtils.IpTypePreference pref = getIpTypePreferenceResolved(ipTypePref);
+    protected static InetAddress pickInetAddress(Iterable<InetAddress> sortedList, IpTypePreference ipTypePref) {
+        IpTypePreference pref = getIpTypePreferenceResolved(ipTypePref);
         for (InetAddress ipAddress : sortedList) {
-            if (pref == IpAddressUtils.IpTypePreference.ANY_IPV4_PREF  || pref == IpAddressUtils.IpTypePreference.ANY_IPV6_PREF) {
+            if (pref == IpTypePreference.ANY_IPV4_PREF  || pref == IpTypePreference.ANY_IPV6_PREF) {
                 return ipAddress;
             }
             if (ipAddress instanceof Inet4Address) {
-                if (pref == IpAddressUtils.IpTypePreference.IPV4_ONLY) {
+                if (pref == IpTypePreference.IPV4_ONLY) {
                     return ipAddress;
                 }
             }
             if (ipAddress instanceof Inet6Address) {
-                if (pref == IpAddressUtils.IpTypePreference.IPV6_ONLY) {
+                if (pref == IpTypePreference.IPV6_ONLY) {
                     return ipAddress;
                 }
             }
@@ -67,38 +68,38 @@ class IpAddressUtilsFilter {
         return null;
     }
     
-    protected static @NonNull List<InetAddress> filterInetAddresses(Iterable<InetAddress> list, IpAddressUtils.IpTypePreference ipTypePref) {
-        IpAddressUtils.IpTypePreference pref = getIpTypePreferenceResolved(ipTypePref);
+    protected static @NonNull List<InetAddress> filterInetAddresses(Iterable<InetAddress> list, IpTypePreference ipTypePref) {
+        IpTypePreference pref = getIpTypePreferenceResolved(ipTypePref);
         List<InetAddress> newList = new ArrayList<>();
         if (list != null) {
             for (InetAddress ipAddress : list) {
-                if (pref == IpAddressUtils.IpTypePreference.ANY_IPV4_PREF || pref == IpAddressUtils.IpTypePreference.ANY_IPV6_PREF) {
+                if (pref == IpTypePreference.ANY_IPV4_PREF || pref == IpTypePreference.ANY_IPV6_PREF) {
                     newList.add(ipAddress);
                 } else {
-                    if ((ipAddress instanceof Inet4Address) && (pref == IpAddressUtils.IpTypePreference.IPV4_ONLY)) {
+                    if ((ipAddress instanceof Inet4Address) && (pref == IpTypePreference.IPV4_ONLY)) {
                         newList.add(ipAddress);
                     }
-                    if ((ipAddress instanceof Inet6Address) && (pref == IpAddressUtils.IpTypePreference.IPV6_ONLY)) {
+                    if ((ipAddress instanceof Inet6Address) && (pref == IpTypePreference.IPV6_ONLY)) {
                         newList.add(ipAddress);
                     }
                 }
             }
         }
-        if (pref == IpAddressUtils.IpTypePreference.ANY_IPV4_PREF) {
+        if (pref == IpTypePreference.ANY_IPV4_PREF) {
             IpAddressUtils.sortIpAddressesShallow(newList,true);
         }
-        if (pref == IpAddressUtils.IpTypePreference.ANY_IPV6_PREF) {
+        if (pref == IpTypePreference.ANY_IPV6_PREF) {
             IpAddressUtils.sortIpAddressesShallow(newList,false);
         }
         return newList;
     }
 
-    private static IpAddressUtils.IpTypePreference getIpTypePreferenceResolved(IpAddressUtils.IpTypePreference ipTypePref) {
-        if (ipTypePref == IpAddressUtils.IpTypePreference.ANY_JDK_PREF) {
+    private static IpTypePreference getIpTypePreferenceResolved(IpTypePreference ipTypePref) {
+        if (ipTypePref == IpTypePreference.ANY_JDK_PREF) {
             if (JDK_PREFER_IPV6_ADDRESS) {
-                return IpAddressUtils.IpTypePreference.ANY_IPV6_PREF;
+                return IpTypePreference.ANY_IPV6_PREF;
             } else {
-                return IpAddressUtils.IpTypePreference.ANY_IPV4_PREF;
+                return IpTypePreference.ANY_IPV4_PREF;
             }
         } else {
             return ipTypePref;

@@ -31,6 +31,10 @@ import org.netbeans.core.network.proxy.pac.PacScriptEvaluator;
 import org.netbeans.core.network.proxy.pac.PacScriptEvaluatorFactory;
 import org.netbeans.core.network.proxy.pac.PacScriptEvaluatorNoProxy;
 import org.netbeans.core.network.proxy.pac.PacValidationException;
+import org.netbeans.core.network.utils.IpAddressUtils;
+import org.netbeans.network.api.IpTypePreference;
+import org.netbeans.core.network.utils.LocalAddressUtils;
+import org.openide.util.Exceptions;
 import org.openide.util.Lookup;
 import org.openide.util.RequestProcessor;
 import org.openide.util.RequestProcessor.Task;
@@ -42,17 +46,19 @@ import org.openide.util.Utilities;
  */
 public class ProxyAutoConfig {
 
-    private static final Map<String, ProxyAutoConfig> file2pac = new HashMap<String, ProxyAutoConfig>(2);
+    private static final Map<InetAddress, Map<String, ProxyAutoConfig>> file2pac = new HashMap<>(2);
     private static final RequestProcessor RP = new RequestProcessor(ProxyAutoConfig.class);
     private static final String PROTO_FILE = "file://";
-
+    
     /**
      * 
      * @param pacFile The string to be parsed into a URI
      * @return ProxyAutoConfig for given pacFile or <code>null</code> if constructor failed
      */
     public static synchronized ProxyAutoConfig get(String pacFile) {
-        if (file2pac.get(pacFile) == null) {
+        InetAddress add = LocalAddressUtils.getMostLikelyLocalInetAddress(IpTypePreference.ANY_IPV4_PREF);
+        Map<String, ProxyAutoConfig> m = file2pac.computeIfAbsent(add, (a) -> new HashMap<>());
+        if (m.get(pacFile) == null) {
             LOGGER.fine("Init ProxyAutoConfig for " + pacFile);
             ProxyAutoConfig instance = null;
             try {
@@ -60,10 +66,10 @@ public class ProxyAutoConfig {
             } catch (URISyntaxException ex) {
                 LOGGER.warning("Parsing " + pacFile + " to URI throws " + ex);
             } finally {
-                file2pac.put(pacFile, instance);
+                m.put(pacFile, instance);
             }
         }
-        return file2pac.get(pacFile);
+        return m.get(pacFile);
     }
     private static final Logger LOGGER = Logger.getLogger(ProxyAutoConfig.class.getName());
     private PacScriptEvaluator evaluator;

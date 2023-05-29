@@ -18,11 +18,14 @@
  */
 package org.netbeans.core.network.proxy.windows;
 
+import com.sun.jna.Callback;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
 import com.sun.jna.Structure.FieldOrder;
+import com.sun.jna.platform.win32.WinDef.ULONGLONG;
+import com.sun.jna.ptr.PointerByReference;
 
 /**
  *
@@ -45,4 +48,10 @@ public interface WindowsNetworkProxyLibrary extends Library {
     public boolean WinHttpGetIEProxyConfigForCurrentUser(
         ProxyConfig proxyConfig
     );
+    
+    int WinHttpRegisterProxyChangeNotification(ULONGLONG flags, ProxyCallback cb, Pointer context, PointerByReference hRef);
+    
+    public interface ProxyCallback extends Callback {
+        public void settingsChanged(long flags, Pointer context);
+    }
 }

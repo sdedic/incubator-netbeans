@@ -19,14 +19,21 @@
 
 package org.netbeans.core.network.utils;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PipedOutputStream;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,10 +45,16 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.netbeans.api.annotations.common.NonNull;
-import org.netbeans.core.network.utils.IpAddressUtils.IpTypePreference;
+import org.netbeans.network.api.IpTypePreference;
+import org.openide.util.BaseUtilities;
+import org.openide.util.Exceptions;
 import org.openide.util.RequestProcessor;
 
 /**
@@ -79,7 +92,7 @@ import org.openide.util.RequestProcessor;
  */
 public class LocalAddressUtils {
     private static final Logger LOG = Logger.getLogger(LocalAddressUtils.class.getName());
-    private static final RequestProcessor RP = new RequestProcessor("LocalNetworkAddressFinder", 4);
+    private static final RequestProcessor RP = new RequestProcessor("LocalNetworkAddressFinder", 6);
     
     // Create some static InetAddress'es. This is done in a somewhat convoluted
     // way, but one which guarantees that no DNS lookup will be performed.
@@ -194,10 +207,18 @@ public class LocalAddressUtils {
      */
     public static void refreshNetworkInfo(boolean await) {
         synchronized (LOCK) {
-            fut1 = RP.submit(C1);
-            fut2 = RP.submit(C2);
-            fut3 = RP.submit(C3);
-            fut4 = RP.submit(C4);
+            if (fut1 == null) {
+                fut1 = RP.submit(C1);
+            }
+            if (fut2 == null) {
+                fut2 = RP.submit(C2);
+            }
+            if (fut3 == null) {
+                fut3 = RP.submit(C3);
+            }
+            if (fut4 == null) {
+                fut4 = RP.submit(C4);
+            }
             if (await) {
                 try {
                     fut1.get();
@@ -318,7 +339,7 @@ public class LocalAddressUtils {
      * @param ipTypePref filter
      * @return prioritized list of addresses
      */
-    public static @NonNull List<InetAddress> getPrioritizedLocalHostAddresses(IpAddressUtils.IpTypePreference ipTypePref)  {
+    public static @NonNull List<InetAddress> getPrioritizedLocalHostAddresses(IpTypePreference ipTypePref)  {
         synchronized (LOCK) {
             if (fut3 == null) {
                 refreshNetworkInfo(false);
@@ -426,7 +447,7 @@ public class LocalAddressUtils {
      * @param ipTypePref IP protocol filter
      * @return IP addresses, never null
      */
-    public static @NonNull InetAddress[] getMostLikelyLocalInetAddresses(IpAddressUtils.IpTypePreference ipTypePref) {
+    public static @NonNull InetAddress[] getMostLikelyLocalInetAddresses(IpTypePreference ipTypePref) {
         List<InetAddress> filteredList = getPrioritizedLocalHostAddresses(ipTypePref);
         IpAddressUtils.removeLoopback(filteredList);
         
@@ -490,7 +511,7 @@ public class LocalAddressUtils {
      * @param ipTypePref IP protocol filter
      * @return IP address, never null
      */
-    public static @NonNull InetAddress getMostLikelyLocalInetAddress(IpAddressUtils.IpTypePreference ipTypePref) {
+    public static @NonNull InetAddress getMostLikelyLocalInetAddress(IpTypePreference ipTypePref) {
         InetAddress[] ipAddresses = getMostLikelyLocalInetAddresses(ipTypePref);
         // We're guaranteed the array will have length > 0 and never null.
         return ipAddresses[0];
@@ -510,7 +531,7 @@ public class LocalAddressUtils {
      * @param ipTypePref IPv4 vs IP4v6 preference
      * @return 
      */
-    public static @NonNull InetAddress getLoopbackAddress(IpAddressUtils.IpTypePreference ipTypePref) {
+    public static @NonNull InetAddress getLoopbackAddress(IpTypePreference ipTypePref) {
         switch(ipTypePref) {
             case IPV4_ONLY:
             case ANY_IPV4_PREF:
@@ -526,7 +547,7 @@ public class LocalAddressUtils {
  
     private static @NonNull List<InetAddress> getLocalNetworkInterfaceAddr() {
         final Map<InetAddress, Integer> mapWithScores = new HashMap<>();
-
+        
         // Looping through all network interfaces on the host.
         // WARNING:  On Windows this is quite slow. On my Intel Core i7 it takes 
         // approximately 1200 msecs and I only have 3 network interfaces defined. 
@@ -546,6 +567,17 @@ public class LocalAddressUtils {
             return Collections.emptyList();
         }
 
+        List<InetAddress> outgoing = new ArrayList<>();
+        if (interfaces.hasMoreElements()) {
+            InetAddress l = getLocalAddress(SOMEADDR_IPV4);
+            if (l != null) {
+                outgoing.add(l);
+            }
+            l = getLocalAddress(SOMEADDR_IPV6);
+            if (l != null) {
+                outgoing.add(l);
+            }
+        }
         while (interfaces.hasMoreElements()) {
             int ifScore = 0;  // the score for the interface, higher is better
             NetworkInterface netIf = interfaces.nextElement(); // inexpensive call
@@ -582,6 +614,9 @@ public class LocalAddressUtils {
                 if (address instanceof Inet6Address) {
                     addrScore -= 1;
                 }
+                if (outgoing.contains(ifAddr.getAddress())) {
+                    addrScore += 2;
+                }
                 
                 mapWithScores.put(address, ifScore + addrScore);
             }
@@ -597,13 +632,147 @@ public class LocalAddressUtils {
             }
         });
         
+        synchronized (LocalAddressUtils.class) {
+            if (list.size() > 0) {
+                c3CachedLocalAddress = list.get(0);
+            } else {
+                c3CachedLocalAddress = null;
+            }
+            localNetworkRefreshTask = RP.scheduleWithFixedDelay(() -> {
+                checkNetworkConnection();
+            }, NETWORK_CHANGE_POLL_DELAY, NETWORK_CHANGE_POLL_DELAY, TimeUnit.SECONDS);
+        }
+        
         return list;  // returns a prioritized list
     }
     
+    private static int NETWORK_CHANGE_POLL_DELAY = Integer.getInteger("org.netbeans.core.network.networkChangePoll", 1 * 60);
     
-   
+    private static InetAddress c3CachedLocalAddress;
     
-   
+    /**
+     * Regexp to parse "route" command output on MacOS X.
+     * The route output provides information about local IP and the gateway; we only need the local IP info at the moment.
+     */
+    private static final Pattern SOCKADDR_RE_4;
+    
+    static {
+        SOCKADDR_RE_4 = Pattern.compile("\\s*(?:[0-9.]+|default)\\s+([0-9.]+)?\\s+([0-9.]+|default)\\s+(?:([a-z0-9.]+):[0-9a-f:.]+)\\s+([0-9.]+)");
+    }
+    
+    /**
+     * Checks that the networking info obtained in the past and possibly cached is still valid. If network change is detected, the method
+     * return {@code true} and the relevant caches are cleared. The check is designed to be quick, some network changes may go unnoticed.
+     * To force refresh, use {@link #refreshNetworkInfo(boolean)}.
+     * 
+     * @return true, if the network may have changed.
+     */
+    public static boolean checkNetworkConnection() {
+        InetAddress cached;
+        synchronized (LocalAddressUtils.class) {
+            if (fut4 == null || fut3 == null) {
+                // no check since the network settings are not known or are invalidated.
+                return true;
+            }
+            cached = c3CachedLocalAddress;
+        }
+        
+        if (cached == null) {
+            return true;
+        }
+        InetAddress a;
+        
+        if (cached instanceof Inet4Address) {
+            a = getLocalAddress(SOMEADDR_IPV4);
+            if (a == null) {
+                a = getLocalAddress(SOMEADDR_IPV6);
+            }
+        } else {
+            // assume it's IPv6 address.
+            a = getLocalAddress(SOMEADDR_IPV6);
+            if (a == null) {
+                a = getLocalAddress(SOMEADDR_IPV4);
+            }
+        }
+        if (!cached.equals(a)) {
+            synchronized (LocalAddressUtils.class) {
+                fut4 = null;
+                fut3 = null;
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    /**
+     * Attempts to determine the outgoing network interface and local address that would
+     * be used to communicate with the destination. The implementation should be reasonably fast, only on MacOS X it 
+     * spawns an external command ({@code route get}). The method returns {@code null} if the outgoing address could not be determined 
+     * which in turns means that the destination may not be reachable. IPv4 is supported at the moment.
+     * 
+     * @param destination the destination address.
+     * @return the local address that would communicate with the specified destination.
+     */
+    public static InetAddress getLocalAddress(InetAddress destination) {
+        if (destination == null) {
+            destination = SOMEADDR_IPV4;
+        }
+        if (BaseUtilities.isMac()) {
+            // on Mac, the hack with DatagramSocket does not work; let's run a simple OS-level command
+            ProcessBuilder pb = new ProcessBuilder("route", "-nv", "get", destination.getHostAddress()); // NOI18N
+            try {
+                Process p = pb.start();
+                try (
+                        InputStreamReader r = new InputStreamReader(p.getInputStream(), Charset.forName("UTF-8")); // NOI18N
+                        BufferedReader br = new BufferedReader(r);
+                ) {
+                    String l;
+                    boolean addresses = false;
+                    
+                    while ((l = br.readLine()) != null) {
+                        if (l.startsWith("sockaddrs:")) { // NOI18N
+                            addresses = true;
+                        } else if (addresses) {
+                            Matcher m = SOCKADDR_RE_4.matcher(l);
+                            if (m.find() && m.group(1) != null) {
+                                return InetAddress.getByName(m.group(1));
+                            }
+                        }
+                    }
+                }
+            } catch (IOException ex) {
+                Exceptions.printStackTrace(ex);
+            }
+            return null;
+        }
+        if (destination instanceof Inet4Address) {
+            // IPv4 attempt
+            try (final DatagramSocket socket = new DatagramSocket()) {
+                socket.connect(SOMEADDR_IPV4, 10002);   // doesn¨t need to be reachable .. and port it irrelevant
+                InetAddress addr = socket.getLocalAddress();
+                if ((addr instanceof Inet4Address) && (!addr.isAnyLocalAddress() && (!addr.isLoopbackAddress()))) {
+                    return addr;
+                }
+            } catch (SecurityException | SocketException ex) {
+            }
+        }
+        // IPv6 attempt
+        try (final DatagramSocket socket = new DatagramSocket()) {
+            InetSocketAddress saddr = new InetSocketAddress(SOMEADDR_IPV6, 1002);
+            socket.connect(saddr);   // doesn¨t need to be reachable .. and port it irrelevant
+            InetAddress addr = socket.getLocalAddress();
+            if ((addr instanceof Inet6Address) && (!addr.isAnyLocalAddress() && (!addr.isLoopbackAddress()))) {
+                return addr;
+            }
+        } catch (SecurityException | SocketException ex) {
+            LOG.log(Level.FINE, "Could not deterine IPv6 outgoing address", ex);
+        }
+
+        return null;
+    }
+    
+    private static ScheduledFuture<?> localNetworkRefreshTask; 
     
     /**
      * Tries to guess if the network interface is a virtual adapter

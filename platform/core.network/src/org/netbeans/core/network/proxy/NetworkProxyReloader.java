@@ -32,6 +32,7 @@ import org.netbeans.core.network.proxy.gnome.GnomeNetworkProxy;
 import org.netbeans.core.network.proxy.kde.KdeNetworkProxy;
 import org.netbeans.core.network.proxy.mac.MacNetworkProxy;
 import org.netbeans.core.network.proxy.windows.WindowsNetworkProxy;
+import org.netbeans.core.network.utils.LocalAddressUtils;
 import org.openide.util.NbPreferences;
 import org.openide.util.Utilities;
 import org.openide.util.lookup.ServiceProvider;
@@ -83,6 +84,7 @@ public class NetworkProxyReloader extends ProxySettings.Reloader {
         NetworkProxySettings.ProxyMode mode = networkProxySettings.getProxyMode();
         switch (mode) {
             case AUTO:
+                LocalAddressUtils.checkNetworkConnection();
                 final ProxyAutoConfig pacForTest = ProxyAutoConfig.get(networkProxySettings.getPacFileUrl());
                 List<Proxy> testHttpProxy = null;
                 final String testHttpProxyHost;

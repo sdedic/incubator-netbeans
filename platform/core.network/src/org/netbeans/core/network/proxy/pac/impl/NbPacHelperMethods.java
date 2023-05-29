@@ -29,7 +29,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import org.netbeans.core.network.utils.IpAddressUtils;
-import org.netbeans.core.network.utils.IpAddressUtils.IpTypePreference;
+import org.netbeans.network.api.IpTypePreference;
 import org.netbeans.core.network.utils.LocalAddressUtils;
 import org.netbeans.core.network.proxy.pac.PacHelperMethods;
 import org.netbeans.core.network.proxy.pac.PacUtils;

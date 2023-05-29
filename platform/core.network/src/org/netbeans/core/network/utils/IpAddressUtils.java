@@ -19,6 +19,7 @@
 
 package org.netbeans.core.network.utils;
 
+import org.netbeans.network.api.IpTypePreference;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -67,40 +68,6 @@ public class IpAddressUtils {
         return INSTANCE;
     }
     
-    /**
-     * Filters the result of a method according to IP protocol preference.
-     */
-    public enum IpTypePreference {
-        /**
-         * Only IPv4 address(es) in the returned value. 
-         */
-        IPV4_ONLY,
-        /**
-         * Only IPv6 address(es) in the returned value. 
-         */
-        IPV6_ONLY,
-        /**
-         * Any of IPv4 or IPv6 addresses are acceptable in the returned value,
-         * but IPv4 address is preferred over IPv6. If the method returns
-         * an array then IPv4 addresses will come before IPv6 addresses.
-         */
-        ANY_IPV4_PREF,
-        /**
-         * Any of IPv4 or IPv6 addresses are acceptable in the returned value,
-         * but IPv6 address is preferred over IPv4. If the method returns
-         * an array then IPv6 addresses will come before IPv4 addresses.
-         */
-        ANY_IPV6_PREF,
-        /**
-         * Any of IPv4 or IPv6 addresses are acceptable in the returned value,
-         * but their internal preference is determined by the setting in the
-         * JDK, namely the {@code java.net.preferIPv6Addresses} system property.
-         * If this property is {@code true} then using this preference will be
-         * exactly as {@link #ANY_IPV6_PREF}, if {@code false} it will be 
-         * exactly as {@link #ANY_IPV4_PREF}.
-         */
-        ANY_JDK_PREF
-    }
     
     /**
      * Performs a name service lookup with a timeout. 
