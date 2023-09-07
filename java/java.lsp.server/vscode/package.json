@@ -446,6 +446,10 @@
 		],
 		"commands": [
 			{
+				"command": "nbls.test",
+				"title": "NBLS Test"
+			},
+			{
 				"command": "nbls.node.properties.edit",
 				"title": "Properties"
 			},

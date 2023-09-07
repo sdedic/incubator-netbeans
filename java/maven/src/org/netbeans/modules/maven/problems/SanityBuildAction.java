@@ -19,30 +19,57 @@
 
 package org.netbeans.modules.maven.problems;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.DefaultArtifact;
+import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
+import org.apache.maven.artifact.resolver.ArtifactResolutionException;
+import org.apache.maven.execution.MavenExecutionRequest;
+import org.apache.maven.execution.MavenExecutionResult;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.building.ModelBuildingException;
+import org.apache.maven.model.building.ModelProblem;
+import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.eclipse.aether.graph.Dependency;
 import org.netbeans.api.project.Project;
+import org.netbeans.api.project.ProjectManager;
 import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.modules.maven.TestChecker;
 import org.netbeans.modules.maven.api.NbMavenProject;
 import org.netbeans.modules.maven.api.execute.RunConfig.ReactorStyle;
 import org.netbeans.modules.maven.api.execute.RunUtils;
+import org.netbeans.modules.maven.embedder.EmbedderFactory;
+import org.netbeans.modules.maven.embedder.MavenEmbedder;
 import org.netbeans.modules.maven.execute.BeanRunConfig;
 import org.netbeans.modules.maven.execute.MavenProxySupport;
 import org.netbeans.modules.maven.execute.MavenProxySupport.ProxyResult;
+import org.netbeans.modules.maven.execute.ReactorChecker;
+import org.netbeans.modules.maven.modelcache.MavenProjectCache;
 import org.netbeans.modules.maven.options.MavenSettings;
 import static org.netbeans.modules.maven.problems.Bundle.*;
 import org.netbeans.spi.project.RootProjectProvider;
 import org.netbeans.spi.project.ui.ProjectProblemResolver;
 import org.netbeans.spi.project.ui.ProjectProblemsProvider;
 import org.openide.execution.ExecutorTask;
+import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
+import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
 import org.openide.util.NbBundle.Messages;
 import org.openide.util.NbPreferences;
@@ -94,7 +121,95 @@ public class SanityBuildAction implements ProjectProblemResolver {
             return pendingResult;
         }
         final CompletableFuture<ProjectProblemsProvider.Result> publicResult = new CompletableFuture<>();
-
+        
+        NbMavenProject mp = nbproject.getLookup().lookup(NbMavenProject.class);
+        NbMavenProject reactorProject = ReactorChecker.findReactor(mp);
+        ProjectProblemsProvider.Result r = ProjectProblemsProvider.Result.create(ProjectProblemsProvider.Status.UNRESOLVED, "Bleee");
+        
+        List<NbMavenProject> reactorProjects = new ArrayList<>();
+        Queue<NbMavenProject> toProcess = new ArrayDeque<>();
+        toProcess.add(reactorProject);
+        
+        Set<String> reactorProjectIds = new HashSet<>();
+        
+        while (!toProcess.isEmpty()) {
+            NbMavenProject p = toProcess.poll();
+            MavenProject p2 = p.getPartialMavenProject();
+            Artifact pa = p2.getArtifact();
+            String id = pa.getGroupId()+ ":" + pa.getArtifactId() + ":" + pa.getVersion();
+            if (pa.getClassifier() != null) {
+                id = id + ":" + pa.getClassifier();
+            }
+            reactorProjectIds.add(id);
+            File base = p.getMavenProject().getBasedir();
+            if (base != null) {
+                for (String s : p2.getModules()) {
+                    FileObject f = FileUtil.toFileObject(base.toPath().resolve(s).toFile());
+                    if (f != null) {
+                        try {
+                            Project sub= ProjectManager.getDefault().findProject(f);
+                            if (sub != null) {
+                                NbMavenProject submaven = sub.getLookup().lookup(NbMavenProject.class);
+                                if (submaven != null) {
+                                    toProcess.add(submaven);
+                                    reactorProjects.add(submaven);
+                                }
+                            }
+                        } catch (IOException ex) {
+                            // TODO: log ?
+                        }
+                    } 
+                }
+            }
+        }
+        
+        /*
+        MavenEmbedder e = EmbedderFactory.getOnlineEmbedder();
+        MavenExecutionRequest er = e.createMavenExecutionRequest();
+        
+        for (NbMavenProject p : reactorProjects) {
+            ProjectBuildingRequest dpbr = e.createMavenExecutionRequest().getProjectBuildingRequest();
+            MavenProject mprj = p.getMavenProject();
+            try {
+                // this will attempt to resolve the project, but might fail
+                Model mdl = p.getRawModel();
+            } catch (ModelBuildingException ex) {
+                MavenExecutionResult exe = MavenProjectCache.getExecutionResult(mprj);
+                // substituted dependencies are reported here. They have no scope
+                List<Dependency> deps = exe.getDependencyResolutionResult().getUnresolvedDependencies();
+                
+                Set<Artifact> artifactsToDownload = new HashSet<>();
+                for (Dependency d : deps) {
+                    org.eclipse.aether.artifact.Artifact a = d.getArtifact();
+                    String id = a.getGroupId()+ ":" + a.getArtifactId() + ":" + a.getVersion();
+                    if (a.getClassifier() != null) {
+                        id = id + ":" + a.getClassifier();
+                    }
+                    if (!reactorProjectIds.contains(id)) {
+                        String t = d.getArtifact().getProperty("type", d.getArtifact().getExtension());
+                        Artifact art = e.createArtifactWithClassifier(
+                                d.getArtifact().getGroupId(), 
+                                d.getArtifact().getArtifactId(),
+                                d.getArtifact().getVersion(), 
+                                t, 
+                                d.getArtifact().getClassifier()
+                        );
+                        try {
+                            e.resolveArtifact(art, p.getPartialMavenProject().getRemoteArtifactRepositories(), er.getLocalRepository());
+                        } catch (ArtifactResolutionException ex1) {
+                            Exceptions.printStackTrace(ex1);
+                        } catch (ArtifactNotFoundException ex1) {
+                            Exceptions.printStackTrace(ex1);
+                        }
+                    }
+                }
+            }
+        }
+        */
+        if (true) {
+            return CompletableFuture.completedFuture(r);
+        }
+        
         Runnable toRet = new Runnable() {
             @Override
             public void run() {
@@ -114,15 +229,18 @@ public class SanityBuildAction implements ProjectProblemResolver {
                     BeanRunConfig config = new BeanRunConfig();
                     config.setExecutionDirectory(FileUtil.toFile(nbproject.getProjectDirectory()));
                     NbMavenProject mavenPrj = nbproject.getLookup().lookup(NbMavenProject.class);
-                    String goals;
+                    String goalString;
                     if (mavenPrj != null
                             && mavenPrj.getMavenProject().getVersion() != null 
                             && mavenPrj.getMavenProject().getVersion().endsWith("SNAPSHOT")) {
-                        goals = NbPreferences.forModule(MavenSettings.class).get("primingBuild.snapshot.goals", "install");
+                        goalString = NbPreferences.forModule(MavenSettings.class).get("primingBuild.snapshot.goals", "-DexcludeReactor=true dependency:resolve-plugins dependency:resolve");
                     } else {
-                        goals = NbPreferences.forModule(MavenSettings.class).get("primingBuild.regular.goals", "package");
+                        goalString = NbPreferences.forModule(MavenSettings.class).get("primingBuild.regular.goals", "package");
                     }
-                    config.setGoals(Arrays.asList("--fail-at-end", goals)); // NOI18N
+                    List<String> goals = new ArrayList<>();
+                    goals.add("--fail-at-end");
+                    goals.addAll(Arrays.asList(goalString.split(" ")));
+                    config.setGoals(goals); // NOI18N
                     config.setReactorStyle(ReactorStyle.ALSO_MAKE);
                     config.setProperty(TestChecker.PROP_SKIP_TEST, "true"); //priming doesn't need test execution, just compilation
                     config.setProject(nbproject);

@@ -90,8 +90,9 @@ public class GradleNetworkProxySupport {
     private static final String JVM_HTTPS_PROXYHOST = "https.proxyHost"; // NOI18N
     private static final String JVM_HTTP_PROXYHOST = "http.proxyHost"; // NOI18N
     
-    private static final int PORT_DEFAULT_HTTPS = 1080;
+    private static final int PORT_DEFAULT_SOCKS = 1080;
     private static final int PORT_DEFAULT_HTTP = 80;
+    private static final int PORT_DEFAULT_HTTPS = 443;
     
     private final Project project;
     
@@ -403,8 +404,14 @@ public class GradleNetworkProxySupport {
                     eprops.put(SYSTEMPROP_HTTP_PROXYPORT, Integer.toString(publicProxyNonDefaultPort));
                     eprops.put(SYSTEMPROP_HTTPS_PROXYPORT, Integer.toString(publicProxyNonDefaultPort));
                 } else {
-                    eprops.remove(SYSTEMPROP_HTTP_PROXYPORT);
-                    eprops.remove(SYSTEMPROP_HTTPS_PROXYPORT);
+                    if (publicProxyPort == PORT_DEFAULT_HTTP) {
+                        eprops.remove(SYSTEMPROP_HTTP_PROXYPORT);
+                    }
+                    if (publicProxyPort == PORT_DEFAULT_HTTPS) {
+                        eprops.remove(SYSTEMPROP_HTTPS_PROXYPORT);
+                    } else {
+                        eprops.put(SYSTEMPROP_HTTPS_PROXYPORT, Integer.toString(publicProxyPort));
+                    }
                 }
                 eprops.setComment(SYSTEMPROP_HTTP_PROXYHOST, new String[] {
                         Bundle.COMMENT_CreatedByNetBeans(DateFormat.getDateTimeInstance().format(new Date()))
@@ -493,7 +500,7 @@ public class GradleNetworkProxySupport {
                             defPort = PORT_DEFAULT_HTTP; 
                             break;
                         case SOCKS:
-                            defPort = PORT_DEFAULT_HTTPS; 
+                            defPort = PORT_DEFAULT_SOCKS; 
                             break;
                     }
                     

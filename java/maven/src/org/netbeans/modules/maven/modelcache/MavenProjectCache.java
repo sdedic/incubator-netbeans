@@ -162,7 +162,7 @@ public final class MavenProjectCache {
             + "This is preventing the project model from loading properly. \n"
             + "Please file a bug report with details about your project and the IDE's log file.\n\n"
     })
-    private static @NonNull MavenProject loadOriginalMavenProject(final File pomFile) {
+    public static @NonNull MavenProject loadOriginalMavenProject(final File pomFile) {
         return loadOriginalMavenProject(pomFile, null, null);
     }
     
@@ -395,6 +395,7 @@ public final class MavenProjectCache {
         if (partial != null) {
             toReturn.setContextValue(CONTEXT_PARTIAL_PROJECT, partial);
         }
+        toReturn.setContextValue(CONTEXT_EXECUTION_RESULT, result);
         return toReturn;
         
     }
@@ -421,8 +422,12 @@ public final class MavenProjectCache {
         if ("error".equals(prj.getGroupId()) && "error".equals(prj.getArtifactId()) && Bundle.LBL_Incomplete_Project_Name().equals(prj.getName())) {
             return true;
         } else {
-            return prj.getContextValue(CONTEXT_PARTIAL_PROJECT) == Boolean.TRUE;
+            return prj.getContextValue(CONTEXT_PARTIAL_PROJECT) != null;
         }
+    }
+    
+    public static MavenProject getPartialProject(MavenProject prj) {
+        return (MavenProject)prj.getContextValue(CONTEXT_PARTIAL_PROJECT);
     }
     
     public static Properties createUserPropsForProjectLoading(Map<String, String> activeConfiguration) {

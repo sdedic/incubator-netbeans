@@ -49,7 +49,7 @@ public class NbArtifactFixer implements ArtifactFixer {
     private static final Logger LOG = Logger.getLogger(NbArtifactFixer.class.getName());
 
     private final ThreadLocal<Set<String>> gav = new ThreadLocal<Set<String>>();        //#234586
-            
+    
     public @Override File resolve(Artifact artifact) {
         if (!artifact.getExtension().equals(NbMavenProject.TYPE_POM)) {
             return null;
@@ -111,7 +111,7 @@ public class NbArtifactFixer implements ArtifactFixer {
             return null;
         }
     }
-
+    
     public static final String FALLBACK_NAME = "F@LLB@CK";
     
     /**

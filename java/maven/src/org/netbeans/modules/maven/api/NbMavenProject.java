@@ -290,6 +290,21 @@ public final class NbMavenProject {
     }
     
     /**
+     * Provides access to a partial project. In case the {@link #getMavenProject} is not a {@link #isErrorPlaceholder(org.apache.maven.project.MavenProject) a fallback project},
+     * the function returns the {@link #getMavenProject()} instance. Otherwise, it returns the partial project model constructed during
+     * a failed project model load. That model may not contain all parts or be completely evaluated or resolved - use at your own risk.
+     * 
+     * @return partial or full project instance.
+     */
+    public @NonNull MavenProject getPartialMavenProject() {
+        MavenProject p = getMavenProject();
+        if (!isErrorPlaceholder(p)) {
+            return p;
+        }
+        return MavenProjectCache.getPartialProject(p);
+    }
+    
+    /**
      * Returns a project evaluated for a certain purpose. The while {@link #getMavenProject}
      * works with the <b>active configuration</b> and does not apply any action-specific properties,
      * this method tries to apply mappings, configurations, etc when loading the project model.
@@ -640,7 +655,7 @@ public final class NbMavenProject {
     public static boolean isErrorPlaceholder(@NonNull MavenProject project) {
         return MavenProjectCache.isFallbackproject(project); // see NbMavenProjectImpl.getFallbackProject
     }
-
+    
     @Override public String toString() {
         return project.toString();
     }

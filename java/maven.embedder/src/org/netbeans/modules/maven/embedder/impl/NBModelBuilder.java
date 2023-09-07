@@ -33,6 +33,7 @@ import org.apache.maven.model.building.DefaultModelBuilder;
 import org.apache.maven.model.building.ModelBuildingException;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.model.building.ModelBuildingResult;
+import org.apache.maven.project.ProjectModelResolver;
 import org.netbeans.modules.maven.embedder.EmbedderFactory;
 import org.netbeans.modules.maven.embedder.MavenEmbedder;
 import org.netbeans.modules.maven.embedder.MavenEmbedder.ModelDescription;

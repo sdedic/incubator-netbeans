@@ -73,9 +73,9 @@ class NBRepositoryModelResolver
         try {
             embedder.resolveArtifact(artifactParent, remoteRepositories, embedder.getLocalRepository());
         } catch (ArtifactResolutionException ex) {
-             throw new UnresolvableModelException(ex.getMessage(),  groupId , artifactId , version );
+             throw new UnresolvableModelException(ex.getMessage(),  groupId , artifactId , version, ex );
         } catch (ArtifactNotFoundException ex) {
-            throw new UnresolvableModelException( ex.getMessage(),  groupId , artifactId , version );
+            throw new UnresolvableModelException( ex.getMessage(),  groupId , artifactId , version, ex );
         }
 
         return new FileModelSource(artifactParent.getFile());

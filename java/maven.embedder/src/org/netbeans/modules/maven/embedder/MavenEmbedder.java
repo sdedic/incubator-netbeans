@@ -31,11 +31,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.maven.DefaultMaven;
 import org.apache.maven.Maven;
-import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.InvalidRepositoryException;
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -98,8 +98,8 @@ import org.openide.util.Exceptions;
 import org.openide.util.BaseUtilities;
 import org.eclipse.aether.repository.Authentication;
 import org.eclipse.aether.DefaultRepositorySystemSession;
+import org.eclipse.aether.graph.Dependency;
 import org.eclipse.aether.internal.impl.EnhancedLocalRepositoryManagerFactory;
-import org.eclipse.aether.internal.impl.SimpleLocalRepositoryManagerFactory;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.NoLocalRepositoryManagerException;
 import org.eclipse.aether.util.repository.AuthenticationBuilder;
@@ -112,7 +112,7 @@ import org.eclipse.aether.util.repository.DefaultProxySelector;
  * Since 2.36, all File instances in Artifacts, MavenProjects or Models should be pre-emptively normalized.
  */
 public final class MavenEmbedder {
-
+    
     private static final Logger LOG = Logger.getLogger(MavenEmbedder.class.getName());
     private final PlexusContainer plexus;
     private final DefaultMaven maven;
@@ -233,8 +233,9 @@ public final class MavenEmbedder {
     }
     
     public MavenExecutionResult readProjectWithDependencies(MavenExecutionRequest req, boolean useWorkspaceResolution) {
+        NbWorkspaceReader reader = new NbWorkspaceReader();
         if (useWorkspaceResolution) {
-            req.setWorkspaceReader(new NbWorkspaceReader());
+            req.setWorkspaceReader(reader);
         }
         File pomFile = req.getPom();
         MavenExecutionResult result = new DefaultMavenExecutionResult();
@@ -249,15 +250,23 @@ public final class MavenEmbedder {
         } catch (ProjectBuildingException ex) {
             //don't add the exception here. this should come out as a build marker, not fill
             //the error logs with msgs
+            if (!ex.getResults().isEmpty() && !reader.getFixedArtifacts().isEmpty()) {
+                ProjectBuildingResult r = ex.getResults().get(0);
+                result.setDependencyResolutionResult(r.getDependencyResolutionResult());
+                reader.getFixedArtifacts().stream().map(a -> new Dependency(a, null)).forEach(r.getDependencyResolutionResult().getUnresolvedDependencies()::add);
+            }
             return result.addException(ex);
+        } finally {
+            
         }
         normalizePaths(result.getProject());
         return result;
     }
 
     public List<MavenExecutionResult> readProjectsWithDependencies(MavenExecutionRequest req, List<File> poms, boolean useWorkspaceResolution) {
+        NbWorkspaceReader reader = new NbWorkspaceReader();
         if (useWorkspaceResolution) {
-            req.setWorkspaceReader(new NbWorkspaceReader());
+            req.setWorkspaceReader(reader);
         }
 //        File pomFile = req.getPom();
         
@@ -605,7 +614,7 @@ public final class MavenEmbedder {
      */
     public void setUpLegacySupport() {
         LegacySupport support = lookupComponent(LegacySupport.class);
-        if (support.getSession() != null) {
+        if (support.getSession() != null && support.getSession().isOffline() == isOffline()) {
             return;
         }
         DefaultRepositorySystemSession session = new DefaultRepositorySystemSession();

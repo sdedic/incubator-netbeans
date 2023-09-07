@@ -21,7 +21,10 @@ package org.netbeans.modules.maven.embedder.impl;
 import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import org.eclipse.aether.artifact.Artifact;
 import org.netbeans.modules.maven.embedder.ArtifactFixer;
 import org.openide.util.Lookup;
 import org.eclipse.aether.repository.WorkspaceReader;
@@ -35,6 +38,7 @@ public class NbWorkspaceReader implements WorkspaceReader {
     private final WorkspaceRepository repo;
     private final Collection<? extends ArtifactFixer> fixers;
     boolean silence = false;
+    private Set<Artifact> fixedArtifacts = new HashSet<>();
     
     public NbWorkspaceReader() {
         repo = new WorkspaceRepository("ide", getClass());
@@ -55,10 +59,15 @@ public class NbWorkspaceReader implements WorkspaceReader {
         for (ArtifactFixer fixer : fixers) {
             File f = fixer.resolve(artifact);
             if (f != null) {
+                fixedArtifacts.add(artifact);
                 return f;
             }
         }
         return null;
+    }
+
+    public Set<Artifact> getFixedArtifacts() {
+        return fixedArtifacts;
     }
 
     @Override

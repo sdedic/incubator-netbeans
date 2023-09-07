@@ -264,6 +264,7 @@
                 <package>org.netbeans.modules.maven.embedder.exec</package>
                 <package>org.eclipse.aether</package>
                 <package>org.eclipse.aether.artifact</package>
+                <package>org.eclipse.aether.graph</package>
                 <package>org.eclipse.org.eclipse.aether</package>
                 <package>org.eclipse.aether.repository</package>
                 <package>org.eclipse.aether.transfer</package>

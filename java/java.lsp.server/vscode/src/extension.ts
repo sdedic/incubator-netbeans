@@ -501,6 +501,14 @@ export function activate(context: ExtensionContext): VSNetBeansAPI {
             commands.executeCommand('workbench.action.focusActiveEditorGroup');
         });
     }));
+
+    context.subscriptions.push(commands.registerCommand('nbls.test', async () =>{
+        let opts : any = {};
+        const GET_PROJECT_ARTIFACTS = 'nbls.project.artifacts';
+        const artifacts = await vscode.commands.executeCommand(GET_PROJECT_ARTIFACTS, window.activeTextEditor?.document.uri.toString(), opts);
+        console.log(artifacts);
+    }));
+
     context.subscriptions.push(commands.registerCommand('java.goto.super.implementation', async () => {
         if (window.activeTextEditor?.document.languageId !== "java") {
             return;
@@ -886,7 +894,7 @@ function doActivateWithJDK(specifiedJDK: string | null, context: ExtensionContex
                     handleLog(log, match[0]);
                 } else {
                     handleLog(log, "Cannot find org.netbeans.modules.java.lsp.server in the log!");
-                }
+                }6
                 log.show(false);
                 killNbProcess(false, log, p);
                 reject("Apache NetBeans Language Server not enabled!");
