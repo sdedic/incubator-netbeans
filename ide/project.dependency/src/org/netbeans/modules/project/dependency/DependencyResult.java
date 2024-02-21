@@ -90,7 +90,7 @@ public interface DependencyResult extends Lookup.Provider {
      * a result of e.g. text edit.
      * @param l the listener
      */
-    public void addSourceChangeListener(ChangeListener l);
+     public void addSourceChangeListener(ChangeListener l);
     
     /**
      * Removes a previously registered listener

@@ -43,7 +43,7 @@ public interface ProjectScopes {
      * 
      * @param s the scope
      * @param s direct if true, just direct implications are returned.
-     * @return 
+     * @return Collection of scopes, which the content of scope `s` is included in.
      */
     public Collection<? extends Scope> implies(Scope s, boolean direct);
 }

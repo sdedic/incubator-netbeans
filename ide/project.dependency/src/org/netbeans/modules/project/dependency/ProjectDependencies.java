@@ -79,6 +79,7 @@ public final class ProjectDependencies {
         private Dependency.Filter filter;
         private boolean offline = true;
         private boolean flush;
+        private Duplicates duplicates = Duplicates.DUPLICATE;
         
         private DependencyQueryBuilder() {
         }
@@ -87,7 +88,7 @@ public final class ProjectDependencies {
             if (scopes == null) {
                 scope(Scopes.COMPILE);
             }
-            return new DependencyQuery(scopes, filter, offline, flush);
+            return new DependencyQuery(scopes, filter, offline, flush, duplicates);
         }
         
         public DependencyQueryBuilder filter(Dependency.Filter f) {
@@ -120,6 +121,35 @@ public final class ProjectDependencies {
             flush = true;
             return this;
         }
+        
+        public DependencyQueryBuilder withDuplicates(Duplicates mode) {
+            this.duplicates = mode;
+            return this;
+        }
+    }
+    
+    /**
+     * Specifies the preferred handling of duplicates. Duplicate elimination is always based on a best-effort: a 
+     * duplicate may be eventually reported, if the implementation does not the knowledge of exact duplicates.
+     */
+    public enum Duplicates {
+        /**
+         * Report duplicate artifacts. The duplicate and its entire subtree will be repeated in the report. Ideal for 
+         * exhaustive traversal. Dependencies may be marked with {@link Relation#DUPLICATE}.
+         */
+        DUPLICATE, 
+        
+        /**
+         * A duplicate will be filtered out entirely, each artifact will be present at most once in the tree. Use if you are
+         * interested in collecting dependencies.
+         */
+        FILTER, 
+        
+        /**
+         * A duplicate will be present, but will report no transitive dependencies. Preferred, if it is not necessary to process
+         * transitive dependencies for each artifact's appearance. Trimmed dependencies should be marked with {@link Relation#DUPLICATE}.
+         */
+        LEAVES
     }
     
     public static final class DependencyQuery {
@@ -127,12 +157,14 @@ public final class ProjectDependencies {
         private final Dependency.Filter filter;
         private final boolean offline;
         private final boolean flushChaches;
+        private final Duplicates duplicates;
 
-        private DependencyQuery(Set<Scope> scopes, Dependency.Filter filter, boolean offline, boolean flushCaches) {
+        private DependencyQuery(Set<Scope> scopes, Dependency.Filter filter, boolean offline, boolean flushCaches, Duplicates duplicates) {
             this.scopes = scopes == null ? Collections.emptySet() : Collections.unmodifiableSet(new LinkedHashSet<>(scopes));
             this.filter = filter;
             this.offline = offline;
             this.flushChaches = flushCaches;
+            this.duplicates = duplicates;
         }
 
         public Set<Scope> getScopes() {
@@ -149,6 +181,10 @@ public final class ProjectDependencies {
 
         public boolean isFlushChaches() {
             return flushChaches;
+        }
+
+        public Duplicates getDuplicates() {
+            return duplicates;
         }
     }
     

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.netbeans.api.project.Project;
+import org.netbeans.modules.project.dependency.ProjectOperationException;
 import org.openide.filesystems.FileObject;
 
 /**
@@ -52,11 +53,11 @@ public interface ProjectReloadImplementation {
      * saved before project load could load fresh information
      * @return set of project files.
      */
-    public Set<FileObject>  findProjectFiles(boolean forProjectLoad);
+    public Set<FileObject>  findChanges(boolean forProjectLoad);
     
     /**
      * Attempts to reload project metadata, to reflect the current project state. Note that
-     * the resulting Future may report an {@link IOException} instead of a Project instance in
+     * the resulting Future may report an {@link IOException} or {@link ProjectOperationException} instead of a Project instance in
      * the case that the project loading fails.
      * 
      * @return a Future that will be completed when the project reloads.
