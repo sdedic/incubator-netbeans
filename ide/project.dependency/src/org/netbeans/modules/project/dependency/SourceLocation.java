@@ -31,14 +31,14 @@ import org.openide.filesystems.FileObject;
  * by another project construction, the {@link #getImpliedBy()} is not null, and provides
  * the model for that construction, which may be project type-specific. For example a dependency may be introduced by intermediate
  * libraries. In that case, when the API is queried for the dependency declaration source,
- * it will return the direct dependence that introduced the dependency in question from {@link #getImpliedBy}
- * and its location range. Other project-specific artifacts may be returned.
+ * it will return the direct {@link Dependency} that introduced the dependency in question from {@link #getImpliedBy}
+ * and its location range. Other project-specific model objects may be returned by {@link #getImpliedBy}.
  * <p/>
- * The SourceLocation can identify another artifact that contains the actual declaration. For implied
- * artifacts ({@link #getImpliedBy()}{@code != null}), the artifact identifies the artifact that declares
+ * The SourceLocation can identify another project model data that implied the actual declaration. For implied
+ * artifacts ({@link #getImpliedBy()}{@code != null}), it identifies the model element that declares
  * the dependency. If the dependency specification is split, i.e. into a BOM project and the
  * actual project where the dependency is used, for parts defined by the BOM the origin artifact identifies
- * the BOM.
+ * the BOM. 
  * 
  * @author sdedic
  */

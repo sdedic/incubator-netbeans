@@ -24,11 +24,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.DocumentEvent;
@@ -50,15 +48,16 @@ import org.netbeans.modules.maven.api.NbMavenProject;
 import org.netbeans.modules.maven.embedder.EmbedderFactory;
 import org.netbeans.modules.maven.model.Utilities;
 import org.netbeans.modules.maven.model.pom.ModelList;
-import org.netbeans.modules.maven.model.pom.POMComponent;
 import org.netbeans.modules.maven.model.pom.POMModel;
 import org.netbeans.modules.maven.model.pom.POMModelFactory;
 import org.netbeans.modules.project.dependency.ArtifactSpec;
 import org.netbeans.modules.project.dependency.Dependency;
 import org.netbeans.modules.project.dependency.DependencyResult;
 import org.netbeans.modules.project.dependency.ProjectScopes;
-import org.netbeans.modules.project.dependency.Scope;
 import org.netbeans.modules.project.dependency.SourceLocation;
+import org.netbeans.modules.project.dependency.spi.DependencyLocationProvider;
+import org.netbeans.modules.project.dependency.spi.ProjectDependenciesImplementation;
+import org.netbeans.modules.project.dependency.spi.ProjectDependenciesImplementation.Result;
 import org.netbeans.modules.xml.xam.ModelSource;
 import org.openide.cookies.EditorCookie;
 import org.openide.filesystems.FileObject;
@@ -72,12 +71,13 @@ import org.openide.util.WeakListeners;
  *
  * @author sdedic
  */
-class MavenDependencyResult implements org.netbeans.modules.project.dependency.DependencyResult, ProjectScopes, PropertyChangeListener {
+class MavenDependencyResult implements Result, PropertyChangeListener, DependencyLocationProvider {
     final Project ideProject;
     final NbMavenProject mavenProject;
+    final ArtifactSpec projectArtifact;
     final Dependency rootNode;
-    final Collection<Scope> scopes;
     final Collection<ArtifactSpec> problems;
+    final ProjectScopes scopes = new MavenStandardScopesImpl();
     PropertyChangeListener wL;
     volatile Model effectiveModel;
     Map<FileObject, StyledDocument> openedPoms = new HashMap<>();
@@ -87,52 +87,15 @@ class MavenDependencyResult implements org.netbeans.modules.project.dependency.D
     private Map<FileObject, DW> documentWatchers = new HashMap<>();
     private volatile boolean valid;
 
-    public MavenDependencyResult(MavenProject proj, Dependency rootNode, Collection<Scope> scopes, Collection<ArtifactSpec> problems, 
-            Project project, NbMavenProject mavenProject) {
+    public MavenDependencyResult(MavenProject proj, ArtifactSpec projectSpec, Dependency rootNode, Collection<ArtifactSpec> problems, 
+            Project project, NbMavenProject mavenProject, ProjectDependenciesImplementation.Context context) {
         this.ideProject = project;
         this.mavenProject = mavenProject;
+        this.projectArtifact = projectSpec;
         this.rootNode = rootNode;
-        this.scopes = scopes;
         this.problems = problems;
-    }
-
-    @Override
-    public ProjectScopes getScopes() {
-        return this;
-    }
-
-    @Override
-    public Collection<? extends Scope> scopes() {
-        return MavenDependenciesImplementation.scope2Maven.keySet();
-    }
-
-    @Override
-    public Collection<? extends Scope> implies(Scope s, boolean direct) {
-        return (direct ? MavenDependenciesImplementation.directScopes : MavenDependenciesImplementation.impliedScopes).getOrDefault(s, Collections.emptySet());
-    }
-
-    @Override
-    public Collection<FileObject> getDependencyFiles() {
-        File file = mavenProject.getMavenProject().getFile();
-        if (file == null) {
-            return Collections.emptyList();
-        }
-        return Collections.singleton(FileUtil.toFileObject(file));
-    }
-
-    @Override
-    public Project getProject() {
-        return ideProject;
-    }
-
-    @Override
-    public Collection<ArtifactSpec> getProblemArtifacts() {
-        return Collections.unmodifiableCollection(problems);
-    }
-
-    @Override
-    public Dependency getRoot() {
-        return rootNode;
+        
+        context.addLocationProvider(this);
     }
 
     @Override
@@ -215,7 +178,7 @@ class MavenDependencyResult implements org.netbeans.modules.project.dependency.D
     }
 
     public String toString() {
-        return "Depdenencies for " + getRoot().getArtifact() + " " + scopes.toString();
+        return "Depdenencies for " + this.projectArtifact + " " + scopes.toString();
     }
 
     public Lookup getLookup() {
@@ -287,7 +250,7 @@ class MavenDependencyResult implements org.netbeans.modules.project.dependency.D
 
     @NbBundle.Messages(value = "ERR_ModelBuildFailed=Model building failed")
     @Override
-    public SourceLocation getDeclarationRange(Dependency dep, String part) throws IOException {
+    public SourceLocation getDeclarationRange(DependencyResult dr, Dependency dep, String part) throws IOException {
         Model m;
         if (effectiveModel == null) {
             FileObject fo = FileUtil.toFileObject(mavenProject.getMavenProject().getFile());
@@ -315,10 +278,10 @@ class MavenDependencyResult implements org.netbeans.modules.project.dependency.D
         
         if (dep.getProjectData() instanceof DependencyNode) {
             DependencyNode pd = (DependencyNode) dep.getProjectData();
-            if (!(pd == rootNode.getProjectData() || pd.getParent() == rootNode.getProjectData())) {
+            if (pd.getParent() != null && pd.getParent().getParent() != null) {
                 do {
                     pd = pd.getParent();
-                } while (pd.getParent() != rootNode.getProjectData());
+                } while (pd.getParent().getParent() != null);
                 List<Dependency> rootDeps = rootNode.getChildren();
                 for (Dependency cd : rootDeps) {
                     if (MavenDependenciesImplementation.artifactEquals(cd.getArtifact(), pd.getArtifact())) {

@@ -126,7 +126,7 @@ public class GradleDependenciesImplementationTest extends NbTestCase {
         );
         assertNotNull("Dependency service is supported", r);
         
-        ArtifactSpec a = r.getRoot().getArtifact();
+        ArtifactSpec a = r.getProjectArtifact();
         assertNotNull("Project has GAV, should be manifested as artifact", a);
         GradleBaseProject gbp = GradleBaseProject.get(p);
         assertEquals(gbp.getName(), a.getArtifactId());
@@ -240,17 +240,23 @@ public class GradleDependenciesImplementationTest extends NbTestCase {
         
         // there are more paths to io.micronaut:micronaut-websocket:3.6.0; some of them are through an explicit dependency,
         // some through an injected one, micronaut-bom, which does not have any SourceLocation atm.
-        List<Dependency> deps = r.getRoot().getChildren().stream().flatMap(d -> d.getChildren().stream()).filter(d -> 
-                d.getArtifact().toString().equals("io.micronaut:micronaut-websocket:3.6.0")).collect(Collectors.toList());
-        assertFalse("Implied dependency is present", deps.isEmpty());
+        List<Dependency.Path> paths;
+        Dependency.Path treePath = Dependency.Path.of(r);
+        paths = r.getRoot().getChildren().stream().map(treePath::next).flatMap(
+            dp -> dp.getLeaf().getChildren().stream().map(dp::next)
+            ).filter(dp ->
+                    dp.getLeaf().getArtifact().toString().equals("io.micronaut:micronaut-websocket:3.6.0")).collect(Collectors.toList());
+        assertFalse("Implied dependency is present", paths.isEmpty());
         
         Dependency rd = null;
-        for (Dependency d : deps) {
-            srcLoc = r.getDeclarationRange(d, null);
+        for (Dependency.Path dp : paths) {
+            srcLoc = r.findDeclarationRange(dp, null);
             if (srcLoc != null) {
                 assertNotNull("4th party artifact should not have null location", srcLoc);
                 assertNotNull("4th party artifacts should report 'implied'", srcLoc.getImpliedBy());
-                for (rd = d.getParent(); rd.getParent() != r.getRoot(); rd = rd.getParent() ) ;
+                for (; dp.getParent().getLeaf() != r.getRoot(); dp = dp.getParent()) {
+                    rd = dp.getLeaf();
+                }
                 break;
             }
         }

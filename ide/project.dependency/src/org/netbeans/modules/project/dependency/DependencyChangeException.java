@@ -22,6 +22,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.netbeans.api.lsp.TextDocumentEdit;
+import org.netbeans.api.lsp.WorkspaceEdit;
 
 /**
  *
@@ -48,10 +50,25 @@ public final class DependencyChangeException extends Exception {
          * A dependency in the request is invalid and cannot be applied.
          */
         MALFORMED,
+
+        /**
+         * The change cannot be applied because one or more participants interfered
+         * in a way that the request cannot be completed.
+         */
+        INTERFERED
     };
     
     private final Reason reason;
+    
+    /**
+     * The original request
+     */
     private final DependencyChange request;
+    
+    /**
+     * The offending edits
+     */
+    private final TextDocumentEdit offendingEdit;
     
     /**
      * Map of offending dependencies. The Map is keyed by the dependencies
@@ -59,24 +76,50 @@ public final class DependencyChangeException extends Exception {
      */
     private final Map<Dependency, Dependency> offendingDependencies;
     
+    /**
+     * Additional context attached for the offending text edits
+     */
+    private WorkspaceEdit workspaceEdit;
+    
     public DependencyChangeException(DependencyChange request, Dependency d, Reason r) {
         this.reason = r;
         this.request = request;
         offendingDependencies = new HashMap<>();
         offendingDependencies.put(d, null);
+        offendingEdit = null;
+    }
+    
+    public DependencyChangeException(DependencyChange request, Reason r, TextDocumentEdit edits) {
+        this.reason = r;
+        this.request = request;
+        offendingDependencies = Collections.emptyMap();
+        offendingEdit = edits;
     }
     
     public DependencyChangeException(DependencyChange request, Reason reason, Map<Dependency, Dependency> offendingDependencies) {
         this.reason = reason;
         this.request = request;
         this.offendingDependencies = Collections.unmodifiableMap(offendingDependencies);
+        offendingEdit = null;
     }
 
+    public DependencyChange getRequest() {
+        return request;
+    }
+    
     /**
      * @return reason for a failed operation
      */
     public Reason getReason() {
         return reason;
+    }
+
+    /**
+     * Get offending text edits.
+     * @return 
+     */
+    public TextDocumentEdit getOffendingEdit() {
+        return offendingEdit;
     }
     
     /**

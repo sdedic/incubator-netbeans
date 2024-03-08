@@ -26,11 +26,11 @@ import org.netbeans.api.project.Project;
 import org.netbeans.modules.gradle.api.NbGradleProject;
 import org.netbeans.modules.project.dependency.DependencyChange;
 import org.netbeans.modules.project.dependency.DependencyChangeException;
-import org.netbeans.modules.project.dependency.DependencyChangeRequest;
 import org.netbeans.modules.project.dependency.DependencyResult;
 import org.netbeans.modules.project.dependency.ProjectDependencies;
 import org.netbeans.modules.project.dependency.ProjectOperationException;
 import org.netbeans.modules.project.dependency.Scopes;
+import org.netbeans.modules.project.dependency.spi.DependencyModifierContext;
 import org.netbeans.modules.project.dependency.spi.ProjectDependencyModifier;
 import org.netbeans.spi.project.ProjectServiceProvider;
 import org.openide.cookies.EditorCookie;
@@ -72,7 +72,7 @@ public class DependencyModifierImpl implements ProjectDependencyModifier {
     }
 
     @Override
-    public Result computeChange(DependencyChangeRequest request) throws DependencyChangeException {
+    public Result computeChange(DependencyModifierContext modContext) throws DependencyChangeException {
         DependencyResult r = ProjectDependencies.findDependencies(project, ProjectDependencies.newQuery(Scopes.DECLARED));
         if (r == null) {
             return null;
@@ -81,7 +81,7 @@ public class DependencyModifierImpl implements ProjectDependencyModifier {
         RewriteContext context = new RewriteContext(project, r);
         DependencyAdder adder = new DependencyAdder(project, context);
         
-        for (DependencyChange change : request.getOperations()) {
+        for (DependencyChange change : modContext.getPendingOperations()) {
             switch (change.getKind()) {
                 case ADD:
                     adder.processRequest(change);
@@ -96,16 +96,6 @@ public class DependencyModifierImpl implements ProjectDependencyModifier {
         WorkspaceEdit e = context.createWorkspaceEdit();
         
         return new Result() {
-            @Override
-            public String getId() {
-                return "project-dependency-add";
-            }
-
-            @Override
-            public boolean suppresses(Result check) {
-                return false;
-            }
-
             @Override
             public WorkspaceEdit getWorkspaceEdit() {
                 return e;

@@ -19,6 +19,7 @@
 package org.netbeans.modules.project.dependency.impl;
 
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -57,8 +58,8 @@ public class ProjectModificationResultImpl {
     private List<ModificationResult>    customModifications = new ArrayList<>();
     private List<Union2<TextDocumentEdit, ResourceOperation>> edits;
     private ModificationResult combinedResult;
-    Map<FileObject, ResourceOperation.CreateFile> createFiles = new HashMap<>();
-    Map<FileObject, TextDocumentEdit> fileModifications = new LinkedHashMap<>();
+    Map<URI, ResourceOperation.CreateFile> createFiles = new HashMap<>();
+    Map<URI, TextDocumentEdit> fileModifications = new LinkedHashMap<>();
 
     public ProjectModificationResultImpl(Project project) {
         this.project = project;
@@ -74,11 +75,19 @@ public class ProjectModificationResultImpl {
         }
         List<Union2<TextDocumentEdit, ResourceOperation>> r = new ArrayList<>();
         
-        for (FileObject f : fileModifications.keySet()) {
-            if (f.isVirtual()) {
-                r.add(Union2.createSecond(createFiles.get(f)));
+        for (URI u : fileModifications.keySet()) {
+            URL u2;
+            
+            try {
+                u2 = u.toURL();
+            } catch (MalformedURLException ex) {
+                continue;
+            }
+            FileObject mapped = URLMapper.findFileObject(u2);
+            if (mapped == null) {
+                r.add(Union2.createSecond(createFiles.get(u)));
             } else {
-                TextDocumentEdit te = fileModifications.get(f);
+                TextDocumentEdit te = fileModifications.get(u);
                 r.add(Union2.createFirst(te));
             }
         }
@@ -88,6 +97,20 @@ public class ProjectModificationResultImpl {
     
     public WorkspaceEdit getWorkspaceEdit() {
         return new WorkspaceEdit(edits());
+    }
+    
+    public WorkspaceEdit getWorkspaceEdit(URI file) {
+        List<Union2<TextDocumentEdit, ResourceOperation>> r = new ArrayList<>();
+        
+        ResourceOperation.CreateFile cf = createFiles.get(file);
+        TextDocumentEdit te = fileModifications.get(file);
+        if (cf != null) {
+            r.add(Union2.createSecond(cf));
+        }
+        if (te != null) {
+            r.add(Union2.createFirst(te));
+        }
+        return r.isEmpty() ? null : new WorkspaceEdit(r);
     }
     
     public void add(ProjectDependencyModifier.Result r) {
@@ -108,55 +131,6 @@ public class ProjectModificationResultImpl {
         }
     }
     
-    /**
-     * Attempts to resolve the String to a FileObject, which may be even virtual.
-     * @param s
-     * @return 
-     */
-    static FileObject fromString(String s) {
-        // attempt to parse as URL; if it succeds, 
-        URL asURL;
-        try {
-            asURL = new URL(s);
-            /*
-            FileObject check = URLMapper.findFileObject(asURL);
-            if (check != null) {
-                return check;
-            }
-            */
-            // go to the "directory" in the URL, according to the spec, the derived URL is cannonicalized.
-            asURL = new URL(asURL, ".");
-        } catch (MalformedURLException ex) {
-            asURL = null;
-        }
-        
-        for (int i = s.lastIndexOf("/"); i >= 0; i = s.lastIndexOf("/", i - 1)) {
-            if (asURL != null) {
-                FileObject fo = URLMapper.findFileObject(asURL);
-                if (fo != null) {
-                    return fo.getFileObject(s.substring(i + 1), false);
-                }
-                try {
-                    URL n = new URL(asURL, "..");
-                    asURL = n;
-                } catch (MalformedURLException ex) {
-                    break;
-                }
-            } else {
-                try {
-                    Path p = Paths.get(s.substring(0, i));
-                    FileObject fo = FileUtil.toFileObject(p.toFile());
-                    if (fo != null) {
-                        return fo.getFileObject(s.substring(i + 1), false);
-                    }
-                } catch (IllegalArgumentException ex) {
-                    return null;
-                }
-            }
-        }
-        return null;
-    }
-    
     @NbBundle.Messages({
         "# {0} - file specification",
         "ERR_UnsupportedFileSpec=Unsupported file specification: {0}",
@@ -168,16 +142,18 @@ public class ProjectModificationResultImpl {
     private void addResourceOperation(ResourceOperation op) {
         if (op instanceof ResourceOperation.CreateFile) {
             ResourceOperation.CreateFile cf = (ResourceOperation.CreateFile)op;
-            FileObject fo = fromString(cf.getNewFile());
-            if (fo == null) {
+            URI u;
+            try {
+                u = URI.create(cf.getNewFile());
+            } catch (IllegalArgumentException ex) {
                 throw new ProjectOperationException(project, ProjectOperationException.State.ERROR, 
                         Bundle.ERR_UnsupportedFileSpec(cf.getNewFile()), Collections.emptySet());
             }
-            if (createFiles.containsKey(fo)) {
+            if (createFiles.containsKey(u)) {
                 // file re-created, clear out all changes
-                fileModifications.remove(fo);
+                fileModifications.remove(u);
             } else {
-                createFiles.put(fo, cf);
+                createFiles.put(u, cf);
             }
             return;
         }
@@ -204,14 +180,19 @@ public class ProjectModificationResultImpl {
     }
     
     private void addTextOperation(TextDocumentEdit edit, boolean saveAll) {
-        FileObject fo = fromString(edit.getDocument());
-        if (fo == null) {
+        URI u;
+        FileObject fo;
+        try {
+            u = URI.create(edit.getDocument());
+            fo = URLMapper.findFileObject(u.toURL());
+        } catch (IllegalArgumentException | MalformedURLException ex) {
             throw new ProjectOperationException(project, ProjectOperationException.State.ERROR, 
                     Bundle.ERR_UnsupportedFileSpec(edit.getDocument()), Collections.emptySet());
         }
-        if (!fo.isValid()) {
+         
+        if (fo == null) {
             // check that creation preceded the edit
-            if (!createFiles.containsKey(fo)) {
+            if (!createFiles.containsKey(u)) {
                 throw new ProjectOperationException(project, ProjectOperationException.State.ERROR, 
                         Bundle.ERR_WritingToMissingFile(edit.getDocument()), Collections.emptySet());
             }
@@ -249,7 +230,7 @@ public class ProjectModificationResultImpl {
                 }
             } 
         } else {
-            fileModifications.put(fo, new TextDocumentEdit(URLMapper.findURL(fo, URLMapper.EXTERNAL).toString(), newEdits));
+            fileModifications.put(u, new TextDocumentEdit(URLMapper.findURL(fo, URLMapper.EXTERNAL).toString(), newEdits));
         }
     }
     

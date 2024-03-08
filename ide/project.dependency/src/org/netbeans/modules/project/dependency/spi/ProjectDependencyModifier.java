@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.Collections;
 import org.netbeans.api.lsp.WorkspaceEdit;
 import org.netbeans.modules.project.dependency.DependencyChangeException;
-import org.netbeans.modules.project.dependency.DependencyChangeRequest;
 import org.netbeans.modules.project.dependency.ProjectOperationException;
 import org.openide.filesystems.FileObject;
 
@@ -47,7 +46,7 @@ public interface ProjectDependencyModifier {
      * @throws DependencyChangeException if the dependencies cannot be changed
      * @throws ProjectOperationException on general project system error conditions
      */
-    public Result   computeChange(DependencyChangeRequest request) throws DependencyChangeException;
+    public Result   computeChange(DependencyModifierContext request) throws DependencyChangeException;
     
     /**
      * Result of dependency modification change.
@@ -64,22 +63,7 @@ public interface ProjectDependencyModifier {
         }
         
         /**
-         * ID of the partial result. Mainly used to override / suppress unwanted changes by
-         * more specific Modified implementations.
-         * @return ID of the result.
-         */
-        public String getId();
-        
-        /**
-         * Return true, if the given result should be suppressed. The Modified should provide its own
-         * replacement in that case.
-         * @param check result to check
-         * @return true, if the result should not be used.
-         */
-        public boolean suppresses(Result check);
-        
-        /**
-         * Returns edits that make the change. 
+         * Computes edits that make the change. 
          * @return edits that implement the requested dependency change.
          */
         public WorkspaceEdit getWorkspaceEdit();

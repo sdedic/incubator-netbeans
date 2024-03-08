@@ -50,6 +50,11 @@ public interface ProjectArtifactsImplementation<Result> {
         return 10000;
     }
     
+    /**
+     * Returns the project instance for the result
+     * @param r result
+     * @return project instance
+     */
     public Project findProject(Result r);
     
     /**
@@ -65,7 +70,19 @@ public interface ProjectArtifactsImplementation<Result> {
      */
     public Collection<ArtifactSpec> findExcludedArtifacts(Result r);
     
+    /**
+     * Adds or removes a listener on the result
+     * @param r the result
+     * @param l the listener
+     * @param add true to add, false to remove
+     */
     public void handleChangeListener(Result r, ChangeListener l, boolean add);
     
+    /**
+     * Determines if the result supports changes. Results that do not support changes never
+     * fire change events.
+     * @param r the result
+     * @return true, if the result supports changes.
+     */
     public boolean computeSupportsChanges(Result r);
 }

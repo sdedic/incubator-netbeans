@@ -20,6 +20,8 @@ package org.netbeans.modules.project.dependency.impl;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.text.BadLocationException;
@@ -32,6 +34,7 @@ import org.netbeans.api.lsp.TextDocumentEdit;
 import org.netbeans.api.lsp.TextEdit;
 import org.openide.cookies.EditorCookie;
 import org.openide.filesystems.FileObject;
+import org.openide.filesystems.URLMapper;
 import org.openide.util.NbBundle;
 
 /**
@@ -80,7 +83,8 @@ public class TextDocumentEditProcessor {
         "ERR_FailedToEditDocument=Failed to edit document {0}",
     })
     private void open() throws IOException {
-        FileObject fo = ProjectModificationResultImpl.fromString(edits.getDocument());
+        URL u = URI.create(edits.getDocument()).toURL();
+        FileObject fo = URLMapper.findFileObject(u);
         if (fo == null || !fo.isValid()) {
             throw new FileNotFoundException(edits.getDocument());
         }

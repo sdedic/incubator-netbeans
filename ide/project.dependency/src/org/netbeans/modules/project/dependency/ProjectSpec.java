@@ -24,7 +24,7 @@ import org.openide.filesystems.FileObject;
 /**
  * Describes a project dependency. Each project is identified by an unique ID
  * like path in Gradle or relative path from the outermost POM in a maven reactor. The ID
- * is build-system dependent. And each project has a directory represented by a FileObject.
+ * is build-system dependent. Each project has a directory represented by a FileObject.
  * 
  * @author sdedic
  */
@@ -37,10 +37,18 @@ public final class ProjectSpec {
         this.location = location;
     }
 
+    /**
+     * Returns project ID, in the project system's syntax. The ID should
+     * allow allow to reference the project within a multi-project build.
+     * @return project id
+     */
     public String getProjectId() {
         return projectId;
     }
 
+    /**
+     * @return project's location.
+     */
     public FileObject getLocation() {
         return location;
     }
@@ -65,6 +73,11 @@ public final class ProjectSpec {
         }
         final ProjectSpec other = (ProjectSpec) obj;
         return Objects.equals(this.location, other.location);
+    }
+    
+    @Override
+    public String toString() {
+        return "@/" + projectId + "(" + location.getNameExt() + ")";
     }
     
     /**
