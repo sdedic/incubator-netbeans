@@ -36,6 +36,7 @@ import org.netbeans.modules.gradle.java.queries.GradleScopes;
 import org.netbeans.modules.gradle.java.queries.GradleScopesBuilder;
 import org.netbeans.modules.project.dependency.DependencyResult;
 import org.netbeans.modules.project.dependency.ProjectOperationException;
+import org.netbeans.modules.project.dependency.spi.DependencyModifierContext;
 import org.openide.cookies.EditorCookie;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;

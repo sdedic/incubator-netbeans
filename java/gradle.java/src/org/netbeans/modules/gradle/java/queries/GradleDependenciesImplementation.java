@@ -46,7 +46,6 @@ import org.netbeans.modules.gradle.api.GradleDependency;
 import org.netbeans.modules.gradle.api.NbGradleProject;
 import org.netbeans.modules.project.dependency.ArtifactSpec;
 import org.netbeans.modules.project.dependency.Dependency;
-import org.netbeans.modules.project.dependency.DependencyResult;
 import org.netbeans.modules.project.dependency.ProjectDependencies;
 import org.netbeans.modules.project.dependency.ProjectOperationException;
 import org.netbeans.modules.project.dependency.ProjectSpec;
@@ -57,7 +56,6 @@ import org.netbeans.spi.project.ProjectServiceProvider;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.util.NbBundle;
-import org.openide.util.Pair;
 
 /**
  *
@@ -118,11 +116,11 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
         "ERR_Unexpected=Unexpected error: {0}"
     })
     @Override
-    public DependencyResult findDependencies(ProjectDependencies.DependencyQuery query) throws ProjectOperationException {
-        CompletableFuture<DependencyResult> result = new CompletableFuture<>();
+    public Result findDependencies(ProjectDependencies.DependencyQuery query, Context context) throws ProjectOperationException {
+        CompletableFuture<Result> result = new CompletableFuture<>();
         
         nbgp.toQuality(Bundle.DESC_ObtainDependencies(), query.isOffline() ? NbGradleProject.Quality.FULL : NbGradleProject.Quality.FULL_ONLINE, query.isFlushChaches()).thenApply(p -> {
-            DependencyResult dr = new Collector(query).processDependencies(nbgp);
+            Result dr = new Collector(query, context).processDependencies(nbgp);
             result.complete(dr);
             return null;
         });
@@ -145,6 +143,7 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
         "ERR_NoProjectDirectory=Unable to find project directory: {0}"
     })
     class Collector {
+        final Context context;
         final ProjectDependencies.DependencyQuery query;
         final GradleBaseProject base;
         
@@ -165,8 +164,9 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
          */
         final Map<File, FileObject> file2FileObject = new HashMap<>();
         
-        public Collector(ProjectDependencies.DependencyQuery query) {
+        public Collector(ProjectDependencies.DependencyQuery query, Context context) {
             this.query = query;
+            this.context = context;
             base = GradleBaseProject.get(project);
         }
         
@@ -177,7 +177,7 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
          * @param allScopes all scopes that should be included.
          * @return dependency result instance
          */
-        DependencyResult declaredDependencies(Set<Scope> allScopes) {
+        Result declaredDependencies(Set<Scope> allScopes) {
             acceptUnresolved = true;
             Set<String> cfgNames = new HashSet<>();
             
@@ -226,21 +226,11 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
                     declared.add(createDependency(dep, Collections.emptyList()));
                 }
             }
-            File f = nbgp.getGradleFiles().getProjectDir();
-            FileObject pf = f == null ? null : FileUtil.toFileObject(f);
-            if (pf == null) {
-                throw new ProjectOperationException(project, ProjectOperationException.State.ERROR, Bundle.ERR_NoProjectDirectory(f));
-            }
-            ArtifactSpec part = createProjectArtifact(null, base.getPath(), null);
-            ProjectSpec pspec = ProjectSpec.create(base.getPath(), pf);
-            
-            Dependency tempRoot = Dependency.create(pspec, part, null, declared, project);
-            
             NbGradleProject ngp = NbGradleProject.get(project);
             GradleBaseProject gbp =  GradleBaseProject.get(project);
             DependencyText.Mapping map;
             try {
-                map = GradleDependencyResult.computeTextMappings(ngp, gbp, tempRoot.getChildren(), true);
+                map = GradleDependencyResult.computeTextMappings(ngp, gbp, declared, true);
             } catch (IOException ex) {
                 throw new ProjectOperationException(project, ProjectOperationException.State.ERROR, "Unable to match dependencies to build script", ex);
             }
@@ -249,10 +239,10 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
                     it.remove();
                 }
             }
-            return new GradleDependencyResult(project, scopes, tempRoot);
+            return createResult(declared);
         }
         
-        DependencyResult processDependencies(NbGradleProject nbgp) {
+        Result processDependencies(NbGradleProject nbgp) {
             GradleBaseProject base =  GradleBaseProject.get(project);
             Collection<Scope> userScopes = query.getScopes();
             
@@ -261,6 +251,12 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
             
             if (processScopes.remove(Scopes.DECLARED)) {
                 return declaredDependencies(allScopes);
+            }
+
+            File f = nbgp.getGradleFiles().getProjectDir();
+            FileObject pf = f == null ? null : FileUtil.toFileObject(f);
+            if (pf == null) {
+                throw new ProjectOperationException(project, ProjectOperationException.State.ERROR, Bundle.ERR_NoProjectDirectory(f));
             }
 
             // process unknown scopes
@@ -307,18 +303,25 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
                     rootDeps.add(n);
                 }
             }
-            
-            File f = nbgp.getGradleFiles().getProjectDir();
-            FileObject pf = f == null ? null : FileUtil.toFileObject(f);
-            if (pf == null) {
-                throw new ProjectOperationException(project, ProjectOperationException.State.ERROR, Bundle.ERR_NoProjectDirectory(f));
+            return createResult(rootDeps);
+        }
+        
+        GradleDependencyResult createResult(List<Dependency> children) {
+            ArtifactSpec part = createProjectArtifact(null, base.getPath(), null);
+            ProjectSpec pspec = ProjectSpec.create(base.getPath(), project.getProjectDirectory());
+            NbGradleProject ngp = NbGradleProject.get(project);
+            context.setProjectArtifact(part);
+            context.setProjectSpec(pspec);
+            context.addRootChildren(children);
+            context.addScopes(scopes);
+            File script = ngp.getGradleFiles().getBuildScript();
+            if (script != null) {
+                FileObject fo = FileUtil.toFileObject(script);
+                if (fo != null) {
+                    context.addDependencyFile(fo);
+                }
             }
-            ArtifactSpec part = createProjectArtifact(null, base.getPath(), rootDeps);
-            ProjectSpec pspec = ProjectSpec.create(base.getPath(), pf);
-            
-            Dependency root = Dependency.create(pspec, part, null, rootDeps, project);
-            
-            return new GradleDependencyResult(project, scopes, root);
+            return new GradleDependencyResult(project, children, context);
         }
         
         ArtifactSpec createProjectArtifact(GradleDependencyResult.Info info, String projectId, List<Dependency> children) {

@@ -308,7 +308,11 @@ public class MavenDependenciesImplementationTest extends NbTestCase {
         } else {
             sb.append("+-- [ ] ");
         }
-        sb.append(from.getArtifact());
+        if (from.getArtifact() != null) {
+            sb.append(from.getArtifact());
+        } else {
+            sb.append(from.getProject());
+        }
         if (from.getScope() != null) {
             sb.append(" / "); sb.append(from.getScope());
         }
@@ -316,7 +320,9 @@ public class MavenDependenciesImplementationTest extends NbTestCase {
         int index = 0;
         List<Dependency> sorted = new ArrayList<>(from.getChildren());
         Collections.sort(sorted, (d1, d2) -> {
-            return d1.getArtifact().toString().compareToIgnoreCase(d2.getArtifact().toString());
+            String s1 = (d1.getArtifact() != null ? d1.getArtifact() : d1.getProject()).toString();
+            String s2 = (d2.getArtifact() != null ? d2.getArtifact() : d2.getProject()).toString();
+            return s1.compareToIgnoreCase(s2);
         });
         for (Dependency c : sorted) {
             printDependencyTree(c, levels + 1, sb);

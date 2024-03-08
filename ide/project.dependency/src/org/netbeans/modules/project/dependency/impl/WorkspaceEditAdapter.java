@@ -20,10 +20,15 @@ package org.netbeans.modules.project.dependency.impl;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
+import static java.util.Objects.nonNull;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.netbeans.api.lsp.ResourceOperation;
@@ -76,16 +81,20 @@ public final class WorkspaceEditAdapter implements ModificationResult {
     }
 
     @Override
-    public Collection<? extends FileObject> getModifiedFileObjects() {
-        Set<FileObject> fos = new LinkedHashSet<>();
-        fos.addAll(impl.createFiles.keySet());
-        fos.addAll(impl.fileModifications.keySet());
-        return fos;
+    public Collection<FileObject> getModifiedFileObjects() {
+        return impl.fileModifications.keySet().stream().map(u -> {
+            try {
+                return URLMapper.findFileObject(u.toURL());
+            } catch (MalformedURLException ex) {
+                // ignore ?
+                return null;
+            }
+        }).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     @Override
-    public Collection<? extends File> getNewFiles() {
-        return impl.createFiles.keySet().stream().sequential().map(f -> FileUtil.toFile(f)).collect(Collectors.toList());
+    public Collection<File> getNewFiles() {
+        return impl.createFiles.keySet().stream().map(File::new).collect(Collectors.toList());
     }
 
     @NbBundle.Messages({
@@ -104,8 +113,9 @@ public final class WorkspaceEditAdapter implements ModificationResult {
                 ResourceOperation op = ch.second();
                 if (op instanceof ResourceOperation.CreateFile) {
                     ResourceOperation.CreateFile cf = (ResourceOperation.CreateFile)op;
-                    FileObject f = ProjectModificationResultImpl.fromString(cf.getNewFile());
-                    if (f.isValid()) {
+                    URL u = URI.create(cf.getNewFile()).toURL();
+                    FileObject f = URLMapper.findFileObject(u);
+                    if (f != null && f.isValid()) {
                         throw new IOException(Bundle.ERR_CreatedFileAlreadyExists(f.getPath()));
                     }
                     FileObject parent = f.getParent();

@@ -22,14 +22,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.netbeans.api.project.Project;
+import org.netbeans.modules.project.dependency.impl.DependencyResultContextImpl;
+import org.netbeans.modules.project.dependency.impl.DependencySpiAccessor;
 import org.netbeans.modules.project.dependency.impl.ProjectModificationResultImpl;
+import org.netbeans.modules.project.dependency.spi.DependencyModifierContext;
 import org.netbeans.modules.project.dependency.spi.ProjectDependenciesImplementation;
 import org.netbeans.modules.project.dependency.spi.ProjectDependencyModifier;
+import org.openide.util.Lookup;
 
 /**
  * Project Query that collects dependencies using project-specific services.
@@ -45,12 +48,32 @@ public final class ProjectDependencies {
      * @throws ProjectOperationException 
      */
     public static DependencyResult findDependencies(Project target, DependencyQuery query) throws ProjectOperationException {
-        ProjectDependenciesImplementation pds = target.getLookup().lookup(ProjectDependenciesImplementation.class);
-        if (pds == null) {
+        Collection<? extends ProjectDependenciesImplementation> pds = target.getLookup().lookupAll(ProjectDependenciesImplementation.class);
+        if (pds.isEmpty()) {
             return null;
-        } else {
-            return pds.findDependencies(query);
         }
+        DependencyResultContextImpl context = new DependencyResultContextImpl();
+        // force load and init class.
+        ProjectDependenciesImplementation.class.getMethods();
+        ProjectDependenciesImplementation.Context apiContext = DependencySpiAccessor.get().createContextImpl(context);
+        List<ProjectDependenciesImplementation.Result> rs = new ArrayList<>();
+        for (ProjectDependenciesImplementation impl : pds) {
+            ProjectDependenciesImplementation.Result r = impl.findDependencies(query, apiContext);
+            if (r != null) {
+                rs.add(r);
+                Lookup lkp = r.getLookup();
+                if (lkp != null) {
+                    context.addLookup(lkp);
+                }
+            }
+        }
+        
+        // None of the providers recognized the project.
+        if (context.getProjectSpec() == null) {
+            return null;
+        }
+        
+        return new DependencyResult(target, rs, context, query);
     }
     
     /**
@@ -72,6 +95,30 @@ public final class ProjectDependencies {
     }
     
     /**
+     * Specifies the preferred handling of duplicates. Duplicate elimination is always based on a best-effort: a 
+     * duplicate may be eventually reported, if the implementation does not the knowledge of exact duplicates.
+     */
+    public enum Duplicates {
+        /**
+         * Report duplicate artifacts. The duplicate and its entire subtree will be repeated in the report. Ideal for 
+         * exhaustive traversal. Dependencies may be marked with {@link Dependency#getOriginal()}. This is the default setting.
+         */
+        DUPLICATE, 
+        
+        /**
+         * A duplicate will be filtered out entirely, each artifact will be present at most once in the tree. Use if you are
+         * interested in collecting dependencies.
+         */
+        FILTER, 
+        
+        /**
+         * A duplicate will be present, but will report no transitive dependencies. Preferred, if it is not necessary to process
+         * transitive dependencies for each artifact's appearance. Trimmed dependencies should be marked with {@link Dependency#getOriginal()}
+         */
+        LEAVES
+    }
+
+    /**
      * Builder that can create {@link DependencyQuery} instance.
      */
     public static final class DependencyQueryBuilder {
@@ -79,6 +126,7 @@ public final class ProjectDependencies {
         private Dependency.Filter filter;
         private boolean offline = true;
         private boolean flush;
+        private Duplicates duplicates = Duplicates.DUPLICATE;
         
         private DependencyQueryBuilder() {
         }
@@ -87,14 +135,24 @@ public final class ProjectDependencies {
             if (scopes == null) {
                 scope(Scopes.COMPILE);
             }
-            return new DependencyQuery(scopes, filter, offline, flush);
+            return new DependencyQuery(scopes, filter, offline, flush, duplicates);
         }
         
+        /**
+         * Set the filter. Previous filter is overwritten.
+         * @param f the filter, {@code null} to clear the filter.
+         * @return builder instance
+         */
         public DependencyQueryBuilder filter(Dependency.Filter f) {
             this.filter = f;
             return this;
         }
         
+        /**
+         * Adds scopes to the query.
+         * @param s additional scopes
+         * @return builder instance
+         */
         public DependencyQueryBuilder scope(Scope... s) {
             if (s == null || s.length == 0) {
                 return this;
@@ -106,16 +164,31 @@ public final class ProjectDependencies {
             return this;
         }
         
+        /**
+         * Allow to work online. By default, dependency reading may fail, if some
+         * of the artifacts is not available locally.
+         * @return builder instance.
+         */
         public DependencyQueryBuilder online() {
             this.offline = false;
             return this;
         }
         
+        /**
+         * Require offline operation. Dependency reading may fail, if some
+         * of the artifacts is not available locally.
+         * @return builder instance.
+         */
         public DependencyQueryBuilder offline() {
             this.offline = true;
             return this;
         }
         
+        /**
+         * Requests to throw away any possible caches, like project model in memory and try to
+         * read the data again from the project files.
+         * @return builder instance.
+         */
         public DependencyQueryBuilder withoutCaches() {
             flush = true;
             return this;
@@ -127,12 +200,18 @@ public final class ProjectDependencies {
         private final Dependency.Filter filter;
         private final boolean offline;
         private final boolean flushChaches;
+        private final Duplicates dupls;
 
-        private DependencyQuery(Set<Scope> scopes, Dependency.Filter filter, boolean offline, boolean flushCaches) {
+        private DependencyQuery(Set<Scope> scopes, Dependency.Filter filter, boolean offline, boolean flushCaches, Duplicates dupls) {
             this.scopes = scopes == null ? Collections.emptySet() : Collections.unmodifiableSet(new LinkedHashSet<>(scopes));
             this.filter = filter;
             this.offline = offline;
             this.flushChaches = flushCaches;
+            this.dupls = dupls;
+        }
+
+        public Duplicates getDuplicates() {
+            return dupls;
         }
 
         public Set<Scope> getScopes() {
@@ -217,37 +296,18 @@ public final class ProjectDependencies {
         }
         
         ProjectModificationResultImpl impl = new ProjectModificationResultImpl(p);
-        List<ProjectDependencyModifier.Result> results = new ArrayList<>();
-        Set<String> exclude = new HashSet<>();
+        DependencyModifierContext ctx = DependencySpiAccessor.get().createModifierContext(change, impl);
         
+        boolean accepted = false;
         for (ProjectDependencyModifier m : modifiers) {
-            ProjectDependencyModifier.Result res = m.computeChange(change);
+            ProjectDependencyModifier.Result res = m.computeChange(ctx);
             if (res != null) {
-                results.add(res);
+                accepted = true;
+                impl.add(res);
             }
         }
-        if (results.isEmpty()) {
+        if (!accepted) {
             return null;
-        }
-        
-        // remove excluded results
-        for (ProjectDependencyModifier.Result r : results) {
-            for (ProjectDependencyModifier.Result c : results) {
-                if (exclude.contains(c.getId())) {
-                    continue;
-                }
-                
-                if (c.suppresses(r)) {
-                    exclude.add(r.getId());
-                    break; // inner cycle
-                }
-            }
-        }
-        
-        for (ProjectDependencyModifier.Result r : results) {
-            if (!exclude.contains(r.getId())) {
-                impl.add(r);
-            }
         }
         
         return new ProjectModificationResult(impl);

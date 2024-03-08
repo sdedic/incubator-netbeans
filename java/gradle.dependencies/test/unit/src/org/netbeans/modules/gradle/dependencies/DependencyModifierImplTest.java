@@ -333,12 +333,16 @@ public class DependencyModifierImplTest extends NbTestCase {
         DependencyResult r = ProjectDependencies.findDependencies(project, ProjectDependencies.newBuilder().scope(scope).build());
         
         Deque<Dependency> toProcess = new ArrayDeque<>();
-        toProcess.add(r.getRoot());
+        ArtifactSpec a = r.getProjectArtifact();
+        String ga = a.getGroupId() + ":" + a.getArtifactId();
+        artifactIds.remove(ga);
+        found.add(ga);
+        
+        toProcess.addAll(r.getRoot().getChildren());
         while (!toProcess.isEmpty()) {
             Dependency d = toProcess.poll();
             toProcess.addAll(d.getChildren());
-            
-            String ga = d.getArtifact().getGroupId() + ":" + d.getArtifact().getArtifactId();
+            ga = d.getArtifact().getGroupId() + ":" + d.getArtifact().getArtifactId();
             artifactIds.remove(ga);
             found.add(ga);
         }

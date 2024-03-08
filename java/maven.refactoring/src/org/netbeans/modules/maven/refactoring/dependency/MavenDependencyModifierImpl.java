@@ -29,13 +29,12 @@ import org.netbeans.api.project.Project;
 import org.netbeans.modules.maven.api.NbMavenProject;
 import org.netbeans.modules.project.dependency.DependencyChange;
 import org.netbeans.modules.project.dependency.DependencyChangeException;
-import org.netbeans.modules.project.dependency.DependencyChangeRequest;
 import org.netbeans.modules.project.dependency.ProjectOperationException;
 import org.netbeans.modules.project.dependency.Scope;
 import org.netbeans.modules.project.dependency.Scopes;
+import org.netbeans.modules.project.dependency.spi.DependencyModifierContext;
 import org.netbeans.modules.project.dependency.spi.ProjectDependencyModifier;
 import org.netbeans.spi.project.ProjectServiceProvider;
-import org.openide.filesystems.FileObject;
 import org.openide.filesystems.URLMapper;
 import org.openide.util.NbBundle;
 import org.openide.util.Union2;
@@ -79,11 +78,11 @@ public class MavenDependencyModifierImpl implements ProjectDependencyModifier {
         "ERR_UnsupportedOperation=Operation {0} is unsupported."
     })
     @Override
-    public Result computeChange(DependencyChangeRequest batch) throws DependencyChangeException {
+    public Result computeChange(DependencyModifierContext batch) throws DependencyChangeException {
         List<TextEdit> edits = null;
 
         RewriteContext rewrite = new RewriteContext(project);
-        for (DependencyChange request : batch.getOperations()) {
+        for (DependencyChange request : batch.getPendingOperations()) {
         
             switch (request.getKind()) {
                 case ADD:
@@ -103,16 +102,6 @@ public class MavenDependencyModifierImpl implements ProjectDependencyModifier {
         TextDocumentEdit e = new TextDocumentEdit(URLMapper.findURL(rewrite.getPomFile(), URLMapper.EXTERNAL).toString(), edits);
         WorkspaceEdit we = new WorkspaceEdit(Collections.singletonList(Union2.createFirst(e)));
         return new Result() {
-            @Override
-            public String getId() {
-                return "maven-add-dependency";
-            }
-
-            @Override
-            public boolean suppresses(Result check) {
-                return false;
-            }
-
             @Override
             public WorkspaceEdit getWorkspaceEdit() {
                 return we;
