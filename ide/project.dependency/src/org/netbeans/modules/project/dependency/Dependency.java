@@ -22,12 +22,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import org.netbeans.api.annotations.common.CheckForNull;
 
 /**
@@ -452,7 +456,7 @@ public final class Dependency {
 
     /**
      * Represents a path from the root of the dependency tree to a specific node throughout
-     * the dependency graph. A {@link DependencyResult} is always associated with a Path.
+     * the dependency graph. A {@link DependencyResult} can be associated with a Path.
      */
     public static final class Path implements Iterable<Dependency> {
         private final DependencyResult result;
@@ -471,13 +475,38 @@ public final class Dependency {
         }
         
         /**
-         * 
+         * Creates a dependency list originating at the root, going down to this Path.
+         * @return list of dependencies, starting at a root.
+         */
+        public List<Dependency> listFromRoot() {
+            Deque<Dependency> ll = new LinkedList<>();
+            for (Path p = this; p != null; p = p.getParent()) {
+                ll.addFirst(p.leaf);
+                p = p.parent;
+            }
+            return new ArrayList<>(ll);
+        }
+        
+        /**
+         * @return a stream from the path's {@link #iterator()}.
+         */
+        public Stream<Dependency> stream() {
+            return StreamSupport.stream(this.spliterator(), false);
+        }
+        
+        /**
          * @return the associated {@link DependencyResult}
          */
         public DependencyResult getResult() {
             return result;
         }
-        
+
+        /**
+         * Returns the parent Path. It will return {@code null}, if this path
+         * identifies the root.
+         * 
+         * @return parent path, or {@code null}, if this is the root.
+         */
         public Path getParent() {
             return parent;
         }
@@ -525,8 +554,18 @@ public final class Dependency {
          * @param deps
          * @return new path.
          */
-        public final Path next(Dependency... deps) {
-            if (deps == null || deps.length == 0) {
+        public Path next(Dependency... deps) {
+            return next(Arrays.asList(deps));
+        }
+        
+        /**
+         * Creates a new Path, appending one or more dependencies.
+         * @param deps
+         * @return new path.
+         */
+        public Path next(Iterable<Dependency> deps) {
+            Iterator<Dependency> it = deps.iterator();
+            if (deps == null || !it.hasNext()) {
                 return this;
             }
             Path p = this;
@@ -539,6 +578,11 @@ public final class Dependency {
             return p;
         }
         
+        /**
+         * Creates an iterator that enumerates dependencies starting from this one
+         * up to the root. It is the reverse of {@link #listFromRoot()}.
+         * @return iterator that enumerates dependencies towards the root.
+         */
         @Override
         public Iterator<Dependency> iterator() {
             return new Iterator<Dependency>() {
@@ -559,7 +603,6 @@ public final class Dependency {
                     return n;
                 }
             };
-
         }
 
         @Override
