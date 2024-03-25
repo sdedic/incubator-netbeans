@@ -37,14 +37,20 @@ import org.netbeans.api.annotations.common.CheckForNull;
 /**
  * Represents a dependency of an artifact. The {@link #getChildren()} artifacts are
  * needed in a certain {@link #getScope()}; should be ignored in unrelated scopes.
- * The artifact that is subject of this dependency is the {@link #getArtifact()} or {@link #getProject()}.
- * Children are expressed using other {@link Dependency} instances.
+ * The artifact that is subject of this dependency is the {@link #getArtifact()} and/or {@link #getProject()}.
+ * Both may be present. Children are expressed using other {@link Dependency} instances.
  * <p>
- * A project does not need to produce a publishable (identifiable) artifact; in such cases, the
- * {@link #getArtifact} may return {@code null}.
+ * If `project` is filled, it means that the build system may eventually build this dependency. A project does not need to produce a 
+ * publishable (identifiable) artifact; in such cases, the {@link #getArtifact} may return {@code null}, but the project should be filled.
+ * Artifacts with blank {@code groupId} are reserved to represent local resources not managed by the build system
  * <p>
- * Dependency does not have well-defined {@link #equals} and {@link #hashCode}, use
- * {@link #getArtifact()} or {@link #getProject()} as key in Maps.
+ * Children may be lazy-computed. Avoid traversing to children unless they are really needed.
+ * <p>
+ * The hashCode and equals favorize artifact over project specification. Scope is not taken into account.
+ * <p>
+ * {@link #getProjectData()} contains implementation-specific data. They should be filled on output from the queries, to allow further
+ * inspection using project or technology-specific APIs. Clients are advised to use Dependency instances obtained from queries in API
+ * calls.
  * 
  * @author sdedic
  */
@@ -72,16 +78,24 @@ public final class Dependency {
      * Lazily provides the linked node. One time, then cleared.
      */
     private Supplier<Dependency>  originalProvider;
+    
+    /**
+     * Implementation-specific data, possibly {@code null}
+     */
     final Object data;
 
-    Dependency(ProjectSpec project, ArtifactSpec artifact, Function<Dependency, List<Dependency>> childSupplier, Scope scope, Dependency original, Object data) {
+    Dependency(ProjectSpec project, ArtifactSpec artifact, 
+            Function<Dependency, List<Dependency>> childSupplier, List<Dependency> children,
+            Scope scope, 
+            Supplier<Dependency> originalSupplier, Dependency original, Object data) {
         this.project = project;
         this.artifact = artifact;
         this.supplier = childSupplier;
         this.scope = scope;
-        this.original = original;
         this.data = data;
-        this.originalProvider = null;
+        this.original = original;
+        this.children = children;
+        this.originalProvider = originalSupplier;
     }
 
     Dependency(ProjectSpec project, ArtifactSpec artifact, List<Dependency> children, Scope scope, Dependency original, Object data) {
@@ -104,6 +118,51 @@ public final class Dependency {
     @CheckForNull
     public ArtifactSpec getArtifact() {
         return artifact;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        if (artifact != null) {
+            hash = 83 * hash + Objects.hashCode(this.artifact);
+        } else if (project != null) {
+            hash = 83 * hash + Objects.hashCode(this.project);
+        }
+        return hash;
+    }
+
+    /**
+     * Matches dependencies. <b>This is not full equals</b>: two dependencies are equal, if
+     * <ul>
+     * <li>their {@link #getArtifact()}s are not {@code null} and are equal, or
+     * <li>their {@link #getProject()}s are equal
+     * </ul>
+     * Dependency scope is not taken into account. This equals definition allows to match
+     * artifacts, make unique sets of them and should be sufficient for most purposes.
+     * 
+     * @param obj
+     * @return 
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Dependency other = (Dependency) obj;
+        // two dependnencies are equal if:
+        // its artifacts are equal, or
+        //      one of them does not define artifact at all, and
+        //      their project specs equal.
+        if (!(this.artifact == null || other.artifact == null)) {
+            return Objects.equals(this.artifact, other.artifact);
+        }
+        return Objects.equals(this.project, other.project);
     }
 
     public List<Dependency> getChildren() {
@@ -137,14 +196,29 @@ public final class Dependency {
         return project;
     }
 
+    /**
+     * Describes how the dependency is used in the project. 
+     * @return dependency scope
+     */
     public Scope getScope() {
         return scope;
     }
     
+    /**
+     * Access to implementation-specific data. Typically contains project-system model
+     * object that describes further the dependency. You must use project system - specific
+     * tools to access or extract useful information.
+     * @return implementation data. 
+     */
     public Object getProjectData() {
         return data;
     }
     
+    /**
+     * String representation. The value is for diagnostic purposes only, its format may change
+     * at any time.
+     * @return string representation of the dependency.
+     */
     public String toString() {
         if (artifact != null) {
             return getArtifact() + "[" + scope + "]";
@@ -167,8 +241,13 @@ public final class Dependency {
     }
 
     /**
-     * Returns 
-     * @return 
+     * Returns the original dependency for duplicates. Duplicate dependencies may
+     * occur in the dependency tree. To avoid complete expansion by the client, the dependency
+     * indicates it is a duplicate ({@link #isDuplicate()} and points to the original one.
+     * The client may just detect a duplicate and rely on reaching the original at some time,
+     * or proceed to the original. Note that it is not guaranteed that all duplicates point
+     * to the same original; just that each of duplicates is marked.
+     * @return original dependency or {@code null}
      */
     public Dependency getOriginal() {
         if (original != null || originalProvider == null) {
@@ -203,16 +282,32 @@ public final class Dependency {
     }
     
     /**
-     * Creates a dependency on a project. The project identifies 
-     * @param project
-     * @param artifact
-     * @param scope
-     * @param children
-     * @param data
+     * Creates a dependency on a project. Project or artifact can be {@code null}, but at least one of them
+     * is required. If `project` is filled, it means that the build system may eventually build this dependency. 
+     * Artifact may be {@code null} for dependencies that do not have any identification. Artifacts with blank {@code groupId}
+     * are reserved to represent local resources not managed by the build system.
+     * @param project project specification.
+     * @param artifact artifact specification
+     * @param scope usage of the dependency
+     * @param children children of the dependency, can be {@code null}
+     * @param data implementation-defined data
      * @return 
      */
     public static Dependency create(ProjectSpec project, ArtifactSpec artifact, Scope scope, List<Dependency> children, Object data) {
         return new Dependency(project, artifact, children, scope, null, data);
+    }
+    
+    /**
+     * Makes a copy of the Dependency. Copy has no children; all other properties are copied. Use {@link Builder#addChildren(java.util.Collection)}
+     * to copy over children references.
+     * 
+     * @param blueprint the Dependency to copy
+     * @return copied instance.
+     */
+    public static Builder copy(Dependency blueprint) {
+        return new Builder(blueprint.getArtifact(), blueprint.getScope(), blueprint.getProjectData()).
+                project(blueprint.getProject()).
+                linkOriginal(blueprint.getOriginal());
     }
     
     /**
@@ -238,17 +333,18 @@ public final class Dependency {
     }
 
     /**
-     * Builder that creates Dependency instances.
+     * Builder that creates Dependency instances. Children and linked original Dependency
+     * can be specified either as values, or as providers.
      */
     public static final class Builder {
         private ProjectSpec project;
         private ArtifactSpec artifact;
         private Scope scope;
         private List<Dependency> children;
-        private Function<Dependency, List<Dependency>> childProvider;
+        private Function<Dependency, List<Dependency>> childSupplier;
         private Object data;
         private Dependency original;
-        private Supplier<Dependency> originalProvider;
+        private Supplier<Dependency> originalSupplier;
 
         Builder(ProjectSpec project, Scope scope, Object data) {
             this.project = project;
@@ -263,14 +359,36 @@ public final class Dependency {
         }
         
         /**
+         * Specifies the artifact for the dependency.
+         * @param spec artifact
+         * @return this Builder
+         */
+        public Builder artifact(ArtifactSpec spec) {
+            this.artifact = spec;
+            return this;
+        }
+        
+        /**
+         * Annotates the dependency with the project
+         * @param spec the project
+         * @return this builder.
+         */
+        public Builder project(ProjectSpec spec) {
+            this.project = spec;
+            return this;
+        }
+        
+        /**
          * Adds lazy-computed children to the dependency. The provider function will
          * be called once to resolve children. Can not be combined with addChildren methods.
          * @param provider resolver
          * @return builder instance.
          */
         public Builder children(Function<Dependency, List<Dependency>> provider) {
-            this.children = null;
-            this.childProvider = provider;
+            if (provider != null) {
+                this.children = null;
+            }
+            this.childSupplier = provider;
             return this;
         }
         
@@ -280,7 +398,7 @@ public final class Dependency {
          * @return builder instance.
          */
         public Builder addChildren(Collection<Dependency> children) {
-            this.childProvider = null;
+            this.childSupplier = null;
             if (this.children == null) {
                 this.children = new ArrayList<>();
             }
@@ -297,7 +415,7 @@ public final class Dependency {
          * @return builder instance.
          */
         public Builder addChildren(Dependency... children) {
-            this.childProvider = null;
+            this.childSupplier = null;
             if (children == null) {
                 return this;
             }
@@ -311,6 +429,9 @@ public final class Dependency {
          */
         public Builder linkOriginal(Dependency orig) {
             this.original = orig;
+            if (orig != null) {
+                originalSupplier = null;
+            }
             return this;
         }
         
@@ -320,7 +441,10 @@ public final class Dependency {
          * @return builder instance.
          */
         public Builder linkOriginal(Supplier<Dependency> orig) {
-            this.originalProvider = orig;
+            this.originalSupplier = orig;
+            if (orig != null) {
+                this.original = null;
+            }
             return this;
         }
         
@@ -329,11 +453,7 @@ public final class Dependency {
          * @return initialized dependency
          */
         public Dependency create() {
-            if (this.childProvider != null) {
-                return new Dependency(project, artifact, childProvider, scope, original, data);
-            } else {
-                return new Dependency(project, artifact, children, scope, original, data);
-            }
+            return new Dependency(project, artifact, childSupplier, children, scope, originalSupplier, original, data);
         }
     }
 
@@ -402,7 +522,7 @@ public final class Dependency {
                 return null;
             }
             Path prev = path;
-            path = path.next(node);            
+            path = path.append(node);            
             try {
                 return visitDependency(node, p);
             } finally {
@@ -456,7 +576,10 @@ public final class Dependency {
 
     /**
      * Represents a path from the root of the dependency tree to a specific node throughout
-     * the dependency graph. A {@link DependencyResult} can be associated with a Path.
+     * the dependency graph. A {@link DependencyResult} can be associated with a Path. The Path
+     * can enumerate its items from the root ({@link #listFromRoot()}, and serve a Stream of
+     * Dependencies towards the root. Two paths are considered equal, if they contain the
+     * same list of dependencies from the root (excluding the root).
      */
     public static final class Path implements Iterable<Dependency> {
         private final DependencyResult result;
@@ -482,7 +605,6 @@ public final class Dependency {
             Deque<Dependency> ll = new LinkedList<>();
             for (Path p = this; p != null; p = p.getParent()) {
                 ll.addFirst(p.leaf);
-                p = p.parent;
             }
             return new ArrayList<>(ll);
         }
@@ -511,6 +633,21 @@ public final class Dependency {
             return parent;
         }
         
+        public static final Path detached(Collection<Dependency> deps) {
+            Path p = null;
+            for (Dependency d : deps) {
+                if (d == null) {
+                    throw new NullPointerException();
+                }
+                if (p == null) {
+                    p = new Path(null, null, d);
+                } else {
+                    p = p.append(d);
+                }
+            }
+            return p;
+        }
+        
         /**
          * Creates a Path from the root. The path starts at the {@link DependencyResult}'s root, and
          * includes Dependncies from listed in `deps`, in their iteration order.
@@ -528,6 +665,10 @@ public final class Dependency {
                 if (d == null) {
                     throw new NullPointerException();
                 }
+                if (p.getParent() == null && p.getLeaf().equals(d)) {
+                    // skip repeated root
+                    continue;
+                }
                 p = new Path(res, p, d);
             }
             return p;
@@ -542,9 +683,8 @@ public final class Dependency {
          * @return Path instance
          */
         public static final Path of(DependencyResult res, Dependency... deps) {
-            Path p = new Path(res, null, res.getRoot());
             if (deps == null || deps.length == 0) {
-                return p;
+                return new Path(res, null, res.getRoot());
             }
             return of(res, Arrays.asList(deps));
         }
@@ -554,8 +694,8 @@ public final class Dependency {
          * @param deps
          * @return new path.
          */
-        public Path next(Dependency... deps) {
-            return next(Arrays.asList(deps));
+        public Path append(Dependency... deps) {
+            return append(Arrays.asList(deps));
         }
         
         /**
@@ -563,7 +703,7 @@ public final class Dependency {
          * @param deps
          * @return new path.
          */
-        public Path next(Iterable<Dependency> deps) {
+        public Path append(List<Dependency> deps) {
             Iterator<Dependency> it = deps.iterator();
             if (deps == null || !it.hasNext()) {
                 return this;
@@ -585,31 +725,16 @@ public final class Dependency {
          */
         @Override
         public Iterator<Dependency> iterator() {
-            return new Iterator<Dependency>() {
-                private Path next = Path.this;
-                        
-                @Override
-                public boolean hasNext() {
-                    return next != null;
-                }
-
-                @Override
-                public Dependency next() {
-                    if (next == null) {
-                        throw new NoSuchElementException();
-                    }
-                    Dependency n = next.leaf;
-                    next = next.parent;
-                    return n;
-                }
-            };
+            return listFromRoot().iterator();
         }
 
         @Override
         public int hashCode() {
             int hash = 3;
-            hash = 71 * hash + Objects.hashCode(this.parent);
-            hash = 71 * hash + Objects.hashCode(this.leaf);
+            if (this.parent != null || this.result == null) {
+                hash = 71 * hash + Objects.hashCode(this.parent);
+                hash = 71 * hash + Objects.hashCode(this.leaf);
+            }
             return hash;
         }
 
@@ -625,10 +750,17 @@ public final class Dependency {
                 return false;
             }
             final Path other = (Path) obj;
-            if (!Objects.equals(this.parent, other.parent)) {
+            if (!Objects.equals(this.leaf, other.leaf)) {
                 return false;
             }
-            return Objects.equals(this.leaf, other.leaf);
+            if (this.parent == null && other.parent == null) {
+                if (this.result != null && other.result != null) {
+                    // both roots of a different result, just compare as relative paths under the root
+                    return true;
+                }
+                // for detached paths, compare even their roots.
+            }
+            return Objects.equals(this.parent, other.parent);
         }
     }
 }

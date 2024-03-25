@@ -30,6 +30,7 @@ import org.netbeans.api.lsp.Completion;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectManager;
 import org.netbeans.api.project.ui.OpenProjects;
+import org.netbeans.core.startup.Main;
 import org.netbeans.junit.NbTestCase;
 import org.netbeans.spi.project.ActionProgress;
 import org.netbeans.spi.project.ActionProvider;
@@ -37,7 +38,9 @@ import org.openide.cookies.EditorCookie;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.loaders.DataObject;
+import org.openide.modules.DummyInstalledFileLocator;
 import org.openide.util.lookup.Lookups;
+import org.openide.windows.IOProvider;
 
 /**
  *
@@ -53,6 +56,14 @@ public class MicronautExpressionLanguageCompletionTestBase extends NbTestCase {
 
     protected @Override void setUp() throws Exception {
         clearWorkDir();
+        /*
+
+        IOProvider p = IOProvider.getDefault();
+        File destDirF = getTestNBDestDir();
+        DummyInstalledFileLocator.registerDestDir(destDirF);
+        Main.getModuleSystem();
+
+        */
         System.setProperty("test.reload.sync", "true");
         FileObject dataFO = FileUtil.toFileObject(getDataDir());
         FileObject testApp = dataFO.getFileObject("maven/micronaut4/simple");
@@ -125,5 +136,16 @@ public class MicronautExpressionLanguageCompletionTestBase extends NbTestCase {
         ap.invokeAction(ActionProvider.COMMAND_PRIME, Lookups.fixed(progress));
         primingLatch.await(10, TimeUnit.MINUTES);
         return p;
+    }
+
+    private static File getTestNBDestDir() throws Exception {
+        String destDir = System.getProperty("test.netbeans.dest.dir");
+        // set in project.properties as test-unit-sys-prop.test.netbeans.dest.dir
+        assertNotNull("test.netbeans.dest.dir property has to be set when running within binary distribution", destDir);
+        return new File(destDir);
+    }
+
+    @org.openide.util.lookup.ServiceProvider(service=org.openide.modules.InstalledFileLocator.class, position = 1000)
+    public static class InstalledFileLocator extends DummyInstalledFileLocator {
     }
 }

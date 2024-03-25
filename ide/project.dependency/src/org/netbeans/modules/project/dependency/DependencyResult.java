@@ -47,7 +47,6 @@ import org.openide.util.lookup.ProxyLookup;
  * The {@link #getLookup() lookup} can be used to search for project-specific services that
  * can provide further info on the artifacts or dependencies.
  * 
- * PENDING: move to SPI, make API delegating wrapper.
  * @author sdedic
  */
 public final class DependencyResult implements Lookup.Provider {
@@ -92,7 +91,7 @@ public final class DependencyResult implements Lookup.Provider {
         if (context.getProjectSpec()== null) {
             throw new IllegalStateException();
         }
-        this.root = Dependency.builder(context.getProjectSpec(), null, project).children(this::getRootChildren).
+        this.root = Dependency.builder(context.getProjectSpec(), null, project).artifact(context.getProjectArtifact()).children(this::getRootChildren).
                 create();
     }
     
@@ -109,7 +108,12 @@ public final class DependencyResult implements Lookup.Provider {
         return context.getProjectArtifact();
     }
 
+    /**
+     * Provides access to data and services produced by dependency implementation(s).
+     * @return lookup instance.
+     */
     @Override
+    @NonNull
     public Lookup getLookup() {
         return lkp;
     }
@@ -117,6 +121,7 @@ public final class DependencyResult implements Lookup.Provider {
     /**
      * @return the inspected project
      */
+    @NonNull
     public Project getProject() {
         return project;
     }
@@ -126,18 +131,26 @@ public final class DependencyResult implements Lookup.Provider {
      * To get the project artifact, use {@link #getProjectArtifact()}.
      * @return project dependency root.
      */
+    @NonNull
     public Dependency getRoot() {
         return root;
     }
 
+    /**
+     * Returns the query that has produced this Result.
+     * @return query instance
+     */
+    @NonNull
     public ProjectDependencies.DependencyQuery getQuery() {
         return query;
     }
     
     /**
-     * Returns files that may declare dependencies contained in this report.
+     * Returns files that may declare dependencies contained in this report. May 
+     * return an empty collection.
      * @return project files that define dependencies.
      */
+    @NonNull
     public Collection<FileObject>   getDependencyFiles() {
         return context.getDependencyFiles();
     }
@@ -151,9 +164,10 @@ public final class DependencyResult implements Lookup.Provider {
     }
     
     /**
-     * Returns artifacts that may be unavailable or erroneous.
+     * Returns artifacts that may be unavailable or erroneous. May return an empty collection.
      * @return problem artifacts
      */
+    @NonNull
     public Collection<ArtifactSpec> getProblemArtifacts() {
         return context.getProblemArtifacts();
     }
@@ -296,7 +310,7 @@ public final class DependencyResult implements Lookup.Provider {
      * dependencies, included only indirectly in this project.
      * 
      * @param d the dependency to query
-     * @param part a specific part that should be located in the text. 
+     * @param part a specific part that should be located in the text. {@code null} for whole declaration.
      * @return the location for the dependency or its part; {@code null} if the
      * source location can not be determined.
      */
@@ -313,6 +327,16 @@ public final class DependencyResult implements Lookup.Provider {
         return null;
     }
     
+    /**
+     * Attempts to find the declaration range for the dependency. If the {@link SourceLocation}
+     * for the dependency cannot be found, the method attempts to locate {@link SourceLocation} for
+     * a (whole, no part) parent dependency - will traverse the supplied `path` upwards to the root.
+     * Use {@link #getDeclarationRange} to get information for just the specific Dependency. 
+     * @param path path to the Dependency
+     * @param part part of the dependency declaration
+     * @return SourceLocation that corresponds to the dependency part, or parent dependency
+     * @throws IOException if a source file cannot be loaded.
+     */
     public @CheckForNull SourceLocation findDeclarationRange(@NonNull Dependency.Path path, String part) throws IOException {
         if (path == null) {
             path = Dependency.Path.of(this, this.getRoot());
@@ -320,7 +344,7 @@ public final class DependencyResult implements Lookup.Provider {
         Dependency original = path.getLeaf();
         while (path != null) {
             Dependency now = path.getLeaf();
-            SourceLocation l = getDeclarationRange(now, part);
+            SourceLocation l = getDeclarationRange(now, now == original ? part : null);
             if (l != null) {
                 if (original == now) {
                     return l;
@@ -341,8 +365,16 @@ public final class DependencyResult implements Lookup.Provider {
         return projectScopes;
     }
     
-    // package-private protocol
     private void fireModelChange() {
+        List<ChangeListener> ll;
         
+        synchronized (this) {
+            if (this.modelListeners == null || modelListeners.isEmpty()) {
+                return;
+            }
+            ll = new ArrayList<>(modelListeners);
+        }
+        ChangeEvent e = new ChangeEvent(this);
+        modelListeners.forEach(l -> l.stateChanged(e));
     }
 }
