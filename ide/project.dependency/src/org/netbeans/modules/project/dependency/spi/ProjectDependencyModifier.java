@@ -40,6 +40,17 @@ import org.openide.filesystems.FileObject;
  */
 public interface ProjectDependencyModifier {
     /**
+     * Returns evaluation order of this Implementation. The default implementation
+     * for the project system should use the default, 10000. Other implementations may choose
+     * its relative position before/after to intercept or augment the requests.
+     * 
+     * @return order of the implementation.
+     */
+    public default int getOrder() {
+        return 10000;
+    }
+
+    /**
      * Computes changes to project files that apply the dependency change
      * @param request
      * @return result of the operation

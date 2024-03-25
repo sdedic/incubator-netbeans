@@ -52,12 +52,14 @@ public final class ProjectDependencies {
         if (pds.isEmpty()) {
             return null;
         }
+        List<ProjectDependenciesImplementation> ordered = new ArrayList<>(pds);
+        Collections.sort(ordered, (i1, i2) -> i1.getOrder() - i2.getOrder());
         DependencyResultContextImpl context = new DependencyResultContextImpl();
         // force load and init class.
         ProjectDependenciesImplementation.class.getMethods();
         ProjectDependenciesImplementation.Context apiContext = DependencySpiAccessor.get().createContextImpl(context);
         List<ProjectDependenciesImplementation.Result> rs = new ArrayList<>();
-        for (ProjectDependenciesImplementation impl : pds) {
+        for (ProjectDependenciesImplementation impl : ordered) {
             ProjectDependenciesImplementation.Result r = impl.findDependencies(query, apiContext);
             if (r != null) {
                 rs.add(r);
@@ -294,12 +296,14 @@ public final class ProjectDependencies {
             // simply unsupported.
             return null;
         }
-        
+        List<ProjectDependencyModifier> ordered = new ArrayList<>(modifiers);
+        Collections.sort(ordered, (m1, m2) -> m1.getOrder() - m2.getOrder());
+
         ProjectModificationResultImpl impl = new ProjectModificationResultImpl(p);
         DependencyModifierContext ctx = DependencySpiAccessor.get().createModifierContext(change, impl);
         
         boolean accepted = false;
-        for (ProjectDependencyModifier m : modifiers) {
+        for (ProjectDependencyModifier m : ordered) {
             ProjectDependencyModifier.Result res = m.computeChange(ctx);
             if (res != null) {
                 accepted = true;

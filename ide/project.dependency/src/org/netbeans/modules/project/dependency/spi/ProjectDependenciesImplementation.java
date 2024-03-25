@@ -41,6 +41,17 @@ import org.openide.util.Lookup;
  */
 public interface ProjectDependenciesImplementation {
     
+    /**
+     * Returns evaluation order of this Implementation. The default implementation
+     * for the project system should use the default, 10000. Other implementations may choose
+     * its relative position before/after to intercept or augment the requests.
+     * 
+     * @return order of the implementation.
+     */
+    public default int getOrder() {
+        return 10000;
+    }
+
     // TODO: change to CompletionStage<>, as the implementation is likely to use some dedicated
     // thread to evaluate the project.
     @NonNull

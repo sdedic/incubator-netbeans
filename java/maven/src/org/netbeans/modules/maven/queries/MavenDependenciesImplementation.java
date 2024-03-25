@@ -494,6 +494,9 @@ public class MavenDependenciesImplementation implements ProjectDependenciesImple
     
     static boolean dependencyEquals(Dependency dspec, org.apache.maven.model.Dependency mavenD) {
         ArtifactSpec spec = dspec.getArtifact();
+        if (spec == null) {
+            return false;
+        }
         String mavenClass = mavenD.getClassifier();
         if ("".equals(mavenClass)) {
             mavenClass = null;

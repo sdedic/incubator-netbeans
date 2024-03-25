@@ -242,8 +242,8 @@ public class GradleDependenciesImplementationTest extends NbTestCase {
         // some through an injected one, micronaut-bom, which does not have any SourceLocation atm.
         List<Dependency.Path> paths;
         Dependency.Path treePath = Dependency.Path.of(r);
-        paths = r.getRoot().getChildren().stream().map(treePath::next).flatMap(
-            dp -> dp.getLeaf().getChildren().stream().map(dp::next)
+        paths = r.getRoot().getChildren().stream().map(treePath::append).flatMap(
+            dp -> dp.getLeaf().getChildren().stream().map(dp::append)
             ).filter(dp ->
                     dp.getLeaf().getArtifact().toString().equals("io.micronaut:micronaut-websocket:3.6.0")).collect(Collectors.toList());
         assertFalse("Implied dependency is present", paths.isEmpty());
