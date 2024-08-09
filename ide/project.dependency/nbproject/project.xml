@@ -164,9 +164,7 @@
                     </test-dependency>
                 </test-type>
             </test-dependencies>
-            <public-packages>
-                <package>org.netbeans.modules.project.dependency</package>
-            </public-packages>
+            <public-packages/>
         </data>
     </configuration>
 </project>
