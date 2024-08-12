@@ -312,7 +312,7 @@ public class GradleReloadImplementationTest extends NbTestCase {
         setupComplexProject();
         
         // need to establish some state, so the check has a baseline
-        ProjectReload.getProjectState(libProject, true);
+        ProjectState save = ProjectReload.getProjectState(libProject, true);
         
         FileObject ociPomFile = ociProject.getProjectDirectory().getFileObject("build.gradle");
         EditorCookie cake = ociPomFile.getLookup().lookup(EditorCookie.class);
@@ -340,7 +340,7 @@ public class GradleReloadImplementationTest extends NbTestCase {
         setupSimpleProject();
         
         // need to establish some state, so the check has a baseline
-        ProjectReload.getProjectState(project, true);
+        ProjectState save = ProjectReload.getProjectState(project, true);
 
         FileObject rootPomFile = prjDir.getFileObject("settings.gradle");
         EditorCookie cake = rootPomFile.getLookup().lookup(EditorCookie.class);
