@@ -400,31 +400,32 @@ public class ProjectOpenedHookImpl extends ProjectOpenedHook {
             return;
         }        
         
+        FileObject basedirFO = FileUtil.toFileObject(basedir);
+        Project p = null;
+        if (basedirFO != null) {
+            try {
+                p = ProjectManager.getDefault().findProject(basedirFO);
+            } catch (IOException x) {
+                LOGGER.log(Level.FINE, null, x);
+            }
+        } else {
+            LOGGER.log(Level.FINE, "no FileObject for {0}", basedir);
+        }
         if (groupId.contains("${") || artifactId.contains("${") || version.contains("${")) {
             LOGGER.log(Level.FINE, "Unevaluated groupId/artifactId/version in {0}", basedir);
-            FileObject basedirFO = FileUtil.toFileObject(basedir);
-            if (basedirFO != null) {
-                try {
-                    Project p = ProjectManager.getDefault().findProject(basedirFO);
-                    if (p != null) {
-                        NbMavenProjectImpl nbmp = p.getLookup().lookup(NbMavenProjectImpl.class);
-                        if (nbmp != null) {
-                            MavenFileOwnerQueryImpl.getInstance().registerProject(nbmp, true);
-                        } else {
-                            LOGGER.log(Level.FINE, "not a Maven project in {0}", basedir);
-                        }
-                    } else {
-                        LOGGER.log(Level.FINE, "no project in {0}", basedir);
-                    }
-                } catch (IOException x) {
-                    LOGGER.log(Level.FINE, null, x);
+            if (p != null) {
+                NbMavenProjectImpl nbmp = p.getLookup().lookup(NbMavenProjectImpl.class);
+                if (nbmp != null) {
+                    MavenFileOwnerQueryImpl.getInstance().registerProject(nbmp, true);
+                } else {
+                    LOGGER.log(Level.FINE, "not a Maven project in {0}", basedir);
                 }
             } else {
-                LOGGER.log(Level.FINE, "no FileObject for {0}", basedir);
+                LOGGER.log(Level.FINE, "no project in {0}", basedir);
             }
         } else {
             try {
-                MavenFileOwnerQueryImpl.getInstance().registerCoordinates(groupId, artifactId, version, Utilities.toURI(basedir).toURL(), true);
+                MavenFileOwnerQueryImpl.getInstance().registerCoordinates(p, groupId, artifactId, version, Utilities.toURI(basedir).toURL(), true);
             } catch (MalformedURLException x) {
                 LOGGER.log(Level.FINE, null, x);
             }

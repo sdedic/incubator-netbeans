@@ -40,7 +40,7 @@ public class NbArtifactFixerTest extends NbTestCase {
         File pom = TestFileUtils.writeFile(new File(getWorkDir(), "pom.xml"), "<project xmlns='http://maven.apache.org/POM/4.0.0'><modelVersion>4.0.0</modelVersion>" +
             "<groupId>g</groupId><artifactId>a</artifactId><version>0</version>" +
             "</project>");
-        MavenFileOwnerQueryImpl.getInstance().registerCoordinates("g", "a", "0", Utilities.toURI(getWorkDir()).toURL(), true);
+        MavenFileOwnerQueryImpl.getInstance().registerCoordinates(null, "g", "a", "0", Utilities.toURI(getWorkDir()).toURL(), true);
         assertEquals(pom, new NbArtifactFixer().resolve(new DefaultArtifact("g:a:pom:0")));
         assertEquals(null, new NbArtifactFixer().resolve(new DefaultArtifact("g:a:jar:0")));
         File fallback = new NbArtifactFixer().resolve(new DefaultArtifact("g:a:pom:1"));

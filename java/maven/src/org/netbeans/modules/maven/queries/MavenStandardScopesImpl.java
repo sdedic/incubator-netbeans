@@ -20,14 +20,14 @@ package org.netbeans.modules.maven.queries;
 
 import java.util.Collection;
 import java.util.Collections;
-import org.netbeans.modules.project.dependency.ProjectScopes;
 import org.netbeans.modules.project.dependency.Scope;
+import org.netbeans.modules.project.dependency.spi.ProjectDependencyScopes;
 
 /**
  *
  * @author sdedic
  */
-public class MavenStandardScopesImpl implements ProjectScopes {
+public class MavenStandardScopesImpl implements ProjectDependencyScopes {
     @Override
     public Collection<? extends Scope> scopes() {
         return MavenDependenciesImplementation.scope2Maven.keySet();

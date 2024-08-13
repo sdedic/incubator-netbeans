@@ -27,8 +27,12 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -75,6 +79,7 @@ public class MavenFileOwnerQueryImpl implements FileOwnerQueryImplementation {
     private final PropertyChangeListener projectListener;
     private final ProjectGroupChangeListener groupListener;
     private final List<ChangeListener> listeners = new CopyOnWriteArrayList<>();
+    private final Map<String, String> closedProjectsMap = new ConcurrentHashMap<>();
 
     private static final AtomicReference<Preferences> prefs = new AtomicReference<>(NbPreferences.forModule(MavenFileOwnerQueryImpl.class).node(EXTERNAL_OWNERS));
 
@@ -137,8 +142,8 @@ public class MavenFileOwnerQueryImpl implements FileOwnerQueryImplementation {
     public static String cacheKey(String groupId, String artifactId, String version) {
         return groupId + ':' + artifactId + ":" + version;
     }
-
-    public void registerCoordinates(String groupId, String artifactId, String version, URL owner, boolean fire) {
+    
+    public void registerCoordinates(Project regProject, String groupId, String artifactId, String version, URL owner, boolean fire) {
         String oldkey = groupId + ':' + artifactId;
         //remove old key if pointing to the same project
         if (owner.toString().equals(prefs().get(oldkey, null))) {
@@ -147,6 +152,11 @@ public class MavenFileOwnerQueryImpl implements FileOwnerQueryImplementation {
         
         String key = cacheKey(groupId, artifactId, version);
         String ownerString = owner.toString();
+        System.err.println("Registering coordinates: " + key + " -> " + ownerString);
+        if (key.contains(":lib:")) {
+            System.err.println("**** LIB");
+        }
+        String competingOwner = prefs().get(key, null);
         try {
             for (String k : prefs().keys()) {
                 String value;
@@ -165,7 +175,28 @@ public class MavenFileOwnerQueryImpl implements FileOwnerQueryImplementation {
         } catch (BackingStoreException ex) {
             LOG.log(Level.FINE, "Error iterating preference to find old mapping", ex);
         }
-        
+        // projects may dangle in memory after they are closed, or were never opened; in that case, an opened refreshing project
+        // should have a priority over a non-open project.
+        if (regProject != null && competingOwner != null && !competingOwner.equals(ownerString)) {
+            FileObject oldF = null;
+            Project oldP = null;
+            try {
+                oldF = URLMapper.findFileObject(new URL(competingOwner));
+                if (oldF != null) {
+                    oldP = ProjectManager.getDefault().findProject(oldF);
+                } 
+                if (oldP != null) {
+                    Collection<Project> projs = Arrays.asList(OpenProjects.getDefault().getOpenProjects());
+                    if (!projs.contains(regProject) && projs.contains(oldP)) {
+                        LOG.log(Level.FINE, "Registering fallback {0} under {1}", new Object[] {owner, key});
+                        closedProjectsMap.put(key, ownerString);
+                        return;
+                    }
+                }
+            } catch (IOException ex) {
+                // unable to open the competing project, but OK, can be ignored
+            }
+        }
         prefs().put(key, ownerString);
         LOG.log(Level.FINE, "Registering {0} under {1}", new Object[] {owner, key});
         if (fire) {
@@ -188,7 +219,7 @@ public class MavenFileOwnerQueryImpl implements FileOwnerQueryImplementation {
             return false;
         }
         try {
-            registerCoordinates(model.getGroupId(), model.getArtifactId(), model.getVersion(), Utilities.toURI(project.getPOMFile().getParentFile()).toURL(), fire);
+            registerCoordinates(project, model.getGroupId(), model.getArtifactId(), model.getVersion(), Utilities.toURI(project.getPOMFile().getParentFile()).toURL(), fire);
         } catch (MalformedURLException ex) {
         }
         return true;
@@ -295,6 +326,9 @@ public class MavenFileOwnerQueryImpl implements FileOwnerQueryImplementation {
             ownerURI = prefs().get(oldKey, null);
             usingOldKey = true;
         }        
+        if (ownerURI == null) {
+            ownerURI = closedProjectsMap.get(key);
+        }
         if (ownerURI != null) {
             boolean stale = true;
             try {
@@ -360,6 +394,10 @@ public class MavenFileOwnerQueryImpl implements FileOwnerQueryImplementation {
         if (ownerURI == null) {
             ownerURI = prefs().get(oldKey, null);
             usingOldKey = true;
+        }
+        if (ownerURI == null) {
+            // try fallbacks
+            ownerURI = closedProjectsMap.get(key);
         }
         if (ownerURI != null) {
             try {

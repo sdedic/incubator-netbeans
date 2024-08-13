@@ -55,7 +55,7 @@ public final class DependencyResult implements Lookup.Provider {
     private final Dependency root;
     private final ProjectDependencies.DependencyQuery query;
     private final Lookup lkp;
-    private final  ProjectScopes projectScopes;
+    private final ProjectScopes projectScopes;
     
     // @GuardedBy(this)
     private List<ChangeListener>    modelListeners = new ArrayList<>();
@@ -81,7 +81,7 @@ public final class DependencyResult implements Lookup.Provider {
         } else {
             this.lkp = new ProxyLookup(parts);
         }
-        this.projectScopes = new ProjectScopesImpl(context.getScopes());
+        this.projectScopes = context.getScopes();
         /*
         Optional<ProjectSpec> pa = resultImpls.stream().map(Result::getProjectArtifact).findFirst();
         this.projectArtifact = .orElse(null);

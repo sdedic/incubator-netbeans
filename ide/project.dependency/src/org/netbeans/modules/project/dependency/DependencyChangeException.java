@@ -26,36 +26,49 @@ import org.netbeans.api.lsp.TextDocumentEdit;
 import org.netbeans.api.lsp.WorkspaceEdit;
 
 /**
- *
+ * Describes a failure of a project dependency operation. The exception data contains the reason and details
+ * of such a failure.
+ * 
  * @since 1.7
  * @author sdedic
  */
 public final class DependencyChangeException extends Exception {
     /**
      * The reason for the failed operation.
-     * PENDING: shouldn't this be String const for a compatible evolution ?
+     * PENDING: shouldn't this be String constants for a compatible evolution ?
      */
     public static enum Reason {
         /**
-         * A conflicting dependency is present for or change.
+         * A conflicting dependency is present, for add or change operations. The {@link #getFailedDependencies()} and
+         * {@link #getConflictSource(org.netbeans.modules.project.dependency.Dependency)} can be used to 
+         * get the details.
          */
         CONFLICT,
         
         /**
-         * The dependency requested to be removed is missing.
+         * The dependency requested to be removed is missing. Use {@link #getFailedDependencies()} to get the
+         * list of missing dependencies.
          */
         MISSING,
         
         /**
-         * A dependency in the request is invalid and cannot be applied.
+         * A dependency in the request is invalid and cannot be applied. Use {@link #getFailedDependencies()}
+         * to get list of failures.
          */
         MALFORMED,
 
         /**
          * The change cannot be applied because one or more participants interfered
-         * in a way that the request cannot be completed.
+         * in a way that the request cannot be completed. Check {@link #getOffendingEdit() for
+         * possibly conflicting change.
          */
-        INTERFERED
+        INTERFERED,
+        
+        /**
+         * The operation is not supported, or a specific dependency is not supported for the
+         * operation.
+         */
+        UNSUPPORTED,
     };
     
     private final Reason reason;
@@ -116,7 +129,7 @@ public final class DependencyChangeException extends Exception {
 
     /**
      * Get offending text edits.
-     * @return 
+     * @return the text edit that caused the operation to fail. 
      */
     public TextDocumentEdit getOffendingEdit() {
         return offendingEdit;

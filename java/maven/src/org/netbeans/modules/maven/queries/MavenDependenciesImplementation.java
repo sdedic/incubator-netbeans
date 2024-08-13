@@ -54,6 +54,7 @@ import org.netbeans.modules.project.dependency.ProjectSpec;
 import org.netbeans.modules.project.dependency.Scope;
 import org.netbeans.modules.project.dependency.Scopes;
 import org.netbeans.modules.project.dependency.spi.ProjectDependenciesImplementation;
+import org.netbeans.modules.project.dependency.spi.ProjectDependencyScopes;
 import org.netbeans.spi.project.ProjectServiceProvider;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
@@ -198,6 +199,11 @@ public class MavenDependenciesImplementation implements ProjectDependenciesImple
                 prjSpec,
                 rootNode, Collections.emptyList(), project, impl.getProjectWatcher(), context
         );
+    }
+    
+    @Override
+    public ProjectDependencyScopes findProjectScopes() {
+        return new MavenStandardScopesImpl();
     }
     
     static Collection<Scope> implies(Scope s) {

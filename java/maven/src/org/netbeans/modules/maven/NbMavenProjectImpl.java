@@ -214,7 +214,10 @@ public final class NbMavenProjectImpl implements Project {
             }
         }
     }
-
+    
+    public long getLoadTimestamp() {
+        return MavenProjectCache.getLoadTimestamp(this.project.get());
+    }
     
     private final Object MODEL_LOCK = new Object();
     private Model model;

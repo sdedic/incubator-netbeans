@@ -52,6 +52,7 @@ import org.netbeans.modules.project.dependency.ProjectSpec;
 import org.netbeans.modules.project.dependency.Scope;
 import org.netbeans.modules.project.dependency.Scopes;
 import org.netbeans.modules.project.dependency.spi.ProjectDependenciesImplementation;
+import org.netbeans.modules.project.dependency.spi.ProjectDependencyScopes;
 import org.netbeans.spi.project.ProjectServiceProvider;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
@@ -94,6 +95,11 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
     
     Set<GradleScope> allScopes() {
         return new HashSet<>(gradleScopes().scopes());
+    }
+
+    @Override
+    public ProjectDependencyScopes findProjectScopes() {
+        return gradleScopes();
     }
     
     GradleScope toGradleScope(Scope s) {
@@ -313,7 +319,6 @@ public class GradleDependenciesImplementation implements ProjectDependenciesImpl
             context.setProjectArtifact(part);
             context.setProjectSpec(pspec);
             context.addRootChildren(children);
-            context.addScopes(scopes);
             File script = ngp.getGradleFiles().getBuildScript();
             if (script != null) {
                 FileObject fo = FileUtil.toFileObject(script);

@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -79,7 +80,7 @@ public final class DependencyChange {
     /**
      * The dependency being worked on.
      */
-    private final List<Dependency>  dependencies;
+    private List<Dependency>  dependencies;
 
     private DependencyChange(EnumSet<Options> options, Kind kind, List<Dependency> dependencies) {
         this.options = options;
@@ -156,6 +157,14 @@ public final class DependencyChange {
     public static Builder builder(Kind k) {
         return new Builder(k);
     }
+    
+    public static Builder clone(DependencyChange original, Dependency... excl) {
+        return Builder.clone(original, excl);
+    }
+   
+    public static Builder cloneExcluding(DependencyChange original, List<Dependency> excl) {
+        return Builder.cloneExcluding(original, excl);
+    }
    
     /**
      * Builder that can create non trivial dependency changes.
@@ -186,6 +195,16 @@ public final class DependencyChange {
             return this;
         }
         
+        public Builder exclude(Dependency... deps) {
+            if (deps == null) {
+                return this;
+            }
+            for (Dependency d : deps) {
+                dependencies.remove(d);
+            }
+            return this;
+        }
+        
         public Builder option(Options... toAdd) {
             if (toAdd == null) {
                 return this;
@@ -193,5 +212,37 @@ public final class DependencyChange {
             options.addAll(Arrays.asList(toAdd));
             return this;
         }
+        
+        public Builder withoutOption(Options... toRemove) {
+            if (toRemove != null) {
+                this.options.removeAll(Arrays.asList(toRemove));
+            }
+            return this;
+        }
+        
+        public static Builder clone(DependencyChange original, Dependency... exclusions) {
+            return exclusions == null ? cloneExcluding(original, null) : cloneExcluding(original, Arrays.asList(exclusions));
+        }
+        
+        public static Builder cloneExcluding(DependencyChange original, List<Dependency> exclusions) {
+            Builder b = builder(original.getKind());
+            if (exclusions == null || exclusions.isEmpty()) {
+                b.dependency(original.getDependencies());
+            } else {
+                Collection<Dependency> deps = new LinkedHashSet<>(original.getDependencies());
+                deps.removeAll(Arrays.asList(exclusions));
+                b.dependency(deps);
+            }
+            b.option(original.getOptions().toArray(Options[]::new));
+            return b;
+        }
+    }
+    
+    void remove(Dependency d) {
+        List<Dependency> nl = new ArrayList<>(dependencies);
+        if (!nl.remove(d)) {
+            throw new IllegalArgumentException();
+        }
+        this.dependencies = Collections.unmodifiableList(nl);
     }
 }

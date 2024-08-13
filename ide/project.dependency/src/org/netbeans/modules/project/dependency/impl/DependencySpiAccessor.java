@@ -18,9 +18,12 @@
  */
 package org.netbeans.modules.project.dependency.impl;
 
+import javax.swing.event.ChangeListener;
 import org.netbeans.modules.project.dependency.DependencyChangeRequest;
+import org.netbeans.modules.project.dependency.ProjectDependencies;
 import org.netbeans.modules.project.dependency.spi.DependencyModifierContext;
 import org.netbeans.modules.project.dependency.spi.ProjectDependenciesImplementation;
+import org.netbeans.modules.project.dependency.spi.ProjectReloadImplementation.ProjectStateData;
 
 /**
  *
@@ -48,7 +51,9 @@ public abstract class DependencySpiAccessor {
         return INSTANCE;
     }
     
+    public abstract void addProjectStateListener(ProjectStateData data, ChangeListener l);
+    
     public abstract DependencyModifierContext createModifierContext(DependencyChangeRequest req, ProjectModificationResultImpl impl);
     
-    public abstract ProjectDependenciesImplementation.Context createContextImpl(DependencyResultContextImpl impl);
+    public abstract ProjectDependenciesImplementation.Context createContextImpl(ProjectDependencies.DependencyQuery query, DependencyResultContextImpl impl);
 }

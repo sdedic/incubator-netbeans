@@ -26,12 +26,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.netbeans.api.project.Project;
+import org.netbeans.modules.project.dependency.impl.DependencyApiAccessor;
 import org.netbeans.modules.project.dependency.impl.DependencyResultContextImpl;
 import org.netbeans.modules.project.dependency.impl.DependencySpiAccessor;
 import org.netbeans.modules.project.dependency.impl.ProjectModificationResultImpl;
 import org.netbeans.modules.project.dependency.spi.DependencyModifierContext;
 import org.netbeans.modules.project.dependency.spi.ProjectDependenciesImplementation;
 import org.netbeans.modules.project.dependency.spi.ProjectDependencyModifier;
+import org.netbeans.modules.project.dependency.spi.ProjectDependencyScopes;
 import org.openide.util.Lookup;
 
 /**
@@ -54,10 +56,17 @@ public final class ProjectDependencies {
         }
         List<ProjectDependenciesImplementation> ordered = new ArrayList<>(pds);
         Collections.sort(ordered, (i1, i2) -> i1.getOrder() - i2.getOrder());
-        DependencyResultContextImpl context = new DependencyResultContextImpl();
+        List<ProjectDependencyScopes> scopes = new ArrayList<>();
+        for (ProjectDependenciesImplementation impl : ordered) {
+            ProjectDependencyScopes sc = impl.findProjectScopes();
+            if (sc != null) {
+                scopes.add(sc);
+            }
+        }
+        DependencyResultContextImpl context = new DependencyResultContextImpl(scopes);
         // force load and init class.
         ProjectDependenciesImplementation.class.getMethods();
-        ProjectDependenciesImplementation.Context apiContext = DependencySpiAccessor.get().createContextImpl(context);
+        ProjectDependenciesImplementation.Context apiContext = DependencySpiAccessor.get().createContextImpl(query, context);
         List<ProjectDependenciesImplementation.Result> rs = new ArrayList<>();
         for (ProjectDependenciesImplementation impl : ordered) {
             ProjectDependenciesImplementation.Result r = impl.findDependencies(query, apiContext);
@@ -254,6 +263,8 @@ public final class ProjectDependencies {
      * @param dependencies list of dependencies to remove
      * @return modification result
      * @see #modifyDependencies(org.netbeans.api.project.Project, org.netbeans.modules.project.dependency.DependencyChange) 
+     * @throws DependencyChangeException if dependency introduces a conflict, is malformed or the operation fails
+     * @throws ProjectOperationException for project system errors, as project not loadable, not valid (reload may be needed), project files not writable etc.
      * @since 1.7
      */
     public static ProjectModificationResult removeDependencies(Project project, List<Dependency> dependencies) throws DependencyChangeException, ProjectOperationException {
@@ -287,8 +298,8 @@ public final class ProjectDependencies {
      * @param p the project
      * @param  the change to made
      * @return proposed changes to make.
-     * @throws DependencyChangeException in case of error or dependency conflicts
-     * @throws ProjectOperationException if the project could not be properly loaded
+     * @throws DependencyChangeException if dependency introduces a conflict, is malformed or the operation fails
+     * @throws ProjectOperationException for project system errors, as project not loadable, not valid (reload may be needed), project files not writable etc.
      */
     public static ProjectModificationResult modifyDependencies(Project p, DependencyChangeRequest change) throws DependencyChangeException, ProjectOperationException {
         Collection<? extends ProjectDependencyModifier> modifiers = p.getLookup().lookupAll(ProjectDependencyModifier.class);
@@ -316,4 +327,23 @@ public final class ProjectDependencies {
         
         return new ProjectModificationResult(impl);
     }
+    
+    static {
+        DependencyApiAccessor.set(new ApiAccessorImpl());
+    }
+    
+    private static class ApiAccessorImpl extends DependencyApiAccessor {
+
+        @Override
+        public ProjectScopes createScopes(List<ProjectDependencyScopes> implementations) {
+            return new ProjectScopes(implementations);
+        }
+
+        @Override
+        public void remove(DependencyChange chg, Dependency d) {
+            chg.remove(d);
+        }
+    }
 }
+
+

@@ -20,9 +20,14 @@ package org.netbeans.modules.project.dependency.spi;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import org.netbeans.api.annotations.common.NullAllowed;
 import org.netbeans.api.lsp.WorkspaceEdit;
+import org.netbeans.modules.project.dependency.Dependency;
 import org.netbeans.modules.project.dependency.DependencyChange;
 import org.netbeans.modules.project.dependency.DependencyChangeRequest;
 import org.netbeans.modules.project.dependency.impl.ProjectModificationResultImpl;
@@ -32,7 +37,7 @@ import org.netbeans.modules.project.dependency.impl.ProjectModificationResultImp
  * as "consumed", so they will not be processed by further Modifier implementations.
  * The context also provides access for pending edits made by Modifiers already processed.
  * A Modifier may choose to reject or modify the operation if it cannot adapt its model.
- * 
+ * <p/>
  * @author sdedic
  */
 public final class DependencyModifierContext {
@@ -65,12 +70,14 @@ public final class DependencyModifierContext {
      * The set of changes is represented as {@link WorkspaceEdit} as this structure can potentially contain
      * some metadata in the future.
      * 
+     * TODO: represent resources using URI, URL or String -- resources may not exist (yet).
+     * 
      * @return currently pending edits.
      */
     public WorkspaceEdit getPendingEdits(URI uri) {
         return impl.getWorkspaceEdit(uri);
     }
-
+    
     /**
      * Returns the current list of pending operations. Some of the requested original operations may
      * be already consumed. See {@link DependencyChangeRequest#getOperations()} for the requested list.
@@ -82,10 +89,65 @@ public final class DependencyModifierContext {
     
     /**
      * Consumes a requested change. No further Modifier will get the change to handle. The change must
-     * be among the currently {@link #getPendingOperations}.
+     * be among the currently {@link #getPendingOperations}. 
      * @param chg the change.
+     * @param dep the dependency that is consumed
      */
-    public void consume(DependencyChange chg) {
-        changes.remove(chg);
+    public void consume(DependencyChange chg, Dependency... consumed) {
+        int index = this.changes.indexOf(chg);
+        if (index == -1) {
+            throw new IllegalArgumentException("Dependency change not part of operation: " + chg);
+        }
+        if (consumed != null && consumed.length > 0) {
+            Set<Dependency> chgDeps = new HashSet<>(Arrays.asList(consumed));
+            chgDeps.removeAll(chg.getDependencies());
+            if (!chgDeps.isEmpty()) {
+                throw new IllegalArgumentException("Dependencies not part of the change: " + chgDeps);
+            }
+            this.changes.set(index, DependencyChange.clone(chg, consumed).create());
+        } else {
+            changes.remove(chg);
+        }
+    }
+    
+    /**
+     * Adds, removes or replaces a Dependency change. Can be called in {@link ProjectDependencyModifier#prepareChange} and will
+     * be visible for <b>all modifier implementations</b>. If the method is called during {@link ProjectDependencyModifier#computeChanges}, 
+     * it will only affect the rest of Modifiers.
+     * <p>
+     * The call can remove, add or replace operations. If {@code remove} is {@code null}, nothing is removed. Similarly, if {@code add}
+     * is empty or null, nothing is added. If items are added, they are added at the specified {@code position} in the <b>original</b>
+     * operation order. 
+     * <p>
+     * If {@code position} is -1, new items are added instead of the removed DependencyChange. If no DependencyChange is removed, they
+     * are added at the end of the operation list.
+     * 
+     * @param remove removes a change from the {@link #getPendingOperations()}. Pass {@code null} for no removal
+     * @param add zero or more changes to add
+     * @param position position where the changes should be added. -1 means add *in place* of the removed item, or at the end of the list.
+     */
+    public void change(@NullAllowed DependencyChange remove, int position, DependencyChange... add) {
+        int index = -1;
+        
+        if (remove != null) {
+            index = changes.indexOf(remove);
+            if (index == 1) {
+                throw new IllegalArgumentException("Change not present: " + remove);
+            }
+            changes.remove(index);
+            if (position > index) {
+                position--;
+            }
+        }
+        if (add == null || add.length == 0) {
+            return;
+        }
+        if (index == -1) {
+            index = position;
+        }
+        if (index == -1) {
+            index = changes.size();
+        }
+        changes.addAll(index, Arrays.asList(add));
     }
 }

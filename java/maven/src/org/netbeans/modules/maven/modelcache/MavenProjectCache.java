@@ -94,6 +94,11 @@ public final class MavenProjectCache {
     private static final String CONTEXT_FALLBACK_PROJECT = "org.netbeans.modules.maven.fallbackProject"; // NOI18N
     
     /**
+     * Timestamp of the project model load.
+     */
+    private static final String CONTEXT_LOAD_TIMESTAMP = "org.netbeans.modules.maven.loadTimestamp"; // NOI18N
+    
+    /**
      * Folder with module-configurable whitelist of lifecycle participants. Currently only 'ignore' can be specified.
      */
     private static final String LIFECYCLE_PARTICIPANT_PREFIX = "Projects/" + NbMavenProject.TYPE + "/LifecycleParticipants/"; // NOI18N
@@ -153,6 +158,23 @@ public final class MavenProjectCache {
         });
 
         return mp;
+    }
+    
+    public static long getLoadTimestamp(MavenProject p) {
+        if (p == null) {
+            return -1;
+        }
+        Object o = p.getContextValue(CONTEXT_LOAD_TIMESTAMP);
+        if (o instanceof Long) {
+            return (long)o;
+        } else {
+            return -2;
+        }
+    }
+    
+    public static Collection<Artifact> getFakedArtifacts(MavenProject p) {
+        Object o = p.getContextValue(CONTEXT_FAKED_ARTIFACTS);
+        return o instanceof Collection ? (Collection)o : Collections.emptySet();
     }
     
     public static MavenProject loadMavenProject(final File pomFile, ProjectActionContext context, RunConfig runConf) {
@@ -294,6 +316,7 @@ public final class MavenProjectCache {
                 newproject.setContextValue(CONTEXT_FAKED_ARTIFACTS, fakes);
             }
         }
+        newproject.setContextValue(CONTEXT_LOAD_TIMESTAMP, startLoading);
         return newproject;
     }
     

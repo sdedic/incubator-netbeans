@@ -20,11 +20,14 @@ package org.netbeans.modules.project.dependency.spi;
 
 
 import java.util.List;
+import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import org.netbeans.api.annotations.common.CheckForNull;
 import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.modules.project.dependency.ArtifactSpec;
 import org.netbeans.modules.project.dependency.Dependency;
 import org.netbeans.modules.project.dependency.DependencyChangeRequest;
+import org.netbeans.modules.project.dependency.DependencyResult;
 import org.netbeans.modules.project.dependency.ProjectDependencies;
 import org.netbeans.modules.project.dependency.ProjectOperationException;
 import org.netbeans.modules.project.dependency.ProjectScopes;
@@ -58,15 +61,25 @@ public interface ProjectDependenciesImplementation {
     public Result findDependencies(@NonNull ProjectDependencies.DependencyQuery query, Context context)
             throws ProjectOperationException;
     
-        /**
+    /**
+     * Returns {@link Scope scopes} or their relationships this implementation defines. The returned
+     * information will be merged with all other providers to create {@link ProjectScopes}
+     * @return project scopes, or {@code null}
+     */
+    @CheckForNull 
+    public ProjectDependencyScopes findProjectScopes();
+    
+    /**
      * Response object that will accumulate data from {@link #findDependencies} implementations.
      * The {@link ProjectDependenciesImplementation} must use this object to collect children, problems
      * and files for the {@link DependencyResult} that will merge the info from multiple providers.
      */
     public static final class Context {
         private final DependencyResultContextImpl impl;
-
-        public Context(DependencyResultContextImpl impl) {
+        private final ProjectDependencies.DependencyQuery query;
+        
+        private Context(ProjectDependencies.DependencyQuery query, DependencyResultContextImpl impl) {
+            this.query = query;
             this.impl = impl;
         }
         
@@ -78,20 +91,20 @@ public interface ProjectDependenciesImplementation {
             return impl.getLookup();
         }
         
+        public ProjectScopes getScopes() {
+            return impl.getScopes();
+        }
+        
+        public ProjectDependencies.DependencyQuery getQuery() {
+            return query;
+        }
+        
         /**
          * Reports a problem related to an artifact.
          * @param spec artifact specification
          */
         public void reportArtifactProblem(ArtifactSpec spec) {
             impl.addProblemArtifact(spec);
-        }
-        
-        /**
-         * Add custom {@link ProjectScopes} that could be used in the produced dependencies.
-         * @param scopes ProjectScopes instance of {@code null}
-         */
-        public void addScopes(@NonNull ProjectScopes scopes) {
-            impl.addScope(scopes);
         }
         
         /**
@@ -140,8 +153,13 @@ public interface ProjectDependenciesImplementation {
         static {
             DependencySpiAccessor.set(new DependencySpiAccessor() {
                 @Override
-                public Context createContextImpl(DependencyResultContextImpl impl) {
-                    return new Context(impl);
+                public void addProjectStateListener(ProjectReloadImplementation.ProjectStateData data, ChangeListener l) {
+                    data.addListener(l);
+                }
+                
+                @Override
+                public Context createContextImpl(ProjectDependencies.DependencyQuery query, DependencyResultContextImpl impl) {
+                    return new Context(query, impl);
                 }
 
                 @Override
@@ -154,12 +172,15 @@ public interface ProjectDependenciesImplementation {
     
     /**
      * Data holder and service accessor returned from {@link #findDependencies}. The implementation
-     * must implement listener managament. Additional services may be provided from {@link Lookup.Provider},
+     * must implement listener management. Additional services may be provided from {@link Lookup.Provider},
      * to interface with other possible plug-ins.
+     * <p/>
+     * If the status or other property of the Result changes, a {@link ChangeEvent} should be broadcasted to
+     * registered {@link ChangeListener}s by the implementation.
      */
     public interface Result extends Lookup.Provider {
         /**
-         * @return True, if the result is still valid.
+         * @return True, if the result is still valid. 
          */
         public boolean isValid();
 

@@ -49,9 +49,18 @@ public class TextDocumentEditProcessor {
     private FileObject targetFile;
     private EditorCookie editor;
     private LineDocument document;
+    private int failedOperation = -1;
     
     public TextDocumentEditProcessor(TextDocumentEdit edits) {
         this.edits = edits;
+    }
+    
+    public int getFailedOperationIndex() {
+        return failedOperation;
+    }
+    
+    public boolean isEditCompleted() {
+        return failedOperation == edits.getEdits().size();
     }
 
     public boolean isForkDocument() {
@@ -148,7 +157,9 @@ public class TextDocumentEditProcessor {
                 }
         );
         if (err[0] != null) {
-            throw new IOException(Bundle.ERR_FailedToEditDocument(edits.getDocument()));
+            IOException e = new IOException(Bundle.ERR_FailedToEditDocument(edits.getDocument()));
+            e.initCause(err[0]);
+            throw e;
         }
         
         if (isSaveAfterEdit() && !isForkDocument()) {
@@ -169,6 +180,7 @@ public class TextDocumentEditProcessor {
         for (TextEdit te : edits.getEdits()) {
             int s = te.getStartOffset();
             int e = te.getEndOffset();
+            failedOperation++;
             // let positions that point at the start of the buffer remain in its place: first 
             // insert the text AFTER the deleted part, then delete.
             if (te.getNewText() != null && !te.getNewText().isEmpty()) {

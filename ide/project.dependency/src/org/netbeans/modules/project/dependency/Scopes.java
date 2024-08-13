@@ -19,7 +19,8 @@
 package org.netbeans.modules.project.dependency;
 
 /**
- *
+ * Specifies predefined or default Scopes that can be used with projects. Note that not all scopes
+ * are necessarily implemented by a project. Check that {@link ProjectDependencies#
  * @author sdedic
  */
 public final class Scopes {

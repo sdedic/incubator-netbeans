@@ -75,9 +75,9 @@ public class MavenFileOwnerQueryImplTest extends NbTestCase {
     
     public void testOldEntriesGetRemoved() throws Exception {
         URL url = new URL("file:///users/mkleint/aaa/bbb");
-        MavenFileOwnerQueryImpl.getInstance().registerCoordinates("a", "b", "0", url, true);
+        MavenFileOwnerQueryImpl.getInstance().registerCoordinates(null, "a", "b", "0", url, true);
         assertNotNull(MavenFileOwnerQueryImpl.prefs().get("a:b:0", null));
-        MavenFileOwnerQueryImpl.getInstance().registerCoordinates("a", "b", "1", url, true);
+        MavenFileOwnerQueryImpl.getInstance().registerCoordinates(null, "a", "b", "1", url, true);
         assertNotNull(MavenFileOwnerQueryImpl.prefs().get("a:b:1", null));
         assertNull(MavenFileOwnerQueryImpl.prefs().get("a:b:0", null));
         

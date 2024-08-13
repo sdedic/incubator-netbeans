@@ -1,4 +1,4 @@
-[ ] @/(micronaut)
+[ ] com.example:demo:0.1[jar]
  +-- [ ] ch.qos.logback:logback-classic:1.2.11[jar] / runtime
  |    +-- [ ] ch.qos.logback:logback-core:1.2.11[jar] / runtime
  |    +-- [ ] org.slf4j:slf4j-api:1.7.36[jar] / runtime

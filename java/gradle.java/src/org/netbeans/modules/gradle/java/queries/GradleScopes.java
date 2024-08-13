@@ -22,15 +22,15 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import org.netbeans.api.project.Project;
-import org.netbeans.modules.project.dependency.ProjectScopes;
 import org.netbeans.modules.project.dependency.Scope;
+import org.netbeans.modules.project.dependency.spi.ProjectDependencyScopes;
 
 /**
  * Implementation of ProjectScopes that bridges Gradle configutations.
  * 
  * @author sdedic
  */
-public final class GradleScopes implements ProjectScopes{
+public final class GradleScopes implements ProjectDependencyScopes{
     private final Project   project;
     private final Map<String, GradleScope> scopes;
 

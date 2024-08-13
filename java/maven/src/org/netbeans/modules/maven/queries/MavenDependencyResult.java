@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.DocumentEvent;
@@ -53,7 +54,7 @@ import org.netbeans.modules.maven.model.pom.POMModelFactory;
 import org.netbeans.modules.project.dependency.ArtifactSpec;
 import org.netbeans.modules.project.dependency.Dependency;
 import org.netbeans.modules.project.dependency.DependencyResult;
-import org.netbeans.modules.project.dependency.ProjectScopes;
+import org.netbeans.modules.project.dependency.Scope;
 import org.netbeans.modules.project.dependency.SourceLocation;
 import org.netbeans.modules.project.dependency.spi.DependencyLocationProvider;
 import org.netbeans.modules.project.dependency.spi.ProjectDependenciesImplementation;
@@ -77,7 +78,7 @@ class MavenDependencyResult implements Result, PropertyChangeListener, Dependenc
     final ArtifactSpec projectArtifact;
     final Dependency rootNode;
     final Collection<ArtifactSpec> problems;
-    final ProjectScopes scopes = new MavenStandardScopesImpl();
+    final Set<Scope> scopes;
     PropertyChangeListener wL;
     volatile Model effectiveModel;
     Map<FileObject, StyledDocument> openedPoms = new HashMap<>();
@@ -94,7 +95,7 @@ class MavenDependencyResult implements Result, PropertyChangeListener, Dependenc
         this.projectArtifact = projectSpec;
         this.rootNode = rootNode;
         this.problems = problems;
-        
+        this.scopes = context.getQuery().getScopes();
         context.addLocationProvider(this);
     }
 

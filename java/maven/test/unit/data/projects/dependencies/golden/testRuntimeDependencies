@@ -1,4 +1,4 @@
-[ ] @/(simpleProject)
+[ ] nbtest.grp:test-app:12.6[jar]
  +-- [ ] nbtest.grp:annotation:12.6[jar] / compilation
  +-- [ ] nbtest.grp:test-lib4:12.6[jar] / runtime
  +-- [ ] nbtest.grp:test-lib:13[jar] / compilation

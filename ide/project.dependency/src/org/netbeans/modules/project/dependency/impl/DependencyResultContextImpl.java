@@ -27,6 +27,7 @@ import org.netbeans.modules.project.dependency.Dependency;
 import org.netbeans.modules.project.dependency.ProjectScopes;
 import org.netbeans.modules.project.dependency.ProjectSpec;
 import org.netbeans.modules.project.dependency.spi.DependencyLocationProvider;
+import org.netbeans.modules.project.dependency.spi.ProjectDependencyScopes;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Lookup;
 import org.openide.util.lookup.ProxyLookup;
@@ -37,7 +38,6 @@ import org.openide.util.lookup.ProxyLookup;
  */
 public class DependencyResultContextImpl {
     private final Set<ArtifactSpec>  problemArtifacts = new LinkedHashSet<>();
-    private final List<ProjectScopes> scopes = new ArrayList<>();
     private final Set<FileObject> files = new LinkedHashSet<>();
     private final List<Dependency> rootChildren = new ArrayList<>();
     private final List<DependencyLocationProvider> locationProviders = new ArrayList<>();
@@ -46,6 +46,11 @@ public class DependencyResultContextImpl {
     private ProjectSpec projectSpec;
     private ArtifactSpec projectArtifact;
     private List<Lookup> lookups = new ArrayList<>();
+    private final ProjectScopes scopes;
+    
+    public DependencyResultContextImpl(List<ProjectDependencyScopes> impls) {
+        scopes = DependencyApiAccessor.get().createScopes(impls);
+    }
 
     public void addLookup(Lookup lkp) {
         lookups.add(lkp);
@@ -78,10 +83,6 @@ public class DependencyResultContextImpl {
         problemArtifacts.add(a);
     }
     
-    public void addScope(ProjectScopes s) {
-        scopes.add(s);
-    }
-    
     public void addRootChildren(List<Dependency> deps) {
         rootChildren.addAll(deps);
     }
@@ -94,7 +95,7 @@ public class DependencyResultContextImpl {
         return files;
     }
 
-    public List<ProjectScopes> getScopes() {
+    public ProjectScopes getScopes() {
         return scopes;
     }
 

@@ -26,13 +26,13 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.netbeans.api.annotations.common.CheckForNull;
+import org.netbeans.api.annotations.common.NullAllowed;
 
 /**
  * Represents a dependency of an artifact. The {@link #getChildren()} artifacts are
@@ -46,11 +46,13 @@ import org.netbeans.api.annotations.common.CheckForNull;
  * <p>
  * Children may be lazy-computed. Avoid traversing to children unless they are really needed.
  * <p>
- * The hashCode and equals favorize artifact over project specification. Scope is not taken into account.
+ * The hashCode and equals favor artifact over project specification. Scope is not taken into account.
  * <p>
  * {@link #getProjectData()} contains implementation-specific data. They should be filled on output from the queries, to allow further
  * inspection using project or technology-specific APIs. Clients are advised to use Dependency instances obtained from queries in API
  * calls.
+ * <p>
+ * The Dependency may indirectly (through project data or suppliers) hold a reference on its originating {@link DependencyResult}. 
  * 
  * @author sdedic
  */
@@ -77,7 +79,7 @@ public final class Dependency {
     /**
      * Lazily provides the linked node. One time, then cleared.
      */
-    private Supplier<Dependency>  originalProvider;
+    private volatile Supplier<Dependency>  originalProvider;
     
     /**
      * Implementation-specific data, possibly {@code null}
@@ -165,6 +167,13 @@ public final class Dependency {
         return Objects.equals(this.project, other.project);
     }
 
+    /**
+     * Returns children of the dependency. If children area lazily computed, the
+     * method materializes the child Dependency instances. Depending on
+     * query options, the children may be enumerated in project-declaration order.
+     * 
+     * @return list of children.
+     */
     public List<Dependency> getChildren() {
         List<Dependency> resolved = this.children;
         if (resolved != null) {
@@ -271,13 +280,13 @@ public final class Dependency {
     /**
      * Creates an artifact dependency. The artifact need not physically exist on the filesystem, but its coordinates
      * must be known. 
-     * @param artifact
-     * @param scope
-     * @param children
-     * @param data
-     * @return 
+     * @param artifact artifact of this dependency
+     * @param scope scope of the dependency
+     * @param children precomputed list of children, can be {@code null}.
+     * @param data project-specific data
+     * @return Dependency instance
      */
-    public static Dependency create(ArtifactSpec artifact, Scope scope, List<Dependency> children, Object data) {
+    public static Dependency create(ArtifactSpec artifact, Scope scope, @NullAllowed List<Dependency> children, Object data) {
         return new Dependency(null, artifact, children, scope, null, data);
     }
     
@@ -291,33 +300,34 @@ public final class Dependency {
      * @param scope usage of the dependency
      * @param children children of the dependency, can be {@code null}
      * @param data implementation-defined data
-     * @return 
+     * @return Dependency instance.
      */
-    public static Dependency create(ProjectSpec project, ArtifactSpec artifact, Scope scope, List<Dependency> children, Object data) {
+    public static Dependency create(ProjectSpec project, ArtifactSpec artifact, Scope scope, @NullAllowed List<Dependency> children, Object data) {
         return new Dependency(project, artifact, children, scope, null, data);
     }
     
     /**
      * Makes a copy of the Dependency. Copy has no children; all other properties are copied. Use {@link Builder#addChildren(java.util.Collection)}
-     * to copy over children references.
+     * to copy over children references. This method ensures that all future-added Dependency properties are copied. The caller
+     * can then override the values it needs to change.
      * 
      * @param blueprint the Dependency to copy
+     * @param includeChildren clones the blueprint's dependencies.
      * @return copied instance.
      */
-    public static Builder copy(Dependency blueprint) {
+    public static Builder copy(Dependency blueprint, boolean includeChildren) {
         return new Builder(blueprint.getArtifact(), blueprint.getScope(), blueprint.getProjectData()).
-                project(blueprint.getProject()).
-                linkOriginal(blueprint.getOriginal());
+                project(blueprint.getProject());
     }
     
     /**
      * Creates a builder for the dependency for a artifact-based dependency.
      * @param spec artifact specification
      * @param scope dependency scope
-     * @param data
-     * @return 
+     * @param data project-specific data.
+     * @return builder builder
      */
-    public static Builder builder(ArtifactSpec spec, Scope scope, Object data) {
+    public static Builder builder(ArtifactSpec spec, Scope scope, @NullAllowed Object data) {
         return new Builder(spec, scope, data);
     }
     
@@ -325,10 +335,10 @@ public final class Dependency {
      * Creates a builder for the dependency for a artifact-based dependency.
      * @param spec artifact specification
      * @param scope dependency scope
-     * @param data
-     * @return 
+     * @param data project specific data
+     * @return builder instance 
      */
-    public static Builder builder(ProjectSpec spec, Scope scope, Object data) {
+    public static Builder builder(ProjectSpec spec, Scope scope, @NullAllowed Object data) {
         return new Builder(spec, scope, data);
     }
 
@@ -380,7 +390,7 @@ public final class Dependency {
         
         /**
          * Adds lazy-computed children to the dependency. The provider function will
-         * be called once to resolve children. Can not be combined with addChildren methods.
+         * be called once to resolve children. Can not be combined with {@link #addChildren} methods.
          * @param provider resolver
          * @return builder instance.
          */
@@ -393,11 +403,12 @@ public final class Dependency {
         }
         
         /**
-         * Adds children to the dependency. 
+         * Adds children to the dependency. Exclusive with {@link #children(java.util.function.Function)} method. If used,
+         * will remove any previous child provider.
          * @param children children to add.
          * @return builder instance.
          */
-        public Builder addChildren(Collection<Dependency> children) {
+        public Builder children(Collection<Dependency> children) {
             this.childSupplier = null;
             if (this.children == null) {
                 this.children = new ArrayList<>();
@@ -409,21 +420,23 @@ public final class Dependency {
         }
         
         /**
-         * Adds children to the dependency.
+         * Adds children to the dependency. Exclusive with {@link #children(java.util.function.Function)} method. If used,
+         * will remove any previous child provider.
          * 
          * @param children children
          * @return builder instance.
          */
-        public Builder addChildren(Dependency... children) {
+        public Builder children(Dependency... children) {
             this.childSupplier = null;
             if (children == null) {
                 return this;
             }
-            return addChildren(Arrays.asList(children));
+            return children(Arrays.asList(children));
         }
         
         /**
-         * Links the dependency to an original.
+         * Links the dependency to an original. Exclusive with {@link #linkOriginal(java.util.function.Supplier)},
+         * calling with non-null "orig" will remove supplier.
          * @param orig original dependency
          * @return builder instance
          */
@@ -497,14 +510,14 @@ public final class Dependency {
          * Scans the dependency result, from its root node.
          * @param r the result
          * @param p the parameter
-         * @return result of the traceresal
+         * @return result of the scan
          */
         public final R scan(DependencyResult r, P p) {
             return scan(Path.of(r), p);
         }
         
         /**
-         * Scans a dependency subtree at "path'
+         * Scans a dependency subtree at "path"
          * @param p parameter
          * @return scanning result
          */
@@ -593,6 +606,10 @@ public final class Dependency {
             this.leaf = leaf;
         }
         
+        /**
+         * Returns the current dependency.
+         * @return the current Dependency instance.
+         */
         public Dependency getLeaf() {
             return leaf;
         }
@@ -633,6 +650,13 @@ public final class Dependency {
             return parent;
         }
         
+        /**
+         * Creates a Path detached from a {@link DependencyResult}. This Path can be
+         * seen as a 'relative' and can be appended to other Path.
+         * 
+         * @param deps dependencies on the path
+         * @return Path instance.
+         */
         public static final Path detached(Collection<Dependency> deps) {
             Path p = null;
             for (Dependency d : deps) {
@@ -719,9 +743,8 @@ public final class Dependency {
         }
         
         /**
-         * Creates an iterator that enumerates dependencies starting from this one
-         * up to the root. It is the reverse of {@link #listFromRoot()}.
-         * @return iterator that enumerates dependencies towards the root.
+         * Creates an iterator that enumerates dependencies from the root to this
+         * one. This instance is enumerated as the last one.
          */
         @Override
         public Iterator<Dependency> iterator() {
