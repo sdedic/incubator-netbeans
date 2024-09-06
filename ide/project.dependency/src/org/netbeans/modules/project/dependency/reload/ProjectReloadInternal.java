@@ -526,7 +526,7 @@ public class ProjectReloadInternal {
             }
         }
         
-        StateRef ref;
+        StateRef ref = null;
         
         // try to keep alive for the length of the operation.
         ProjectState oldS = null;
@@ -557,10 +557,8 @@ public class ProjectReloadInternal {
             }
         } finally {
             if (oldS != null) {
-                // some harmless thing that the optimizer cannot throw away and GC oldS prematurely.
-                synchronized (oldS) {
-                    oldS.notify();
-                }
+                // assume ref must not be null
+                ref.toDetach.checkFileTimestamps();
             }
             endOperation(p, null, null);
         }

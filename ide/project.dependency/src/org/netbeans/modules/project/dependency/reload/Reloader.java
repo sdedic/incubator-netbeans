@@ -684,7 +684,19 @@ public final class Reloader {
             if (q != null && q.isWorseThan(request.getMinQuality())) {
                 break;
             }
-            if (!d.loadedData.isConsistent() || !d.loadedData.isValid()) {
+            if (!d.loadedData.isValid()) {
+                break;
+            }
+            long ts = d.loadedData.getTimestamp();
+            Collection<FileObject> fos = d.loadedData.getFiles();
+            for (FileObject f : fos) {
+                f.refresh();
+                if (f.lastModified().getTime() > ts) {
+                    d.loadedData.fireChanged(false, true);
+                    break;
+                }
+            }
+            if (!d.loadedData.isConsistent() && request.isConsistent()) {
                 break;
             }
             if (lastRetries.contains(d)) {

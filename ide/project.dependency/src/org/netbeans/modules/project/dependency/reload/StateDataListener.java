@@ -93,6 +93,32 @@ class StateDataListener extends FileChangeAdapter implements ProjectStateListene
         for (ProjectReloadImplementation.ProjectStateData<?> d : parts.values()) {
             ReloadSpiAccessor.get().addProjectStateListener(d, this);
         }
+        checkFileTimestamps();
+    }
+
+
+    public void checkFileTimestamps() {
+        ProjectState s = tracker.get();
+        if (s == null) {
+            return;
+        }
+        Map<FileObject, Collection<ProjectStateData>> wf = watchedFiles;
+        for (Map.Entry<FileObject, Collection<ProjectStateData>> e : wf.entrySet()) {
+            FileObject f = e.getKey();
+            f.refresh();
+            long t = f.lastModified().getTime();
+            for (ProjectStateData d : e.getValue()) {
+                if (!d.isConsistent() || !d.isValid()) {
+                    continue;
+                }
+                if (d.getTimestamp() < t) {
+                    if (LOG.isLoggable(Level.FINE)) {
+                        LOG.log(Level.FINER, "CHECK {0}: StateData not consistent: {1}", new Object[] { s.toString(), d.toString() });
+                    }
+                    d.fireChanged(false, true);
+                }
+            }
+        }
     }
 
     @Override
@@ -263,7 +289,7 @@ class StateDataListener extends FileChangeAdapter implements ProjectStateListene
 
     @Override
     public void fileChanged(FileEvent fe) {
-        reportFile(fe.getFile(), -1);
+        reportFile(fe.getFile(), fe.getFile().lastModified().getTime());
     }
 
     @Override
@@ -290,8 +316,8 @@ class StateDataListener extends FileChangeAdapter implements ProjectStateListene
                 }
                 ReloadApiAccessor.get().updateProjectState(state, true, false, ch, ed, null);
             }
+            watchedFiles.getOrDefault(f, Collections.emptyList()).forEach(d -> d.fireChanged(false, true));
         }
-        watchedFiles.getOrDefault(f, Collections.emptyList()).forEach(d -> d.fireChanged(false, true));
     }
     
 }
