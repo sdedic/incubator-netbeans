@@ -166,7 +166,7 @@ public interface ProjectReloadImplementation<D> {
             this.timestamp = timestamp;
             this.projectData = projectData;
             this.error = error;
-            if (!valid && LOG.isLoggable(Level.FINER)) {
+            if (!valid && quality != Quality.NONE && LOG.isLoggable(Level.FINER)) {
                 LOG.log(Level.FINER, "Created invalid state data {0}", toString());
                 LOG.log(Level.FINER, "Origin", new Throwable());
             }
@@ -351,7 +351,7 @@ public interface ProjectReloadImplementation<D> {
         }
         
         Set<Class> getInconsistencies() {
-            return new HashSet<>(inconsistencies);
+            return inconsistencies == null ? Collections.emptySet() : new HashSet<>(inconsistencies);
         }
 
         synchronized void addListener(ProjectStateListener l) {
@@ -767,7 +767,8 @@ public interface ProjectReloadImplementation<D> {
         }
         
         public <T> T ensureLoadContext(Class<T> clazz, Supplier<T> factory) {
-            if (loadContext == null) {
+            T lc = getLoadContext(clazz);
+            if (lc == null) {
                 loadContext = factory.get();
             }
             return (T)loadContext;

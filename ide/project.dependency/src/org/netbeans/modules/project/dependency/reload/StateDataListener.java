@@ -94,6 +94,7 @@ class StateDataListener extends FileChangeAdapter implements ProjectStateListene
             ReloadSpiAccessor.get().addProjectStateListener(d, this);
         }
         checkFileTimestamps();
+        checkInconsistencies();
     }
 
 
@@ -103,21 +104,16 @@ class StateDataListener extends FileChangeAdapter implements ProjectStateListene
             return;
         }
         Map<FileObject, Collection<ProjectStateData>> wf = watchedFiles;
-        for (Map.Entry<FileObject, Collection<ProjectStateData>> e : wf.entrySet()) {
-            FileObject f = e.getKey();
-            f.refresh();
-            long t = f.lastModified().getTime();
-            for (ProjectStateData d : e.getValue()) {
-                if (!d.isConsistent() || !d.isValid()) {
-                    continue;
-                }
-                if (d.getTimestamp() < t) {
-                    if (LOG.isLoggable(Level.FINE)) {
-                        LOG.log(Level.FINER, "CHECK {0}: StateData not consistent: {1}", new Object[] { s.toString(), d.toString() });
-                    }
-                    d.fireChanged(false, true);
-                }
-            }
+        Reloader.checkFileTimestamps(s, wf);
+    }
+
+    void checkInconsistencies() {
+        ProjectState s = tracker.get();
+        if (s == null) {
+            return;
+        }
+        for (ProjectStateData d : parts.values()) {
+            Reloader.markInconsistencies(d, null, parts, s);
         }
     }
 

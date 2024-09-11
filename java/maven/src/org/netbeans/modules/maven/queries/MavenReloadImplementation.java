@@ -83,6 +83,11 @@ public class MavenReloadImplementation implements ProjectReloadImplementation, P
             lastData.clear();
         }
     }
+    
+    // test only
+    ProjectStateData getLastCachedData() {
+        return lastData.get();
+    }
 
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
