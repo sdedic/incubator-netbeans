@@ -24,13 +24,15 @@ import java.util.concurrent.CompletableFuture;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.netbeans.api.project.Project;
 import org.netbeans.modules.java.lsp.server.files.OpenedDocuments;
+import org.netbeans.modules.java.lsp.server.protocol.NbCodeLanguageClient;
 import org.openide.filesystems.FileObject;
+import org.openide.util.Lookup;
 
 /**
  *
  * @author sdedic
  */
-public interface LspServerState {
+public interface LspServerState extends Lookup.Provider {
     /**
      * Returns a Future that completes on initial project open. Use to shortcut
      * service responses during server's initialization:
@@ -114,4 +116,12 @@ public interface LspServerState {
      * @return list of workspace folders
      */
     public List<FileObject> getClientWorkspaceFolders();
+    
+    /**
+     * Provides access to the attached LSP client. The client instance may be missing in early
+     * initialization stages. It must be available at the time the initialization messages is received, 
+     * and its value will not change from that time on.
+     * @return the client instance
+     */
+    public NbCodeLanguageClient getClient();
 }
