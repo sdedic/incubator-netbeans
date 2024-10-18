@@ -46,6 +46,7 @@ import java.util.logging.Logger;
 import com.google.gson.InstanceCreator;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import java.util.LinkedHashMap;
 import java.util.prefs.Preferences;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -123,6 +124,7 @@ import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.modules.java.lsp.server.LspGsonSetup;
 import org.netbeans.modules.java.lsp.server.LspServerState;
 import org.netbeans.modules.java.lsp.server.LspSession;
+import org.netbeans.modules.java.lsp.server.LspSessionService;
 import org.netbeans.modules.java.lsp.server.Utils;
 import org.netbeans.modules.java.lsp.server.explorer.LspTreeViewServiceImpl;
 import org.netbeans.modules.java.lsp.server.explorer.api.NodeChangedParams;
@@ -182,7 +184,7 @@ public final class Server {
 
     public static NbLspServer launchServer(Pair<InputStream, OutputStream> io, LspSession session) {
         LanguageServerImpl server = new LanguageServerImpl(session);
-        ConsumeWithLookup msgProcessor = new ConsumeWithLookup(server.getSessionLookup());
+        ConsumeWithLookup msgProcessor = new ConsumeWithLookup(session.getLookup());
         Launcher<NbCodeLanguageClient> serverLauncher = createLauncher(server, io, msgProcessor::attachLookup, msgProcessor::addService);
         NbCodeLanguageClient remote = serverLauncher.getRemoteProxy();
         ((LanguageClientAware) server).connect(remote);
@@ -415,7 +417,35 @@ public final class Server {
         private final TextDocumentServiceImpl textDocumentService = new TextDocumentServiceImpl(this);
         private final WorkspaceServiceImpl workspaceService = new WorkspaceServiceImpl(this);
         private final InstanceContent   sessionServices = new InstanceContent();
-        private final AbstractLookup sessionOnly = new AbstractLookup(sessionServices);
+        /**
+         * Just instances of services.
+         */
+        private final AbstractLookup sessionServicesLookup = new AbstractLookup(sessionServices);
+        /**
+         * Controls the {@link #sessionOnly}
+         */
+        private final ProxyLookup.Controller sessionController = new ProxyLookup.Controller();
+        
+        /**
+         * Complete session-only lookup.
+         */
+        private final Lookup sessionOnly = new ProxyLookup(sessionController);
+
+        /**
+         * Session Lookup, including the Default lookup.
+         * SessionLookup:
+         * <ul>
+         * <li>sessionParts == sessionController
+         *      <ul>
+         *          <li>lookups contributed by services
+         *          <li>sessionServicesLookup
+         *          <li>LspSession.getLookup
+         *      </ul>
+         * <li>
+         * <li>Lookup.getDefault()
+         * </ul>
+         * 
+         */
         private final Lookup sessionLookup = new ProxyLookup(
                 sessionOnly,
                 Lookup.getDefault()
@@ -465,10 +495,22 @@ public final class Server {
         
         LanguageServerImpl(LspSession session) {
             this.lspSession = session;
+            sessionServices.add(openedDocuments);
+            sessionController.setLookups(sessionServicesLookup);
         }
 
         private Lookup getSessionLookup() {
             return lspSession.getLookup();
+        }
+        
+        @Override
+        public Lookup getLookup() {
+            return lspSession.getLookup();
+        }
+        
+        @Override
+        public NbCodeLanguageClient getClient() {
+            return client;
         }
         
         /**
@@ -860,8 +902,7 @@ public final class Server {
             }
         }
 
-        private InitializeResult constructInitResponse(InitializeParams init, JavaSource src, NbCodeClientCapabilities capa) {
-            ServerCapabilities capabilities = new ServerCapabilities();
+        private InitializeResult constructInitResponse(ServerCapabilities capabilities, InitializeParams init, JavaSource src, NbCodeClientCapabilities capa) {
             if (src != null) {
                 TextDocumentSyncOptions textDocumentSyncOptions = new TextDocumentSyncOptions();
                 textDocumentSyncOptions.setChange(TextDocumentSyncKind.Incremental);
@@ -955,6 +996,35 @@ public final class Server {
             client.setClientCaps(capa);
             hackConfigureGroovySupport(capa);
             hackNoReuseOfOutputsForAntProjects();
+            
+            List<LspSessionService> toInitialize = new ArrayList<>();
+            for (LspSessionService.Factory f : Lookup.getDefault().lookupAll(LspSessionService.Factory.class)) {
+                try {
+                    LspSessionService o = f.create(this);
+                    if (o != null) {
+                        LOG.log(Level.FINE, "Created LSP service: {0}", o);
+                        toInitialize.add(o);
+                        sessionServices.add(o);
+                    }
+                } catch (Exception | Error ex) {
+                    LOG.log(Level.SEVERE, "Error creating session service using {0}", f);
+                }
+            }
+            Map<LspSessionService, CompletableFuture<Consumer<ServerCapabilities>>> initializers = new LinkedHashMap<>();
+            for (LspSessionService s : new ArrayList<>(toInitialize)) {
+                try {
+                    LOG.log(Level.FINE, "Initializing LSP service: {0}", s);
+                    CompletableFuture<Consumer<ServerCapabilities>> initF = s.initialize(this, init);
+                    if (initF != null) {
+                        LOG.log(Level.FINE, "LSP service initializer registered (finished: {1}): {0}", new Object[] { s, initF.isDone() });
+                        initializers.put(s, initF);
+                    }
+                } catch (Exception | Error ex) {
+                    LOG.log(Level.SEVERE, "Error initializing LSP service using {0}", s);
+                    toInitialize.remove(s);
+                }
+            }
+            
             List<FileObject> projectCandidates = new ArrayList<>();
             List<WorkspaceFolder> folders = init.getWorkspaceFolders();
             if (folders != null) {
@@ -1018,15 +1088,46 @@ public final class Server {
             }).thenApply(this::showIndexingCompleted);
 
             initializeOptions();
-
+            
             workspaceService.setClientWorkspaceFolders(init.getWorkspaceFolders());
 
             // but complete the InitializationRequest independently of the project initialization.
-            return CompletableFuture.completedFuture(
-                    finishInitialization(
-                        constructInitResponse(init, checkJavaSupport(), capa)
-                    )
-            );
+            ServerCapabilities capabilities = new ServerCapabilities();
+            CompletableFuture<Void> f;
+            
+            if (!initializers.isEmpty()) {
+                f = CompletableFuture.allOf(initializers.values().toArray(CompletableFuture[]::new));
+            } else {
+                f = CompletableFuture.completedFuture(null);
+            }
+            return f.thenApply((v) -> {
+                List<Lookup> participants = new ArrayList<>();
+                for (LspSessionService s : initializers.keySet()) {
+                    CompletableFuture<Consumer<ServerCapabilities>> processor = initializers.get(s);
+                    try {
+                        Consumer<ServerCapabilities> c = processor.getNow(null);
+                        if (c != null) {
+                            LOG.log(Level.FINE, "Adjusting server capabilities from  {0}", s);
+                            c.accept(capabilities);
+                        }
+                    } catch (CompletionException ex) {
+                        ex.printStackTrace();
+                        toInitialize.remove(s);
+                    }
+                }
+                for (LspSessionService s : toInitialize) {
+                    Lookup part = s.createLookup();
+                    if (part != null && part != Lookup.EMPTY) {
+                        participants.add(part);
+                    }
+                }
+
+                participants.add(sessionServicesLookup);
+                sessionController.setLookups(participants.toArray(Lookup[]::new));
+                return finishInitialization(
+                    constructInitResponse(capabilities, init, checkJavaSupport(), capa)
+                );
+            });
         }
 
         private void collectProjectCandidates(FileObject fo, List<FileObject> candidates, AtomicBoolean cancel) throws IOException {
@@ -1102,6 +1203,13 @@ public final class Server {
 
         @Override
         public CompletableFuture<Object> shutdown() {
+            sessionLookup.lookupAll(LspSessionService.class).forEach(s -> {
+                try {
+                    s.shutdown(this);
+                } catch (Exception | Error ex) {
+                    LOG.log(Level.SEVERE, "Error shutting down service: {0}", s);
+                }
+            });
             return CompletableFuture.completedFuture(null);
         }
 
