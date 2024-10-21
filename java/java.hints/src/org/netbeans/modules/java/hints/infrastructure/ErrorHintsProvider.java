@@ -179,9 +179,11 @@ public final class ErrorHintsProvider extends JavaParserResultTask {
 
         final Position[] range = getLine(info, d, doc, pos, endPos < 0 ? pos : endPos);
 
+        /*
         if (isCanceled()) {
             return null;
         }
+        */
 
         if (range == null || range[0] == null || range[1] == null) {
             return null;
