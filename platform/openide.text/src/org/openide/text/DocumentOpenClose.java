@@ -729,6 +729,9 @@ final class DocumentOpenClose {
                                 loadDoc.remove(0, loadDoc.getLength());
                             }
                         } catch (BadLocationException ex) {
+                            if (ex.getCause() instanceof IOException) {
+                                throw (IOException)ex.getCause();
+                            }
                             LOG.log(Level.INFO, null, ex);
                         }
                     }
@@ -800,12 +803,8 @@ final class DocumentOpenClose {
                 ces.setPreventModification(true);
                 
             } catch (BadLocationException ex) {
-                if (ex.getCause() instanceof IOException) {
-                    loadIOException = (IOException)ex.getCause();
-                } else {
-                    // Wrap BLE into ISE and throw it as runtime exception
-                    loadRuntimeException = new IllegalStateException(ex);
-                }
+                // Wrap BLE into ISE and throw it as runtime exception
+                loadRuntimeException = new IllegalStateException(ex);
             } catch (IOException ex) {
                 loadIOException = ex; // Handle UQE during reload in upper run()
             }
