@@ -800,8 +800,12 @@ final class DocumentOpenClose {
                 ces.setPreventModification(true);
                 
             } catch (BadLocationException ex) {
-                // Wrap BLE into ISE and throw it as runtime exception
-                loadRuntimeException = new IllegalStateException(ex);
+                if (ex.getCause() instanceof IOException) {
+                    loadIOException = (IOException)ex.getCause();
+                } else {
+                    // Wrap BLE into ISE and throw it as runtime exception
+                    loadRuntimeException = new IllegalStateException(ex);
+                }
             } catch (IOException ex) {
                 loadIOException = ex; // Handle UQE during reload in upper run()
             }
@@ -1026,7 +1030,7 @@ final class DocumentOpenClose {
         
     }
     
-    private final class DocumentRef extends WeakReference<StyledDocument> implements Runnable {
+    final class DocumentRef extends WeakReference<StyledDocument> implements Runnable {
 
         public DocumentRef(StyledDocument doc) {
             super(doc, org.openide.util.Utilities.activeReferenceQueue());
