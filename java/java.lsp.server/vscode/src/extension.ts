@@ -957,6 +957,10 @@ export function activate(context: ExtensionContext): VSNetBeansAPI {
     configuration.initialize(context);
     jdk.initialize(context);
 
+    context.subscriptions.push(vscode.commands.registerCommand("test.workspace.edit", () => {
+        vscode.commands.executeCommand("nbls.test.workspace.edit", vscode.window.activeTextEditor?.document.uri.toString());
+    }));
+
     // register completions:
     launchConfigurations.registerCompletion(context);
     return Object.freeze({
@@ -1390,12 +1394,13 @@ function doActivateWithJDK(specifiedJDK: string | null, context: ExtensionContex
                 // don't ask why vscode mangles URIs this way; in addition, it uses lowercase drive letter ???
                 return `file:///${re[1].toLowerCase()}%3A/${re[2]}`;
             });
-            let ok = true;
+            let count = 0;
             for (let ed of workspace.textDocuments) {
                 let uri = ed.uri.toString();
 
                 if (uriList.includes(uri)) {
                     ed.save();
+                    count++;
                     continue;
                 } 
                 if (uri.startsWith("file:///")) {
@@ -1403,12 +1408,11 @@ function doActivateWithJDK(specifiedJDK: string | null, context: ExtensionContex
                     uri = "file:/" + uri.substring(8);
                     if (uriList.includes(uri)) {
                         ed.save();
-                        continue;
+                        count++;
                     }
                 }
-                ok = false;
             }
-            return ok;
+            return count === uriList.length;
         });
         c.onRequest(InputBoxRequest.type, async param => {
             return await window.showInputBox({ title: param.title, prompt: param.prompt, value: param.value, password: param.password });
