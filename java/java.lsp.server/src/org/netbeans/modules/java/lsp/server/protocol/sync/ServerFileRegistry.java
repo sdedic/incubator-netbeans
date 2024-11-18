@@ -16,36 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.protocol;
+package org.netbeans.modules.java.lsp.server.protocol.sync;
 
-import java.util.List;
-import org.eclipse.xtext.xbase.lib.Pure;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import org.netbeans.modules.java.lsp.server.LspServerState;
+import org.netbeans.modules.java.lsp.server.protocol.NbCodeLanguageClient;
+import org.openide.filesystems.FileObject;
 
 /**
- *
- * @author sdedic
+ * Tracks what documents are opened by a LspServer and what Servers opened
+ * a particular FileObject (URI).
  */
-public class SaveDocumentRequestParams {
-    private List<String> documents;
-
-    public SaveDocumentRequestParams() {
-    }
-
-    public SaveDocumentRequestParams(List<String> documents) {
-        this.documents = documents;
-    }
-
-    @Pure
-    public List<String> getDocuments() {
-        return documents;
-    }
-
-    public void setDocuments(List<String> documents) {
-        this.documents = documents;
-    }
-    
-    @Override
-    public String toString() {
-        return "SaveDocuments[" + documents.toString() + "]";
-    }
+public interface ServerFileRegistry {
+    public <T> CompletableFuture<T> whenClientReady(LspServerState server, Object desc, Function<NbCodeLanguageClient, CompletableFuture<T>> workFactory);
+    public Set<LspServerState> getAttachedServers(FileObject f);
 }

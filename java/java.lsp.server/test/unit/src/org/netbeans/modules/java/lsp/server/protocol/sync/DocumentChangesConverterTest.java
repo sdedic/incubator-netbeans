@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.protocol;
+package org.netbeans.modules.java.lsp.server.protocol.sync;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import javax.swing.text.BadLocationException;
-import javax.swing.text.DefaultStyledDocument;
 import javax.swing.text.Document;
 import javax.swing.text.Position;
 import static junit.framework.TestCase.assertEquals;

@@ -16,11 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.modules.java.lsp.server.protocol;
+package org.netbeans.modules.java.lsp.server.protocol.sync;
 
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -28,11 +31,11 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Function;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
-import org.netbeans.api.editor.document.EditorDocumentUtils;
 import org.netbeans.api.lsp.TextEdit;
 import org.netbeans.lib.editor.util.swing.DocumentUtilities;
 import org.openide.util.Exceptions;
@@ -49,19 +52,48 @@ import org.openide.util.Exceptions;
  * state as the document is modified.
  * <p>
  * It could be also used to normalize a sequence of overlapping TextEdits.
+ * <p>
+ * The Converter can be configured with an initial set of edits, that have happened before
+ * the Convertor started to listen to Document events. Such edits will be considered when computing
+ * the complete set of changes.
+ * <p>
+ * The Convertor tracks text removed by edits: for each edit, the Document's content removed is recorded
+ * and available from {@link #getRemovedParts()}.
+ * <p>
+ * Dev note: this is a copy of org.netbeans.modules.maven.refactoring.dependency.DocumentChanges converter, extended
+ * and bugfixed as a result of more thorough testing. The implementation should be retrofitted into the original class
+ * or better, invent a way how the Maven can get rid of the copy entirely. 
  * @author sdedic
  */
 public class DocumentChangesConverter implements DocumentListener {
-    private final Document document;
-    private boolean adjustPositions;
+    private final Reference<Document> document;
 
     public DocumentChangesConverter(Document document) {
-        this.document = document;
+        this.document = new WeakReference<>(document);
     }
     
     public Document getDocument() {
-        return this.document;
+        return this.document.get();
     }
+    
+    /**
+     * Adds initial edits, from the initial state to the point before this ChangesConverter started
+     * to monitor the document.
+     * @param initialEdits the edits
+     * @param removedText text removed by removal edits
+     * @return this instance.
+     */
+    public DocumentChangesConverter useInitialEdits(List<TextEdit> initialEdits, Map<TextEdit, String> removedText) {
+        this.initialEdits = initialEdits;
+        this.removedStrings.putAll(removedText);
+        return this;
+    }
+    
+    /**
+     * Edits that have been collected since this Converter become active. The
+     * edits must be ordered the same way as from {@link #makeTextEdits()}.
+     */
+    private List<TextEdit> initialEdits = Collections.emptyList();
     
     /**
      * Edits captured from the document.
@@ -78,38 +110,78 @@ public class DocumentChangesConverter implements DocumentListener {
         return true;
     }
     
-    protected void notifyChanged() {}
+    protected void notifyChanged(boolean firstChange) {}
     
     public Map<TextEdit, String> getRemovedParts() {
         return removedEditStrings;
     }
     
+    public synchronized boolean isEmpty() {
+        return recordedEdits.isEmpty() && initialEdits.isEmpty();
+    }
+    
+    public synchronized void adjustEdits(Function<TextEdit, Integer> modifier) throws BadLocationException {
+        List<TextEdit> sorted = new ArrayList<>(recordedEdits);
+        sorted.sort(textEditComparator(recordedEdits));
+        for (int i = 0; i < sorted.size(); i++) {
+            TextEdit e = sorted.get(i);
+            Integer offset = modifier.apply(e);
+            if (offset != null) {
+                TextEdit e2 = new TextEdit(e.getStartOffset() + offset, e.getEndOffset() + offset, e.getNewText());
+                int where = recordedEdits.indexOf(e);
+                recordedEdits.set(where, e2);
+                String rt = removedStrings.remove(e);
+                if (rt != null) {
+                    removedStrings.put(e2, rt);
+                }
+            }
+        }
+    }
+    
     @Override
-    public void insertUpdate(DocumentEvent e) {
+    public synchronized void insertUpdate(DocumentEvent e) {
         if (!isEnabled()) {
             return;
         }
+        Document d = document.get();
+        if (d == null) {
+            return;
+        }
+        boolean empty = false;
         try {
-            String text = document.getText(e.getOffset(), e.getLength());
-            TextEdit edit = new TextEdit(e.getOffset(), e.getOffset(), text);
-            recordedEdits.add(edit);
+            String text = d.getText(e.getOffset(), e.getLength());
+            String addedText = (String)DocumentUtilities.getEventProperty(e, String.class);
+            assert text.equals(addedText);
+            TextEdit edit = new TextEdit(e.getOffset(), e.getOffset(), addedText);
+            synchronized (this) {
+                empty = recordedEdits.isEmpty();
+                recordedEdits.add(edit);
+            }
         } catch (BadLocationException ex) {
             Exceptions.printStackTrace(ex);
         }
-        notifyChanged();
+        notifyChanged(empty);
     }
 
     @Override
-    public void removeUpdate(DocumentEvent e) {
+    public synchronized void removeUpdate(DocumentEvent e) {
         if (!isEnabled()) {
+            return;
+        }
+        Document d = document.get();
+        if (d == null) {
             return;
         }
         String removedText = (String)DocumentUtilities.getEventProperty(e, String.class);
         assert removedText != null : "Every BaseDocument should offer this functionality!";
         TextEdit edit = new TextEdit(e.getOffset(), e.getOffset() + e.getLength(), null);
-        recordedEdits.add(edit);
-        removedStrings.put(edit, removedText);
-        notifyChanged();
+        boolean empty;
+        synchronized (this) {
+            empty = recordedEdits.isEmpty();
+            recordedEdits.add(edit);
+            removedStrings.put(edit, removedText);
+        }
+        notifyChanged(empty);
     }
 
     @Override
@@ -123,6 +195,40 @@ public class DocumentChangesConverter implements DocumentListener {
      * that new instance.
      */
     private List<TextEdit> ordered = new ArrayList<>();
+    
+    public static final Comparator<TextEdit> textEditComparator(List<TextEdit> executionOrder) {
+        return (t1, t2) -> {
+            int d = t1.getStartOffset() - t2.getStartOffset();
+            if (d != 0) {
+                return d;
+            }
+            if (executionOrder != null) {
+                int n1 = executionOrder.indexOf(t1);
+                int n2 = executionOrder.indexOf(t2);
+                if (n1 == -1) {
+                    return 1;
+                } else if (n2 == -1) {
+                    return 1;
+                }
+                return n1 - n2;
+            } else {
+                int n1 = t1.getEndOffset() - t1.getStartOffset();
+                int n2 = t2.getEndOffset() - t2.getStartOffset();
+                int r1 = ((n1 > 0) ? 1 : 0) + (t1.getNewText() != null && !t1.getNewText().isEmpty() ? 1 : 0);
+                int r2 = ((n2 > 0) ? 1 : 0) + (t2.getNewText() != null && !t2.getNewText().isEmpty() ? 1 : 0);
+                if (r1 != r2) {
+                    return r1 - r2;
+                }
+                if (n1 > 0 && n2 < 0) {
+                    return -1;
+                } else if (n2 > 0 && n1 < 0) {
+                    return 1;
+                } else {
+                    return System.identityHashCode(t1) - System.identityHashCode(t2);
+                }
+            }
+        };
+    }
     
     // must process events in the edit queue. Must insert into 'ordered' first !
     private final TreeSet<TextEdit> condensed = new TreeSet<TextEdit>((TextEdit t1, TextEdit t2) -> {
@@ -181,12 +287,14 @@ public class DocumentChangesConverter implements DocumentListener {
      * 
      * @return series of non-overlapping edits.
      */
-    public List<TextEdit> makeTextEdits() {
+    public synchronized List<TextEdit> makeTextEdits() {
         ordered.clear();
+        ordered.addAll(initialEdits);
         ordered.addAll(recordedEdits);
         removedEditStrings.clear();
         removedEditStrings.putAll(removedStrings);
         condensed.clear();
+        condensed.addAll(initialEdits);
         
         T: for (int i = 0; i < recordedEdits.size(); i++) {
             TextEdit t = recordedEdits.get(i);

@@ -36,6 +36,7 @@ public final class OpenedDocuments {
 
     private final Map<String, Document> openedDocuments = new ConcurrentHashMap<>();
     private final List<Consumer<String>> openedConsumers = new ArrayList<>();
+    private final List<Consumer<String>> closedConsumers = new ArrayList<>();
 
     /**
      * Get URIs of opened documents.
@@ -71,9 +72,36 @@ public final class OpenedDocuments {
      * Notify that a document was closed.
      */
     public Document notifyClosed(String uri) {
+        synchronized (closedConsumers) {
+            for (Consumer<String> c : closedConsumers) {
+                c.accept(uri);
+            }
+        }
         return openedDocuments.remove(uri);
     }
 
+    /**
+     * Add a consumer to be notified with URIs of opened documents.
+     * The added consumer is notified with the already opened documents immediately.
+     */
+    public void addClosedConsumer(Consumer<String> openedConsumer) {
+        synchronized (closedConsumers) {
+            closedConsumers.add(openedConsumer);
+        }
+        for (String uri : getUris()) {
+            openedConsumer.accept(uri);
+        }
+    }
+
+    /**
+     * Remove a consumer that was previously added.
+     */
+    public void removeClosedConsumer(Consumer<String> openedConsumer) {
+        synchronized (closedConsumers) {
+            closedConsumers.remove(openedConsumer);
+        }
+    }
+    
     /**
      * Add a consumer to be notified with URIs of opened documents.
      * The added consumer is notified with the already opened documents immediately.

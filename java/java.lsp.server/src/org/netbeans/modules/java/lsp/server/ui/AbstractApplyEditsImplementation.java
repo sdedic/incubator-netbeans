@@ -24,6 +24,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.logging.Logger;
 import org.eclipse.lsp4j.ApplyWorkspaceEditParams;
 import org.eclipse.lsp4j.ApplyWorkspaceEditResponse;
@@ -141,32 +142,64 @@ public class AbstractApplyEditsImplementation implements ApplyEditsImplementatio
             }
         }
         
+        private CompletableFuture<Void> performSave(CompletableFuture<Void> response) {
+            Function<Void, CompletableFuture<Void>> f = (v) -> client.requestDocumentSave(new SaveDocumentRequestParams(new ArrayList<>(processed)))
+            .thenAccept(success -> {
+                saved.addAll(processed);
+            });
+            if (response == null) {
+                return f.apply(null);
+            } else {
+                return response.thenCompose(f);
+            }
+        }
+        
         public CompletableFuture<Void> execute() {
             CompletableFuture<Void> response = null;
             if (edits.isEmpty()) {
                 return CompletableFuture.completedFuture(null);
             }
             for (WorkspaceEdit e : edits) {
-                currentEdit = e;
+                List<Union2<TextDocumentEdit, ResourceOperation>> filtered = new ArrayList<>();
+                List<String> emptyDocs = new ArrayList<>();
+                boolean changed = false;
+                for (Union2<TextDocumentEdit, ResourceOperation> ch : e.getDocumentChanges()) {
+                    if (ch.hasFirst()) {
+                        TextDocumentEdit te = ch.first();
+                        if (te.getEdits() == null || te.getEdits().isEmpty()) {
+                            emptyDocs.add(te.getDocument());
+                            changed = true;
+                            continue;
+                        }
+                    }
+                    filtered.add(ch);
+                }
+                if (filtered.isEmpty()) {
+                    if (doSave) {
+                        processed.addAll(emptyDocs);
+                        continue;
+                    }
+                } 
+                if (changed) {
+                    currentEdit = new WorkspaceEdit(filtered);
+                } else {
+                    currentEdit = e;
+                }
                 
                 CompletableFuture<ApplyWorkspaceEditResponse> next;
                 
                 if (response == null) {
-                    next = client.applyEdit(new ApplyWorkspaceEditParams(Utils.workspaceEditFromApi(e, null, client)));
+                    next = client.applyEdit(new ApplyWorkspaceEditParams(Utils.workspaceEditFromApi(currentEdit, null, client)));
                 } else {
-                    next = response.thenCompose((v) -> client.applyEdit(new ApplyWorkspaceEditParams(Utils.workspaceEditFromApi(e, null, client))));
+                    next = response.thenCompose((v) -> client.applyEdit(new ApplyWorkspaceEditParams(Utils.workspaceEditFromApi(currentEdit, null, client))));
                 }
-                response = next.thenCompose((r) -> handleClientResponse(e, r));
+                response = next.thenCompose((r) -> handleClientResponse(currentEdit, r));
             }
             
             if (doSave) {
-                return response.thenCompose(v -> client.requestDocumentSave(new SaveDocumentRequestParams(new ArrayList<>(processed))))
-                    .thenApply(success -> {
-                        saved.addAll(processed);
-                        return null;
-                    });
+                return performSave(response);
             } else {
-                return response;
+                return response != null ? response : CompletableFuture.completedFuture(null);
             }
         }
     }

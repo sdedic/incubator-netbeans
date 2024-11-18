@@ -18,6 +18,7 @@
  */
 package org.netbeans.modules.java.lsp.server.protocol;
 
+import org.netbeans.modules.java.lsp.server.protocol.sync.DocumentSyncFilter;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -165,6 +166,7 @@ import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageClientAware;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.netbeans.api.annotations.common.CheckForNull;
+import org.netbeans.api.editor.document.EditorDocumentUtils;
 import org.netbeans.api.editor.mimelookup.MimeLookup;
 import org.netbeans.api.editor.mimelookup.MimeRegistration;
 import org.netbeans.api.java.lexer.JavaTokenId;
@@ -291,6 +293,11 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
     private final Map<String, RequestProcessor.Task> diagnosticTasks = new HashMap<>();
     private final LspServerState server;
     private NbCodeLanguageClient client;
+    
+    /**
+     * Helper delegate to handle synchronization between client and local server changes.
+     */
+    private DocumentSyncFilter editFilter;
 
     TextDocumentServiceImpl(LspServerState server) {
         this.server = server;
@@ -469,6 +476,7 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
     @Override
     public void connect(LanguageClient client) {
         this.client = (NbCodeLanguageClient)client;
+        this.editFilter = Lookup.getDefault().lookup(DocumentSyncFilter.class);
     }
 
     private int[] coloring2TokenType;
@@ -1624,15 +1632,15 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
             // the document may be not opened yet. Clash with in-memory content can happen only if
             // the doc was opened prior to request reception.
             String text = params.getTextDocument().getText();
-            try {
-                if (doc == null) {
-                    doc = ec.openDocument();
-                }
-                updateDocumentIfNeeded(text, doc);
-            } catch (BadLocationException ex) {
-                Exceptions.printStackTrace(ex);
-                //TODO: include stack trace:
-                client.logMessage(new MessageParams(MessageType.Error, ex.getMessage()));
+            boolean update = editFilter == null || editFilter.notifyDidOpenDocument(server, params.getTextDocument().getUri(), text);
+            if (doc == null) {
+                doc = ec.openDocument();
+            }
+            Document fDoc = doc;
+            if (update) {
+                runClientDocumentChange((StyledDocument)doc, true, () -> 
+                    updateDocumentIfNeeded(text, fDoc)
+                );
             }
             server.getOpenedDocuments().notifyOpened(params.getTextDocument().getUri(), doc);
             
@@ -1678,9 +1686,39 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
             //only change in line endings, no need to change the Document content:
             return ;
         }
-
+        
         doc.remove(0, doc.getLength());
         doc.insertString(0, newTextString, null);
+    }
+    
+    void runClientDocumentChange(StyledDocument doc, boolean atomicLock, DocumentSyncFilter.ClientDocumentAction action) {
+        DocumentSyncFilter.ClientDocumentAction a2;
+        if (atomicLock) {
+            // make the runAtomic lock inside client change, so the filter need not to copy document contents.
+            a2 = () -> {
+               BadLocationException[] thrown = new BadLocationException[1];
+               NbDocument.runAtomic(doc, () -> {
+                   try {
+                       action.run();
+                   } catch (BadLocationException ex) {
+                       thrown[0] = ex;
+                   }
+               });
+               if (thrown[0] != null) {
+                   throw thrown[0];
+               }
+           };
+        } else {
+            a2 = action;
+        }
+        try {
+            if (editFilter != null) {
+                editFilter.runClientDocumentChange(a2);
+            }
+        } catch (BadLocationException ex) {
+            Exceptions.printStackTrace(ex);
+            client.logMessage(new MessageParams(MessageType.Error, ex.getMessage()));
+        }
     }
 
     @Override
@@ -1689,18 +1727,29 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
         String uri = params.getTextDocument().getUri();
         Document rawDoc = server.getOpenedDocuments().getDocument(uri);
         if (rawDoc != null) {
+            FileObject f = EditorDocumentUtils.getFileObject(rawDoc);
             StyledDocument doc = (StyledDocument) rawDoc;
-            NbDocument.runAtomic(doc, () -> {
-                for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
-                    try {
+            // run the analysis as atomic edit
+            List<TextDocumentContentChangeEvent> events = new ArrayList<>(params.getContentChanges());
+            
+            runClientDocumentChange(doc, true, () -> {
+                List<TextDocumentContentChangeEvent> events2;
+
+                // filter incoming events for those that really originated on the client. Events that are
+                // fired because of Server's reflected changes should be filtered out.
+                if (editFilter != null && editFilter.checkLocalChangesPending(server, uri, rawDoc)) {
+                    events2 = editFilter.adjustDocumentChanges(server, uri, rawDoc, events);
+                } else {
+                    events2 = events;
+                }
+                if (!events.isEmpty()) {
+                        for (TextDocumentContentChangeEvent change : events2) {
                         int start = Utils.getOffset(doc, change.getRange().getStart());
                         int end   = Utils.getOffset(doc, change.getRange().getEnd());
                         doc.remove(start, end - start);
                         doc.insertString(start, change.getText(), null);
-                    } catch (BadLocationException ex) {
-                        throw new IllegalStateException(ex);
                     }
-                }
+                };
             });
             for (String key : VALID_ERROR_KEYS) {
                 doc.putProperty("lsp-errors-valid-" + key, null);
@@ -1727,6 +1776,9 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
                 }
             }
             if (ec != null) {
+                if (ec.isModified() && ec instanceof CloneableEditorSupport) {
+                    waitForDocumentReload(ec, file, doc);
+                }
                 ec.close();
             }
         } finally {
@@ -1777,27 +1829,43 @@ public class TextDocumentServiceImpl implements TextDocumentService, LanguageCli
         if (LOG.isLoggable(Level.FINE)) {
             LOG.log(Level.FINE, "Refresh done on {0}, timestamp {1}, existing editor: {2}", new Object[] { file, file.lastModified().getTime(), cake });
         }
-        if (cake == null) {
+        waitForDocumentReload(cake, file, null);
+    }
+    
+    private void waitForDocumentReload(EditorCookie ec, FileObject file, Document doc) {
+        if (ec == null) {
+            ec = file != null ? file.getLookup().lookup(EditorCookie.class) : null;
+            if (ec == null && doc != null) {
+                DataObject dObj = (DataObject) doc.getProperty(Document.StreamDescriptionProperty);
+                if (dObj != null) {
+                    ec = dObj.getLookup().lookup(EditorCookie.class);
+                }
+            }
+        }
+        if (ec == null) {
             return;
         }
-        StyledDocument alreadyLoaded = cake.getDocument();
+        StyledDocument alreadyLoaded = ec.getDocument();
         if (alreadyLoaded == null) {
             return;
         }
-        try {
-            // if the FileObject.refresh() only now discovered a change, it have fired an event and initiated a reload, which might
-            // be still pending. Grab the reload task and wait for it:
-            Method reload = CloneableEditorSupport.class.getDeclaredMethod("reloadDocument");
-            reload.setAccessible(true);
-            org.openide.util.Task t = (org.openide.util.Task)reload.invoke(cake);
-            // wait for a limited time, this could be enough for the reload to complete, blocking LSP queue. We do not want to block LSP queue indefinitely:
-            // in case of an error, the server could become unresponsive.
-            if (!t.waitFinished(300)) {
-                LOG.log(Level.WARNING, "{0}: document reload did not finish in 300ms", file);
+        EditorCookie fec = ec;
+        // if the FileObject.refresh() only now discovered a change, it have fired an event and initiated a reload, which might
+        // be still pending. Grab the reload task and wait for it:
+        runClientDocumentChange(alreadyLoaded, false, () -> {
+            try {
+                Method reload = CloneableEditorSupport.class.getDeclaredMethod("reloadDocument");
+                reload.setAccessible(true);
+                org.openide.util.Task t = (org.openide.util.Task)reload.invoke(fec);
+                // wait for a limited time, this could be enough for the reload to complete, blocking LSP queue. We do not want to block LSP queue indefinitely:
+                // in case of an error, the server could become unresponsive.
+                if (!t.waitFinished(300)) {
+                    LOG.log(Level.WARNING, "{0}: document reload did not finish in 300ms", file);
+                }
+            } catch (ReflectiveOperationException | InterruptedException | SecurityException ex) {
+                // nop 
             }
-        } catch (ReflectiveOperationException | InterruptedException | SecurityException ex) {
-            // nop 
-        }
+        });
     }
 
     CompletableFuture<List<? extends Location>> superImplementations(String uri, Position position) {
